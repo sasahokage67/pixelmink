@@ -691,6 +691,83 @@ export const DICTIONARY: Translations = {
     ru: 'Вы сохраняете полное право распоряжаться своими данными. Вы можете в любой момент обновить навыки, изменить профиль или запросить немедленное и необратимое удаление аккаунта в настройках.',
     kz: 'Сіз өз деректеріңіздің толық иесі болып қаласыз. Кез келген уақытта дағдыларыңызды жаңарта аласыз, профиліңізді өзгерте аласыз немесе параметрлер арқылы аккаунтты толық жоюды сұрай аласыз.',
   },
+
+  // Platform Rules & Code of Conduct
+  terms_title: {
+    en: 'Platform Rules & Code of Conduct',
+    ru: 'Правила платформы и кодекс инженеров',
+    kz: 'Платформа ережелері және инженерлер кодексі',
+  },
+  terms_subtitle: {
+    en: 'Standards, barter principles, and conduct rules governing all peer-to-peer exchanges on pixelmink.',
+    ru: 'Регламент, принципы бартера и профессиональные нормы для всех участников платформы pixelmink.',
+    kz: 'pixelmink платформасындағы барлық қатысушыларға арналған регламент, бартер қағидалары мен кәсіби нормалар.',
+  },
+  terms_last_updated: {
+    en: 'Protocol Rules v1.0 • September 2026',
+    ru: 'Правила протокола v1.0 • Сентябрь 2026',
+    kz: 'Хаттама ережелері v1.0 • Қыркүйек 2026',
+  },
+  terms_r1_title: {
+    en: '1. Strict 1:1 Reciprocal Barter (Zero Fiat)',
+    ru: '1. Строгий эквивалентный бартер 1:1 (Без денег)',
+    kz: '1. 1:1 қатаң теңгерімді бартер (Ақшасыз)',
+  },
+  terms_r1_desc: {
+    en: '1 hour of teaching equals exactly 1 hour of learning. Any requests for fiat money, commercial consulting fees, or side payments are strictly prohibited and result in permanent ban.',
+    ru: '1 час обучения равен ровно 1 часу изучения. Любые требования фиатных денег, платных консультаций или денежных вознаграждений категорически запрещены и влекут перманентный бан.',
+    kz: '1 сағат үйрету дәл 1 сағат білім алуға тең. Ақшалай төлем талап ету, ақылы қызмет ұсыну қатаң тыйым салынады және аккаунттың біржола бұғатталуына әкеледі.',
+  },
+  terms_r2_title: {
+    en: '2. Punctuality & Cancellation Policy',
+    ru: '2. Пунктуальность и политика отмены сессий',
+    kz: '2. Ұқыптылық және сессиялардан бас тарту саясаты',
+  },
+  terms_r2_desc: {
+    en: 'Sessions must start on time. Rescheduling or cancellation is permitted at least 2 hours in advance. No-shows without notice deduct 1 credit in favor of the waiting peer.',
+    ru: 'Сессии начинаются строго вовремя. Перенос или отмена допускаются минимум за 2 часа до начала. Неявка без предупреждения приводит к списанию 1 часа в пользу ожидавшего участника.',
+    kz: 'Сессиялар келісілген уақытта басталуы тиіс. Кездесуді ауыстыру немесе тоқтату кемінде 2 сағат бұрын жасалуы керек. Ескертусіз келмеген жағдайда 1 сағат күткен қатысушы пайдасына есептеледі.',
+  },
+  terms_r3_title: {
+    en: '3. Skill Authenticity & Genuine Competence',
+    ru: '3. Достоверность навыков и реальный опыт',
+    kz: '3. Дағдылардың шынайылығы және нақты тәжірибе',
+  },
+  terms_r3_desc: {
+    en: 'List only skills in which you possess verified hands-on production or algorithmic knowledge. Misrepresenting your expertise damages community trust and lowers your matching rating.',
+    ru: 'Указывайте только те компетенции, которыми владеете на практике. Искажение реального опыта разрушает доверие сообщества и снижает рейтинг в алгоритме матчинга.',
+    kz: 'Профильде тек өзіңіз нақты тәжірибеде меңгерген дағдыларды көрсетіңіз. Жалған біліктілік қоғамдастық сенімін жояды және сәйкестендіру рейтингін түсіреді.',
+  },
+  terms_r4_title: {
+    en: '4. Code Confidentiality & NDA Protection',
+    ru: '4. Конфиденциальность закрытого кода и NDA',
+    kz: '4. Жабық код пен NDA құпиялылығы',
+  },
+  terms_r4_desc: {
+    en: 'During screen sharing or live debugging, copying, leaking, recording, or publishing proprietary company code, API credentials, or internal architecture shown by peers is strictly forbidden.',
+    ru: 'Во время совместного дебага и демонстрации экрана строго запрещается копировать, сохранять, распространять или публиковать проприетарный код, API-ключи или коммерческие архитектуры участников.',
+    kz: 'Бірлескен жұмыс және экран көрсету кезінде қатысушылардың жеке немесе компаниялық жабық кодын, API кілттерін таратуға немесе сақтауға қатаң тыйым салынады.',
+  },
+  terms_r5_title: {
+    en: '5. Zero Toxicity & Engineering Respect',
+    ru: '5. Культура общения и нулевая токсичность',
+    kz: '5. Қарым-қатынас мәдениеті және нөлдік токсикалық',
+  },
+  terms_r5_desc: {
+    en: 'Constructive code reviews, mutual respect across all experience levels (from Junior to Staff), and zero tolerance for harassment, arrogance, marketing, or spam.',
+    ru: 'Конструктивная критика, взаимоуважение независимо от грейда инженера и нулевая терпимость к хамству, надменности, спаму и рекламе сторонних платных курсов.',
+    kz: 'Сындарлы кері байланыс, деңгейіне қарамастан кез келген инженерге құрмет көрсету және дөрекілікке, менмендікке, спамға және жарнамаға нөлдік төзімділік.',
+  },
+  terms_r6_title: {
+    en: '6. Honest Post-Session Reviews',
+    ru: '6. Обязательные честные рецензии',
+    kz: '6. Міндетті шынайы пікірлер',
+  },
+  terms_r6_desc: {
+    en: 'Both participants must complete a technical feedback assessment after each call. Reviews calibrate the algorithm to prioritize high-value mentors across the platform.',
+    ru: 'Оба участника обязаны оценить техническую сессию после ее завершения. Отзывы калибруют алгоритм и продвигают наиболее полезных и ответственных менторов.',
+    kz: 'Сессия аяқталғаннан кейін екі қатысушы да техникалық бағалау жазуға міндетті. Пікірлер алгоритмді дәлдеп, ең пайдалы менторларды алға шығарады.',
+  },
 };
 
 interface LanguageContextType {

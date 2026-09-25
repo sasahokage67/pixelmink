@@ -460,10 +460,6 @@ export default function LandingPage() {
               <p className="text-zinc-400 font-sans leading-relaxed text-xs max-w-sm">
                 {t('footer_brand_desc')}
               </p>
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-white/5 border border-white/10 text-[11px] text-zinc-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span>Zero Commercialization • Peer-to-Peer</span>
-              </div>
             </div>
 
             {/* Platform Navigation */}
@@ -511,19 +507,9 @@ export default function LandingPage() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/privacy" className="hover:text-white transition-colors">
+                  <Link href="/terms" className="hover:text-white transition-colors">
                     {t('footer_terms')}
                   </Link>
-                </li>
-                <li>
-                  <a
-                    href="https://github.com/sasahokage67/pixelmink/blob/main/LICENSE"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-white transition-colors"
-                  >
-                    MIT License
-                  </a>
                 </li>
               </ul>
             </div>
