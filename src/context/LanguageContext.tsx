@@ -347,14 +347,39 @@ export const DICTIONARY: Translations = {
     kz: 'Дағдыларды таңдауға өту (02)',
   },
   reg_matrix_title: {
-    en: 'Computer Science Matrix',
-    ru: 'Матрица навыков Computer Science',
-    kz: 'Computer Science дағдылар матрицасы',
+    en: 'Skills Catalog (Ranked by Popularity)',
+    ru: 'Каталог навыков (по популярности)',
+    kz: 'Дағдылар каталогы (танымалдылығы бойынша)',
   },
   reg_matrix_desc: {
-    en: 'Select the topics you can mentor in, and the skills you want to learn.',
-    ru: 'Выберите темы, которым вы можете обучать, и то, что хотите изучить.',
-    kz: 'Үйрете алатын тақырыптарды және үйренгіңіз келетін дағдыларды таңдаңыз.',
+    en: 'Organized from most popular to specialized across Coding, Design, Video, and AI.',
+    ru: 'Отсортировано от самых востребованных к нишевым: Кодинг, Дизайн, Монтаж и ИИ.',
+    kz: 'Ең сұранысқа иеден бастап арнайыға дейін: Бағдарламалау, Дизайн, Монтаж және ЖИ.',
+  },
+  filter_all: {
+    en: 'All',
+    ru: 'Все',
+    kz: 'Барлығы',
+  },
+  filter_coding: {
+    en: '💻 Coding',
+    ru: '💻 Кодинг',
+    kz: '💻 Кодинг',
+  },
+  filter_design: {
+    en: '🎨 Design & 3D',
+    ru: '🎨 Дизайн',
+    kz: '🎨 Дизайн',
+  },
+  filter_video: {
+    en: '🎬 Video & Audio',
+    ru: '🎬 Монтаж',
+    kz: '🎬 Монтаж',
+  },
+  filter_ai: {
+    en: '🤖 AI & ML',
+    ru: '🤖 ИИ',
+    kz: '🤖 ЖИ',
   },
   reg_can_teach: {
     en: 'I Can Teach',
@@ -367,9 +392,9 @@ export const DICTIONARY: Translations = {
     kz: 'Үйренгім келеді',
   },
   reg_search_placeholder: {
-    en: 'Search CS skills (e.g. Rust, PyTorch, Concurrency)...',
-    ru: 'Поиск по CS навыкам (например, Rust, PyTorch, Concurrency)...',
-    kz: 'CS дағдыларын іздеу (мысалы, Rust, PyTorch, Concurrency)...',
+    en: 'Search skills (e.g. Python, Figma, Premiere Pro, ChatGPT, Rust)...',
+    ru: 'Поиск навыков (например, Python, Figma, Premiere Pro, ChatGPT, Blender)...',
+    kz: 'Дағдыларды іздеу (мысалы, Python, Figma, Premiere Pro, ChatGPT, Blender)...',
   },
   reg_btn_to_bio: {
     en: 'Proceed to Bio & Matching (03)',
@@ -412,9 +437,9 @@ export const DICTIONARY: Translations = {
     kz: 'Нақты уақыттағы Identicon превьюі',
   },
   reg_calc_power: {
-    en: 'Calculated Peer Match Power',
-    ru: 'Рассчитанная сила матчинга',
-    kz: 'Есептелген сәйкестік күші',
+    en: 'Network Match Synergy',
+    ru: 'Совпадение с платформой',
+    kz: 'Платформамен сәйкестік',
   },
   reg_instant_overlap: {
     en: 'Instant Network Overlap:',

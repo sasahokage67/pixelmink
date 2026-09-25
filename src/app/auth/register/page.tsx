@@ -32,40 +32,57 @@ import {
 
 interface SkillItem {
   name: string;
-  category: 'Systems' | 'AI & ML' | 'Theory' | 'DevOps' | 'Data' | 'Languages';
+  category: 'Coding' | 'Design' | 'Video' | 'AI';
+  popularityRank: number;
   tag: string;
 }
 
 const CS_SKILL_CATALOG: SkillItem[] = [
-  // Low-Level Systems
-  { name: 'Rust', category: 'Systems', tag: 'Memory Safe' },
-  { name: 'Golang', category: 'Systems', tag: 'Concurrency' },
-  { name: 'C/C++ & Systems', category: 'Systems', tag: 'Kernel / OS' },
-  { name: 'Linux Kernel & OS', category: 'Systems', tag: 'eBPF / POSIX' },
+  // 1. ЯЗЫКИ И КОДИНГ (от самых популярных к нишевым)
+  { name: 'Python', category: 'Coding', popularityRank: 1, tag: '#1 Топ • AI & Backend' },
+  { name: 'JavaScript', category: 'Coding', popularityRank: 2, tag: '#2 Топ • Web & Frontend' },
+  { name: 'TypeScript', category: 'Coding', popularityRank: 3, tag: '#3 Топ • React & Next.js' },
+  { name: 'C++', category: 'Coding', popularityRank: 4, tag: '#4 Популярно • GameDev & Speed' },
+  { name: 'C# / .NET', category: 'Coding', popularityRank: 5, tag: '#5 Популярно • Unity & Backend' },
+  { name: 'Java', category: 'Coding', popularityRank: 6, tag: '#6 Популярно • Enterprise & Android' },
+  { name: 'Golang', category: 'Coding', popularityRank: 7, tag: '#7 Популярно • Микросервисы' },
+  { name: 'Rust', category: 'Coding', popularityRank: 8, tag: '#8 Трендовый • Systems & Safety' },
+  { name: 'PHP', category: 'Coding', popularityRank: 9, tag: '#9 Популярно • Web & Laravel' },
+  { name: 'Kotlin / Swift', category: 'Coding', popularityRank: 10, tag: '#10 Mobile • iOS & Android' },
+  { name: 'SQL & Базы данных', category: 'Coding', popularityRank: 11, tag: '#11 База • PostgreSQL & Data' },
+  { name: 'Docker & DevOps', category: 'Coding', popularityRank: 12, tag: '#12 Инфраструктура • CI/CD' },
+  { name: 'HTML & CSS / Tailwind', category: 'Coding', popularityRank: 13, tag: '#13 Верстка • Адаптивный веб' },
+  { name: 'Алгоритмы и структуры данных', category: 'Coding', popularityRank: 14, tag: '#14 Фундамент • LeetCode & Big O' },
+  { name: 'Linux Kernel & Bash', category: 'Coding', popularityRank: 15, tag: '#15 Системное • Терминал & OS' },
+  { name: 'Low-Level & Ассемблер', category: 'Coding', popularityRank: 16, tag: '#16 Нишевое • Reverse & Ядро' },
 
-  // AI & ML
-  { name: 'PyTorch & AI', category: 'AI & ML', tag: 'Deep Learning' },
-  { name: 'Prompt Engineering & LLMs', category: 'AI & ML', tag: 'RAG & Agents' },
-  { name: 'Computer Vision & OpenCV', category: 'AI & ML', tag: 'YOLO / Tensors' },
+  // 2. ДИЗАЙН И 3D (от самых популярных к нишевым)
+  { name: 'Figma', category: 'Design', popularityRank: 1, tag: '#1 Топ • UI/UX & Прототипы' },
+  { name: 'UI/UX Дизайн', category: 'Design', popularityRank: 2, tag: '#2 Топ • Исследования & Сетки' },
+  { name: 'Photoshop', category: 'Design', popularityRank: 3, tag: '#3 Топ • Растр & Графика' },
+  { name: 'Blender 3D', category: 'Design', popularityRank: 4, tag: '#4 Трендовый • 3D Модели & Рендер' },
+  { name: 'Illustrator', category: 'Design', popularityRank: 5, tag: '#5 Популярно • Вектор & Логотипы' },
+  { name: 'Веб-дизайн & Тильда', category: 'Design', popularityRank: 6, tag: '#6 Популярно • Лендинги & Типографика' },
+  { name: 'Motion Design', category: 'Design', popularityRank: 7, tag: '#7 Популярно • Анимация интерфейсов' },
+  { name: 'Cinema 4D & Octane', category: 'Design', popularityRank: 8, tag: '#8 Pro • 3D Motion & VFX' },
+  { name: '3D Скульптинг (ZBrush)', category: 'Design', popularityRank: 9, tag: '#9 Нишевое • Персонажи & HighPoly' },
 
-  // Theory & Algorithms
-  { name: 'Algorithms & Data Structures', category: 'Theory', tag: 'O(log N)' },
-  { name: 'Linear Algebra & 3D Math', category: 'Theory', tag: 'Tensors' },
+  // 3. МОНТАЖ И ВИДЕО (от самых популярных к нишевым)
+  { name: 'Premiere Pro', category: 'Video', popularityRank: 1, tag: '#1 Топ • Видеомонтаж & YouTube' },
+  { name: 'After Effects', category: 'Video', popularityRank: 2, tag: '#2 Топ • VFX & Моушн-графика' },
+  { name: 'DaVinci Resolve', category: 'Video', popularityRank: 3, tag: '#3 Трендовый • Цветокор & Монтаж' },
+  { name: 'CapCut / Reels / Shorts', category: 'Video', popularityRank: 4, tag: '#4 Топ • Вертикальный контент' },
+  { name: 'FL Studio & Звук (SFX)', category: 'Video', popularityRank: 5, tag: '#5 Популярно • Саунд-дизайн & Голос' },
+  { name: 'Сценарии & Сторителлинг', category: 'Video', popularityRank: 6, tag: '#6 База • Режиссура & Драматургия' },
+  { name: 'Color Grading & LUTs', category: 'Video', popularityRank: 7, tag: '#7 Pro • Кинематографичный цвет' },
+  { name: '3D Трекинг & Кеинг', category: 'Video', popularityRank: 8, tag: '#8 Нишевое • Хромакей & Композитинг' },
 
-  // DevOps & Cloud
-  { name: 'Docker & Containers', category: 'DevOps', tag: 'Rootless' },
-  { name: 'Kubernetes', category: 'DevOps', tag: 'Cluster' },
-  { name: 'Git & GitHub Workflows', category: 'DevOps', tag: 'CI/CD' },
-
-  // Databases & Security
-  { name: 'PostgreSQL & SQL', category: 'Data', tag: 'ACID / Index' },
-  { name: 'Distributed Systems', category: 'Data', tag: 'Consensus' },
-  { name: 'Cybersecurity & Pentest', category: 'Data', tag: 'AppSec' },
-
-  // Languages
-  { name: 'Python', category: 'Languages', tag: 'Backend' },
-  { name: 'TypeScript', category: 'Languages', tag: 'Strict Types' },
-  { name: 'React & Next.js', category: 'Languages', tag: 'App Router' },
+  // 4. ИИ И НЕЙРОСЕТИ (от самых популярных к нишевым)
+  { name: 'Prompt Engineering & ChatGPT', category: 'AI', popularityRank: 1, tag: '#1 Топ • Промпты & GPT-4' },
+  { name: 'Midjourney & Stable Diffusion', category: 'AI', popularityRank: 2, tag: '#2 Топ • Генерация & ComfyUI' },
+  { name: 'PyTorch & Deep Learning', category: 'AI', popularityRank: 3, tag: '#3 Pro • Обучение нейросетей' },
+  { name: 'AI Агенты & RAG Архитектура', category: 'AI', popularityRank: 4, tag: '#4 Трендовый • LLM & Векторные БД' },
+  { name: 'Computer Vision & OpenCV', category: 'AI', popularityRank: 5, tag: '#5 Нишевое • Распознавание объектов' },
 ];
 
 const STOPWORDS = new Set([
@@ -98,6 +115,7 @@ export default function RegisterPage() {
   ]);
 
   const [activeSkillTab, setActiveSkillTab] = useState<'TEACH' | 'LEARN'>('TEACH');
+  const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'Coding' | 'Design' | 'Video' | 'AI'>('ALL');
   const [skillSearch, setSkillSearch] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -113,17 +131,23 @@ export default function RegisterPage() {
     return Array.from(new Set(words)).slice(0, 6);
   }, [bio]);
 
-  // Filter skills by category or search
+  // Filter skills by category and search, strictly sorted by popularity rank (1 to N)
   const filteredSkills = useMemo(() => {
-    if (!skillSearch.trim()) return CS_SKILL_CATALOG;
-    const query = skillSearch.toLowerCase();
-    return CS_SKILL_CATALOG.filter(
-      (s) =>
-        s.name.toLowerCase().includes(query) ||
-        s.category.toLowerCase().includes(query) ||
-        s.tag.toLowerCase().includes(query)
-    );
-  }, [skillSearch]);
+    let list = CS_SKILL_CATALOG;
+    if (selectedCategory !== 'ALL') {
+      list = list.filter((s) => s.category === selectedCategory);
+    }
+    if (skillSearch.trim()) {
+      const query = skillSearch.toLowerCase();
+      list = list.filter(
+        (s) =>
+          s.name.toLowerCase().includes(query) ||
+          s.category.toLowerCase().includes(query) ||
+          s.tag.toLowerCase().includes(query)
+      );
+    }
+    return list.slice().sort((a, b) => a.popularityRank - b.popularityRank);
+  }, [selectedCategory, skillSearch]);
 
   const toggleTeachSkill = (skillName: string) => {
     if (teachSkills.includes(skillName)) {
@@ -498,6 +522,33 @@ export default function RegisterPage() {
                     </button>
                   </div>
 
+                  {/* Category Filter Pills (Coding, Design, Video, AI) */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { id: 'ALL', label: t('filter_all'), count: CS_SKILL_CATALOG.length },
+                      { id: 'Coding', label: t('filter_coding'), count: CS_SKILL_CATALOG.filter((s) => s.category === 'Coding').length },
+                      { id: 'Design', label: t('filter_design'), count: CS_SKILL_CATALOG.filter((s) => s.category === 'Design').length },
+                      { id: 'Video', label: t('filter_video'), count: CS_SKILL_CATALOG.filter((s) => s.category === 'Video').length },
+                      { id: 'AI', label: t('filter_ai'), count: CS_SKILL_CATALOG.filter((s) => s.category === 'AI').length },
+                    ].map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat.id as any)}
+                        className={`px-2.5 py-1 rounded text-[11px] font-mono transition-all flex items-center gap-1.5 ${
+                          selectedCategory === cat.id
+                            ? 'bg-blue-600 text-white font-semibold shadow-sm shadow-blue-500/20'
+                            : 'bg-[#141419] border border-white/[0.08] text-zinc-400 hover:text-zinc-200 hover:border-white/20'
+                        }`}
+                      >
+                        <span>{cat.label}</span>
+                        <span className={`text-[9px] px-1 rounded ${selectedCategory === cat.id ? 'bg-black/20 text-white' : 'bg-white/5 text-zinc-500'}`}>
+                          {cat.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
                   {/* Search Filter */}
                   <div className="relative">
                     <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -511,12 +562,19 @@ export default function RegisterPage() {
                   </div>
 
                   {/* Skills Grid */}
-                  <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
                     {filteredSkills.map((s) => {
                       const isSelected =
                         activeSkillTab === 'TEACH'
                           ? teachSkills.includes(s.name)
                           : learnSkills.includes(s.name);
+
+                      const categoryColors = {
+                        Coding: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+                        Design: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
+                        Video: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+                        AI: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+                      };
 
                       return (
                         <button
@@ -530,8 +588,8 @@ export default function RegisterPage() {
                           className={`p-2.5 rounded text-left border transition-all text-xs font-mono flex flex-col justify-between ${
                             isSelected
                               ? activeSkillTab === 'TEACH'
-                                ? 'bg-emerald-500/15 border-emerald-500/50 text-white'
-                                : 'bg-blue-500/15 border-blue-500/50 text-white'
+                                ? 'bg-emerald-500/15 border-emerald-500/50 text-white shadow-sm shadow-emerald-500/10'
+                                : 'bg-blue-500/15 border-blue-500/50 text-white shadow-sm shadow-blue-500/10'
                               : 'bg-[#141419] border-white/[0.06] text-zinc-400 hover:border-white/20'
                           }`}
                         >
@@ -547,9 +605,11 @@ export default function RegisterPage() {
                               <Plus className="w-3.5 h-3.5 shrink-0 text-zinc-600" />
                             )}
                           </div>
-                          <div className="mt-1 flex items-center justify-between text-[9px] text-zinc-500">
-                            <span>{s.category}</span>
-                            <span className="px-1 py-0.2 rounded bg-white/5 text-zinc-400">
+                          <div className="mt-1.5 flex items-center justify-between text-[9px]">
+                            <span className={`px-1.5 py-0.5 rounded border text-[9px] ${categoryColors[s.category]}`}>
+                              {s.category}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded bg-white/5 text-zinc-400 border border-white/5 truncate max-w-[130px]">
                               {s.tag}
                             </span>
                           </div>
@@ -612,7 +672,7 @@ export default function RegisterPage() {
                     />
                   </div>
 
-                  {/* Summary Box */}
+                  {/* Summary Box (Calculated Peer Match line deleted as requested) */}
                   <div className="p-4 rounded bg-[#111116] border border-white/[0.08] space-y-2 text-xs font-mono">
                     <div className="text-zinc-400">
                       {t('reg_can_teach')}:{' '}
@@ -625,10 +685,6 @@ export default function RegisterPage() {
                       <span className="text-blue-400 font-semibold">
                         {learnSkills.join(', ')}
                       </span>
-                    </div>
-                    <div className="text-zinc-400">
-                      {t('reg_calc_power')}:{' '}
-                      <span className="text-white font-bold">{matchScore}%</span>
                     </div>
                   </div>
 
