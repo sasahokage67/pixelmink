@@ -36,9 +36,9 @@ module.exports = {
         },
       },
       fontFamily: {
-        pixel: ["'Press Start 2P'", "'Pixelify Sans'", "'Silkscreen'", 'monospace'],
-        sans: ["'Pixelify Sans'", "'Press Start 2P'", "'Silkscreen'", 'monospace'],
-        mono: ["'Press Start 2P'", "'Pixelify Sans'", 'monospace'],
+        sans: ["'Inter'", '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ["'JetBrains Mono'", 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+        pixel: ["'Press Start 2P'", 'monospace'],
       },
       borderRadius: {
         pill: '4px',

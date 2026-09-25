@@ -161,7 +161,7 @@ export default function LandingPage() {
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2.5 group">
             <Logo size={28} />
-            <span className="font-pixel text-sm font-bold text-white group-hover:text-blue-400 transition-colors">
+            <span className="text-sm font-bold text-white tracking-tight group-hover:text-blue-400 transition-colors">
               pixelmink
             </span>
           </Link>
@@ -213,26 +213,25 @@ export default function LandingPage() {
         {/* 1. HERO SECTION: DRINKIT-STYLE EDITORIAL TYPOGRAPHY & ZERO SLOP */}
         <section className="relative pt-6 pb-16 border-b border-white/[0.08]">
           <div className="max-w-4xl space-y-6">
-            {/* Status Badge */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#111115] border border-white/10 text-xs font-mono text-zinc-300">
-              <Logo size={18} />
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-              <span className="text-white font-bold tracking-tight">pixelmink</span>
+            {/* Clean Status Badge (Glitch-free, Drinkit style) */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#111115] border border-white/10 text-xs font-mono text-zinc-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-white font-semibold">pixelmink</span>
               <span className="text-zinc-600">•</span>
-              <span className="text-blue-400">{t('protocol_tag')}</span>
+              <span>Genesis Release v1.0</span>
             </div>
 
-            {/* Slogan & Bold Statement */}
-            <div className="space-y-3">
-              <h1 className="text-3xl sm:text-5xl md:text-6xl font-pixel font-bold text-white tracking-tight leading-tight">
+            {/* Slogan & Bold Statement (Clean Inter typography, no broken Cyrillic) */}
+            <div className="space-y-2">
+              <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-white tracking-tight leading-[1.08]">
                 {t('hero_title_1')}
               </h1>
-              <p className="text-2xl sm:text-4xl md:text-5xl font-pixel text-zinc-500 tracking-tight">
+              <p className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-zinc-500 tracking-tight leading-[1.08]">
                 {t('hero_title_2')}
               </p>
             </div>
 
-            <p className="text-xs sm:text-sm text-zinc-400 font-mono max-w-2xl leading-relaxed pt-2">
+            <p className="text-xs sm:text-sm text-zinc-400 font-sans max-w-2xl leading-relaxed pt-1">
               {t('hero_desc')}
             </p>
 
@@ -240,7 +239,7 @@ export default function LandingPage() {
             <div className="flex flex-wrap items-center gap-3 pt-3">
               <Link
                 href="/auth/register"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold tap-active transition-all shadow-lg shadow-blue-600/20"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold tap-active transition-all shadow-lg shadow-blue-600/20"
               >
                 <span>{t('hero_btn_register')}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -248,7 +247,7 @@ export default function LandingPage() {
 
               <Link
                 href="/discover"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded bg-[#131318] hover:bg-[#181820] border border-white/[0.12] text-zinc-300 font-mono text-xs tap-active transition-all"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-[#131318] hover:bg-[#181820] border border-white/[0.12] text-zinc-300 font-mono text-xs tap-active transition-all"
               >
                 <span>{t('hero_btn_explore')}</span>
                 <ArrowUpRight className="w-3.5 h-3.5 text-zinc-500" />
@@ -256,30 +255,30 @@ export default function LandingPage() {
 
               <Link
                 href="/matches"
-                className="inline-flex items-center gap-2 px-4 py-3 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white font-mono text-xs transition-all"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white font-mono text-xs transition-all"
               >
                 <Sparkles className="w-3.5 h-3.5 text-blue-400" />
                 <span>{t('hero_btn_matches')}</span>
               </Link>
             </div>
 
-            {/* Protocol Metrics Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6 border-t border-white/[0.06]">
-              <div className="p-3 rounded bg-[#111114] border border-white/[0.06]">
-                <div className="text-[10px] font-mono uppercase text-zinc-500">{t('metric_exchanged')}</div>
-                <div className="text-lg font-mono font-bold text-white mt-0.5">1,420+ hrs</div>
+            {/* Protocol Startup Spec Bar (Authentic, no fake metrics) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6 border-t border-white/[0.08]">
+              <div className="p-3.5 rounded-xl bg-[#111114] border border-white/[0.08]">
+                <div className="text-[11px] font-mono uppercase text-zinc-500 tracking-wider">{t('spec_stage_title')}</div>
+                <div className="text-sm font-mono font-bold text-white mt-1">{t('spec_stage_val')}</div>
               </div>
-              <div className="p-3 rounded bg-[#111114] border border-white/[0.06]">
-                <div className="text-[10px] font-mono uppercase text-zinc-500">{t('metric_accuracy')}</div>
-                <div className="text-lg font-mono font-bold text-emerald-400 mt-0.5">97.8%</div>
+              <div className="p-3.5 rounded-xl bg-[#111114] border border-white/[0.08]">
+                <div className="text-[11px] font-mono uppercase text-zinc-500 tracking-wider">{t('spec_model_title')}</div>
+                <div className="text-sm font-mono font-bold text-emerald-400 mt-1">{t('spec_model_val')}</div>
               </div>
-              <div className="p-3 rounded bg-[#111114] border border-white/[0.06]">
-                <div className="text-[10px] font-mono uppercase text-zinc-500">{t('metric_cost')}</div>
-                <div className="text-lg font-mono font-bold text-blue-400 mt-0.5">{t('metric_free')}</div>
+              <div className="p-3.5 rounded-xl bg-[#111114] border border-white/[0.08]">
+                <div className="text-[11px] font-mono uppercase text-zinc-500 tracking-wider">{t('spec_cost_title')}</div>
+                <div className="text-sm font-mono font-bold text-blue-400 mt-1">{t('spec_cost_val')}</div>
               </div>
-              <div className="p-3 rounded bg-[#111114] border border-white/[0.06]">
-                <div className="text-[10px] font-mono uppercase text-zinc-500">{t('metric_infra')}</div>
-                <div className="text-lg font-mono font-bold text-zinc-300 mt-0.5">P2P WebRTC</div>
+              <div className="p-3.5 rounded-xl bg-[#111114] border border-white/[0.08]">
+                <div className="text-[11px] font-mono uppercase text-zinc-500 tracking-wider">{t('spec_stack_title')}</div>
+                <div className="text-sm font-mono font-bold text-zinc-300 mt-1">{t('spec_stack_val')}</div>
               </div>
             </div>
           </div>
@@ -293,7 +292,7 @@ export default function LandingPage() {
                 <Sparkles className="w-3 h-3" />
                 {t('sim_badge')}
               </div>
-              <h2 className="text-xl sm:text-2xl font-pixel font-bold text-white tracking-tight mt-1">
+              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-1">
                 {t('sim_title')}
               </h2>
             </div>
@@ -452,7 +451,7 @@ export default function LandingPage() {
               <div className="text-[10px] font-mono uppercase text-emerald-400 tracking-wider">
                 {t('cat_tag')}
               </div>
-              <h2 className="text-xl sm:text-2xl font-pixel font-bold text-white tracking-tight mt-1">
+              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-1">
                 {t('cat_title')}
               </h2>
             </div>
@@ -507,7 +506,7 @@ export default function LandingPage() {
             <div className="text-[10px] font-mono uppercase text-blue-400 tracking-wider">
               {t('rules_tag')}
             </div>
-            <h2 className="text-xl sm:text-2xl font-pixel font-bold text-white tracking-tight mt-1">
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-1">
               {t('rules_title')}
             </h2>
           </div>
@@ -598,7 +597,7 @@ export default function LandingPage() {
             <div className="flex justify-center">
               <Logo size={42} />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-pixel font-bold text-white tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
               {t('manifesto_title_1')}<br />
               {t('manifesto_title_2')}
             </h2>

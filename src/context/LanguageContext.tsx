@@ -103,31 +103,46 @@ export const DICTIONARY: Translations = {
     kz: 'Матчинг алгоритмі',
   },
 
-  // Metrics
-  metric_exchanged: {
-    en: 'Exchanged',
-    ru: 'Обменено часов',
-    kz: 'Алмасылған сағат',
+  // Startup Launch Specs (Authentic, no fake metrics)
+  spec_stage_title: {
+    en: 'Platform Status',
+    ru: 'Статус платформы',
+    kz: 'Платформа кезеңі',
   },
-  metric_accuracy: {
-    en: 'Match Accuracy',
-    ru: 'Точность матчинга',
-    kz: 'Сәйкестік дәлдігі',
+  spec_stage_val: {
+    en: 'Genesis Launch v1.0',
+    ru: 'Открытый запуск v1.0',
+    kz: 'Ашық старт v1.0',
   },
-  metric_cost: {
-    en: 'Cost per Hour',
-    ru: 'Стоимость часа',
-    kz: 'Сағаттық бағасы',
+  spec_model_title: {
+    en: 'Barter Rule',
+    ru: 'Принцип обмена',
+    kz: 'Алмасу қағидаты',
   },
-  metric_free: {
-    en: '$0.00 (Zero Money)',
-    ru: '$0.00 (Только знания)',
-    kz: '$0.00 (Тек білім)',
+  spec_model_val: {
+    en: '1 Hour = 1 Hour',
+    ru: '1 час = 1 час',
+    kz: '1 сағат = 1 сағат',
   },
-  metric_infra: {
-    en: 'Infrastructure',
-    ru: 'Инфраструктура',
-    kz: 'Инфрақұрылым',
+  spec_cost_title: {
+    en: 'Fiat Currency',
+    ru: 'Фиатные деньги',
+    kz: 'Ақшалай төлем',
+  },
+  spec_cost_val: {
+    en: '$0 (Zero Money)',
+    ru: '0 ₸ / 0 ₽ (Без денег)',
+    kz: '0 ₸ (Ақшасыз)',
+  },
+  spec_stack_title: {
+    en: 'Session Stack',
+    ru: 'Связь и сессии',
+    kz: 'Байланыс және бейне',
+  },
+  spec_stack_val: {
+    en: 'P2P WebRTC Direct',
+    ru: 'P2P WebRTC Direct',
+    kz: 'P2P WebRTC Direct',
   },
 
   // Simulator

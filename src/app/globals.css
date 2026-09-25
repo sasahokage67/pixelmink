@@ -1,12 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;500;600;700&family=Silkscreen:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Press+Start+2P&display=swap&subset=cyrillic,cyrillic-ext,latin');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --font-pixel-heading: 'Press Start 2P', monospace;
-  --font-pixel-body: 'Pixelify Sans', 'Press Start 2P', monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-pixel: 'Press Start 2P', monospace;
   --background: #09090b;
   --foreground: #fafafa;
 }
@@ -14,14 +15,24 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-pixel-body);
+  font-family: var(--font-sans);
   overflow-x: hidden;
-  image-rendering: pixelated;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, .font-heading {
-  font-family: var(--font-pixel-heading);
+  font-family: var(--font-sans);
   letter-spacing: -0.03em;
+  font-weight: 700;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.font-pixel {
+  font-family: var(--font-pixel);
 }
 
 /* Custom Minimalist Scrollbar */
@@ -36,23 +47,19 @@ h1, h2, h3, .font-heading {
 
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
-  border-radius: 0px;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
 }
 
-.font-mono {
-  font-family: var(--font-pixel-body);
-}
-
-/* Clean Pixel Card */
+/* Clean Drinkit Minimalist Card */
 .drinkit-card {
   background-color: #111114;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  transition: border-color 0.15s ease-out;
+  border-radius: 12px;
+  transition: border-color 0.15s ease-out, background-color 0.15s ease-out;
 }
 
 .drinkit-card:hover {
@@ -61,10 +68,10 @@ h1, h2, h3, .font-heading {
 
 /* Utilitarian Pill */
 .drinkit-pill {
-  font-family: var(--font-pixel-body);
+  font-family: var(--font-mono);
   font-size: 11px;
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.03);
 }
@@ -74,10 +81,10 @@ h1, h2, h3, .font-heading {
   transform: scale(0.98);
 }
 
-/* Subtle Pixel Matrix Backdrop */
+/* Subtle Grid Backdrop */
 .pixel-grid-bg {
   background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-  background-size: 16px 16px;
+  background-size: 20px 20px;
 }
 
 .pixel-border {
@@ -87,9 +94,3 @@ h1, h2, h3, .font-heading {
 .pixel-border:hover {
   border-color: rgba(255, 255, 255, 0.25);
 }
-
-.font-pixel-title {
-  font-family: var(--font-pixel-heading);
-  letter-spacing: -0.03em;
-}
-
