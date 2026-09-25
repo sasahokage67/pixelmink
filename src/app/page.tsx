@@ -173,9 +173,9 @@ export default function LandingPage() {
 
       {/* MAIN LANDING BODY */}
       <div className="max-w-6xl mx-auto px-4 md:px-8 space-y-24 py-8">
-        {/* 1. HERO SECTION: DRINKIT-STYLE EDITORIAL TYPOGRAPHY & ZERO SLOP */}
-        <section className="relative pt-6 pb-16 border-b border-white/[0.08]">
-          <div className="max-w-4xl space-y-6">
+        {/* 1. HERO SECTION: CENTERED SYMMETRICAL EDITORIAL LAYOUT */}
+        <section className="relative pt-8 pb-16 border-b border-white/[0.08]">
+          <div className="max-w-3xl mx-auto text-center space-y-6 flex flex-col items-center">
 
             {/* Slogan & Bold Statement (Press Start 2P Retro Pixel Typography) */}
             <div className="space-y-4">
@@ -187,12 +187,12 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <p className="text-xs sm:text-sm text-zinc-400 font-sans max-w-2xl leading-relaxed pt-1">
+            <p className="text-xs sm:text-sm text-zinc-400 font-sans max-w-2xl mx-auto leading-relaxed pt-1">
               {t('hero_desc')}
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-wrap items-center gap-3 pt-3">
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
               <Link
                 href="/auth/register"
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold tap-active transition-all shadow-lg shadow-blue-600/20"
@@ -211,16 +211,16 @@ export default function LandingPage() {
             </div>
 
             {/* Protocol Startup Spec Bar (Authentic, 3-column) */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-6 border-t border-white/[0.08]">
-              <div className="p-3.5 rounded-xl bg-[#111114] border border-white/[0.08]">
+            <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-3 pt-8 border-t border-white/[0.08]">
+              <div className="p-3.5 rounded-xl bg-[#111114] border border-white/[0.08] text-center">
                 <div className="text-[11px] font-mono uppercase text-zinc-500 tracking-wider">{t('spec_stage_title')}</div>
                 <div className="text-sm font-mono font-bold text-white mt-1">{t('spec_stage_val')}</div>
               </div>
-              <div className="p-3.5 rounded-xl bg-[#111114] border border-white/[0.08]">
+              <div className="p-3.5 rounded-xl bg-[#111114] border border-white/[0.08] text-center">
                 <div className="text-[11px] font-mono uppercase text-zinc-500 tracking-wider">{t('spec_model_title')}</div>
                 <div className="text-sm font-mono font-bold text-emerald-400 mt-1">{t('spec_model_val')}</div>
               </div>
-              <div className="p-3.5 rounded-xl bg-[#111114] border border-white/[0.08]">
+              <div className="p-3.5 rounded-xl bg-[#111114] border border-white/[0.08] text-center">
                 <div className="text-[11px] font-mono uppercase text-zinc-500 tracking-wider">{t('spec_cost_title')}</div>
                 <div className="text-sm font-mono font-bold text-blue-400 mt-1">{t('spec_cost_val')}</div>
               </div>
@@ -286,7 +286,7 @@ export default function LandingPage() {
 
         {/* 4. PROTOCOL ARCHITECTURE (HOW IT WORKS) */}
         <section id="how-it-works" className="space-y-6 scroll-mt-20">
-          <div>
+          <div className="text-center max-w-xl mx-auto space-y-1">
             <div className="text-[10px] font-mono uppercase text-blue-400 tracking-wider">
               {t('rules_tag')}
             </div>
