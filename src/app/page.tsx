@@ -161,7 +161,7 @@ export default function LandingPage() {
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2.5 group">
             <Logo size={28} />
-            <span className="text-sm font-bold text-white tracking-tight group-hover:text-blue-400 transition-colors">
+            <span className="font-pixel text-xs sm:text-sm text-white group-hover:text-blue-400 transition-colors">
               pixelmink
             </span>
           </Link>
@@ -221,12 +221,12 @@ export default function LandingPage() {
               <span>Genesis Release v1.0</span>
             </div>
 
-            {/* Slogan & Bold Statement (Clean Inter typography, no broken Cyrillic) */}
-            <div className="space-y-2">
-              <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-white tracking-tight leading-[1.08]">
+            {/* Slogan & Bold Statement (Press Start 2P Retro Pixel Typography) */}
+            <div className="space-y-4">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-pixel text-white leading-relaxed">
                 {t('hero_title_1')}
               </h1>
-              <p className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-zinc-500 tracking-tight leading-[1.08]">
+              <p className="text-lg sm:text-xl md:text-2xl font-pixel text-zinc-500 leading-relaxed">
                 {t('hero_title_2')}
               </p>
             </div>
@@ -292,7 +292,7 @@ export default function LandingPage() {
                 <Sparkles className="w-3 h-3" />
                 {t('sim_badge')}
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-1">
+              <h2 className="text-sm sm:text-base md:text-lg font-pixel text-white leading-relaxed mt-1">
                 {t('sim_title')}
               </h2>
             </div>
@@ -451,7 +451,7 @@ export default function LandingPage() {
               <div className="text-[10px] font-mono uppercase text-emerald-400 tracking-wider">
                 {t('cat_tag')}
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-1">
+              <h2 className="text-sm sm:text-base md:text-lg font-pixel text-white leading-relaxed mt-1">
                 {t('cat_title')}
               </h2>
             </div>
@@ -506,7 +506,7 @@ export default function LandingPage() {
             <div className="text-[10px] font-mono uppercase text-blue-400 tracking-wider">
               {t('rules_tag')}
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-1">
+            <h2 className="text-sm sm:text-base md:text-lg font-pixel text-white leading-relaxed mt-1">
               {t('rules_title')}
             </h2>
           </div>
@@ -597,7 +597,7 @@ export default function LandingPage() {
             <div className="flex justify-center">
               <Logo size={42} />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+            <h2 className="text-base sm:text-lg md:text-xl font-pixel text-white leading-relaxed">
               {t('manifesto_title_1')}<br />
               {t('manifesto_title_2')}
             </h2>

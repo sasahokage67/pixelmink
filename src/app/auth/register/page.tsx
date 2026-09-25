@@ -221,7 +221,7 @@ export default function RegisterPage() {
       <header className="px-4 md:px-8 py-3.5 border-b border-white/[0.08] flex items-center justify-between">
         <Link href="/" className="inline-flex items-center gap-2 group">
           <Logo size={24} />
-          <span className="text-sm font-bold text-white tracking-tight group-hover:text-blue-400 transition-colors">
+          <span className="font-pixel text-xs sm:text-sm text-white group-hover:text-blue-400 transition-colors">
             pixelmink
           </span>
           <span className="hidden sm:inline text-xs font-mono text-zinc-500 border-l border-white/10 pl-3 ml-1">
@@ -246,7 +246,7 @@ export default function RegisterPage() {
           {/* LEFT COLUMN: BRAND MANIFESTO & LIVE MATCH PREVIEW (DRINKIT MINIMALISM) */}
           <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-20">
             <div className="space-y-3">
-              <div className="text-xl sm:text-2xl font-bold text-white leading-tight tracking-tight">
+              <div className="text-base sm:text-lg font-pixel text-white leading-relaxed">
                 {t('hero_title_1')}<br />
                 <span className="text-zinc-500">{t('hero_title_2')}</span>
               </div>

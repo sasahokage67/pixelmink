@@ -21,18 +21,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, .font-heading {
-  font-family: var(--font-sans);
-  letter-spacing: -0.03em;
-  font-weight: 700;
+h1, h2, h3, .font-heading, .font-pixel {
+  font-family: var(--font-pixel);
+  line-height: 1.45;
 }
 
 .font-mono {
   font-family: var(--font-mono);
 }
 
-.font-pixel {
-  font-family: var(--font-pixel);
+.font-sans {
+  font-family: var(--font-sans);
 }
 
 /* Custom Minimalist Scrollbar */
