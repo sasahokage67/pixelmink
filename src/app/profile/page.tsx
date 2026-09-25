@@ -26,12 +26,14 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { useSocket } from '@/context/SocketContext';
 import Identicon from '@/components/ui/Identicon';
 
 function ProfileContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user: currentUser, refreshUser } = useAuth();
+  const { socket } = useSocket();
   const { lang } = useLanguage();
 
   const queryUserId = searchParams.get('userId') || searchParams.get('id');
@@ -169,8 +171,34 @@ function ProfileContent() {
     }
   };
 
-  const handleStartCall = () => {
+  const handleStartCall = async () => {
     const roomId = `room_${Date.now()}`;
+    try {
+      if (targetUserId) {
+        await fetch('/api/calls', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            receiverId: targetUserId,
+            roomId,
+            type: 'VIDEO',
+          }),
+        });
+
+        if (socket) {
+          socket.emit('call:initiate', {
+            callerId: currentUser?.id,
+            callerName: currentUser?.profile?.name || currentUser?.email?.split('@')[0] || 'Peer',
+            callerAvatar: currentUser?.profile?.avatar,
+            receiverId: targetUserId,
+            roomId,
+            type: 'VIDEO',
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Call initiate error:', e);
+    }
     router.push(`/calls/${roomId}`);
   };
 

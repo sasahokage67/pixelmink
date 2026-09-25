@@ -86,6 +86,44 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, socket, isConnected]);
 
+  // Audio ringtone playback during incoming call
+  useEffect(() => {
+    if (!incomingCall) return;
+
+    let intervalId: any;
+    const playChime = () => {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+      } catch (e) {
+        // audio policy fallback
+      }
+    };
+
+    playChime();
+    intervalId = setInterval(playChime, 2400);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [incomingCall]);
+
   const acceptCall = () => {
     if (!incomingCall) return;
     const { roomId, callerId } = incomingCall;
@@ -113,39 +151,49 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     >
       {children}
 
-      {/* Global Incoming Call Notification Modal */}
+      {/* High-Visibility Center Screen Incoming Call Modal */}
       {incomingCall && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#121217] border border-blue-500/40 shadow-2xl rounded-2xl p-5 w-84 max-w-sm animate-in fade-in slide-in-from-bottom-4">
-          <div className="flex items-center space-x-3 mb-4">
-            <Identicon name={incomingCall.callerName || 'peer'} size={44} />
-            <div>
-              <div className="text-xs font-mono uppercase text-blue-400 tracking-wider flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
-                Incoming {incomingCall.type} Call
-              </div>
-              <div className="text-sm font-semibold text-white tracking-tight">{incomingCall.callerName}</div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in select-none">
+          <div className="bg-[#111116] border border-blue-500/40 shadow-2xl rounded-3xl p-6 sm:p-8 w-full max-w-sm text-center space-y-5 animate-in zoom-in-95">
+            {/* Pulsing Avatar */}
+            <div className="relative mx-auto w-20 h-20 rounded-full flex items-center justify-center bg-blue-500/10 border-2 border-blue-500/40">
+              <span className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping" />
+              <Identicon name={incomingCall.callerName || 'peer'} size={60} />
             </div>
-          </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={declineCall}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-pill bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-mono tap-active transition-all"
-            >
-              <PhoneOff className="w-3.5 h-3.5 text-red-400" />
-              Decline
-            </button>
-            <button
-              onClick={acceptCall}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-pill bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-medium tap-active transition-all shadow-lg shadow-blue-600/30"
-            >
-              {incomingCall.type === 'VIDEO' ? (
-                <Video className="w-3.5 h-3.5" />
-              ) : (
-                <Phone className="w-3.5 h-3.5" />
-              )}
-              Answer Call
-            </button>
+            <div className="space-y-1">
+              <div className="text-[11px] font-mono uppercase text-blue-400 tracking-wider font-bold flex items-center justify-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                <span>Входящий {incomingCall.type === 'VIDEO' ? 'видеозвонок' : 'аудиозвонок'}</span>
+              </div>
+              <div className="text-xl font-bold text-white tracking-tight">
+                {incomingCall.callerName}
+              </div>
+              <p className="text-xs font-mono text-zinc-400">
+                вызывает вас на прямое P2P соединение
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={declineCall}
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-xs font-bold transition-all tap-active"
+              >
+                <PhoneOff className="w-4 h-4 text-red-400" />
+                <span>Отклонить</span>
+              </button>
+              <button
+                onClick={acceptCall}
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold transition-all tap-active shadow-lg shadow-emerald-600/30 animate-pulse"
+              >
+                {incomingCall.type === 'VIDEO' ? (
+                  <Video className="w-4 h-4" />
+                ) : (
+                  <Phone className="w-4 h-4" />
+                )}
+                <span>Принять вызов</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
