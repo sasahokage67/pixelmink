@@ -17,6 +17,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import Identicon from '@/components/ui/Identicon';
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -93,26 +94,15 @@ export default function ProfilePage() {
       <div className="drinkit-card p-6 md:p-8 space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div className="flex items-center gap-5">
-            <div className="relative w-20 h-20 rounded-full overflow-hidden bg-zinc-800 border-2 border-white/10 shrink-0">
-              {p?.avatar ? (
-                <img src={p.avatar} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center font-mono text-2xl font-bold text-blue-400">
-                  {p?.name?.charAt(0) || 'A'}
-                </div>
-              )}
-            </div>
+            <Identicon name={p?.name || user?.email || 'peer'} size={76} />
 
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
                   {p?.name || 'Alex Voronov'}
                 </h1>
-                {p?.verified && (
-                  <CheckCircle2 className="w-4 h-4 text-blue-400" />
-                )}
-                <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                  {user?.role || 'MENTOR'}
+                <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  {user?.role || 'PEER'}
                 </span>
               </div>
 

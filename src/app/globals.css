@@ -1,12 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;500;600;700&family=Silkscreen:wght@400;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --font-ibm-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-ibm-mono: 'IBM Plex Mono', monospace;
+  --font-pixel-heading: 'Press Start 2P', monospace;
+  --font-pixel-body: 'Pixelify Sans', 'Press Start 2P', monospace;
   --background: #09090b;
   --foreground: #fafafa;
 }
@@ -14,9 +14,14 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-ibm-sans);
+  font-family: var(--font-pixel-body);
   overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
+  image-rendering: pixelated;
+}
+
+h1, h2, h3, .font-heading {
+  font-family: var(--font-pixel-heading);
+  letter-spacing: -0.03em;
 }
 
 /* Custom Minimalist Scrollbar */
@@ -26,47 +31,40 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #09090b;
 }
 
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
-  border-radius: 9999px;
+  border-radius: 0px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Code & monospace helper */
 .font-mono {
-  font-family: var(--font-ibm-mono);
+  font-family: var(--font-pixel-body);
 }
 
-/* Subtle border utility */
-.border-subtle {
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-/* Drinkit Clean Card */
+/* Clean Pixel Card */
 .drinkit-card {
   background-color: #111114;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  transition: border-color 0.15s ease-out, transform 0.15s ease-out;
+  border-radius: 8px;
+  transition: border-color 0.15s ease-out;
 }
 
 .drinkit-card:hover {
   border-color: rgba(255, 255, 255, 0.18);
 }
 
-/* Drinkit Pill */
+/* Utilitarian Pill */
 .drinkit-pill {
-  font-family: var(--font-ibm-mono);
+  font-family: var(--font-pixel-body);
   font-size: 11px;
-  letter-spacing: -0.02em;
-  padding: 3px 10px;
-  border-radius: 9999px;
+  padding: 3px 8px;
+  border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.03);
 }

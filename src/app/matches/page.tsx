@@ -17,6 +17,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import Identicon from '@/components/ui/Identicon';
 
 export default function MatchesPage() {
   const router = useRouter();
@@ -212,21 +213,10 @@ export default function MatchesPage() {
                   <div className="space-y-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full overflow-hidden bg-zinc-800 border border-white/10 shrink-0">
-                          {candidate?.profile?.avatar ? (
-                            <img src={candidate.profile.avatar} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center font-mono font-bold text-blue-400">
-                              {candidate?.profile?.name?.charAt(0) || 'P'}
-                            </div>
-                          )}
-                        </div>
+                        <Identicon name={candidate?.profile?.name || candidate?.email || 'peer'} size={44} />
                         <div>
-                          <div className="text-sm font-semibold text-white tracking-tight flex items-center gap-1.5">
+                          <div className="text-sm font-semibold text-white tracking-tight">
                             {candidate?.profile?.name}
-                            {candidate?.profile?.verified && (
-                              <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
-                            )}
                           </div>
                           <div className="text-[10px] font-mono text-zinc-500">
                             ⭐️ {candidate?.profile?.rating || '4.9'} • {candidate?.profile?.location || 'Remote'}
@@ -258,6 +248,18 @@ export default function MatchesPage() {
                         </li>
                       ))}
                     </ul>
+
+                    {/* Description Keywords Matched */}
+                    {m.descriptionKeywordsMatched && m.descriptionKeywordsMatched.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                        <span className="text-[10px] font-mono text-zinc-500">Bio & Goal overlap:</span>
+                        {m.descriptionKeywordsMatched.map((kw: string) => (
+                          <span key={kw} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                            #{kw}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions */}

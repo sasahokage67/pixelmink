@@ -27,25 +27,22 @@ module.exports = {
           300: '#93c5fd',
           400: '#60a5fa',
           500: '#3b82f6',
-          600: '#2563eb', // Electric Tech Cobalt
+          600: '#2563eb',
           700: '#1d4ed8',
           800: '#1e40af',
           900: '#1e3a8a',
           DEFAULT: '#2563eb',
           foreground: '#ffffff',
         },
-        cobalt: {
-          DEFAULT: '#2563eb',
-          glow: 'rgba(37, 99, 235, 0.25)',
-        }
       },
       fontFamily: {
-        sans: ['var(--font-ibm-sans)', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-ibm-mono)', 'monospace'],
+        pixel: ["'Press Start 2P'", "'Pixelify Sans'", "'Silkscreen'", 'monospace'],
+        sans: ["'Pixelify Sans'", "'Press Start 2P'", "'Silkscreen'", 'monospace'],
+        mono: ["'Press Start 2P'", "'Pixelify Sans'", 'monospace'],
       },
       borderRadius: {
-        pill: '9999px',
-        card: '14px',
+        pill: '4px',
+        card: '8px',
       },
     },
   },

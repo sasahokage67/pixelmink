@@ -15,6 +15,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import Identicon from '@/components/ui/Identicon';
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -226,15 +227,7 @@ export default function AdminPage() {
             {usersList.map((u: any) => (
               <div key={u.id} className="py-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full overflow-hidden bg-zinc-800 border border-white/10 shrink-0">
-                    {u.profile?.avatar ? (
-                      <img src={u.profile.avatar} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center font-mono text-xs font-bold text-blue-400">
-                        {u.profile?.name?.charAt(0) || 'U'}
-                      </div>
-                    )}
-                  </div>
+                  <Identicon name={u.profile?.name || u.email || 'peer'} size={36} />
                   <div>
                     <div className="text-xs font-semibold text-white flex items-center gap-1.5">
                       {u.profile?.name || 'User'}

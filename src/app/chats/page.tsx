@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
+import Identicon from '@/components/ui/Identicon';
 import {
   Search,
   Phone,
@@ -302,15 +303,7 @@ export default function ChatsPage() {
                   }`}
                 >
                   <div className="relative shrink-0">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-zinc-800 border border-white/10">
-                      {peer?.profile?.avatar ? (
-                        <img src={peer.profile.avatar} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center font-mono font-bold text-blue-400">
-                          {peer?.profile?.name?.charAt(0) || 'U'}
-                        </div>
-                      )}
-                    </div>
+                    <Identicon name={peer?.profile?.name || conv.title || 'peer'} size={38} />
                     {online && (
                       <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[#09090b]" />
                     )}
@@ -346,15 +339,7 @@ export default function ChatsPage() {
           <div className="p-4 border-b border-white/[0.08] flex items-center justify-between bg-[#111114]">
             <div className="flex items-center gap-3 min-w-0">
               <div className="relative">
-                <div className="w-9 h-9 rounded-full overflow-hidden bg-zinc-800 border border-white/10 shrink-0">
-                  {otherMember?.profile?.avatar ? (
-                    <img src={otherMember.profile.avatar} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center font-mono font-bold text-blue-400">
-                      {otherMember?.profile?.name?.charAt(0) || 'U'}
-                    </div>
-                  )}
-                </div>
+                <Identicon name={otherMember?.profile?.name || 'peer'} size={36} />
                 {isPeerOnline && (
                   <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[#111114]" />
                 )}
@@ -407,15 +392,7 @@ export default function ChatsPage() {
                 >
                   <div className="flex items-end gap-2 max-w-[85%] md:max-w-[70%]">
                     {!isMine && (
-                      <div className="w-7 h-7 rounded-full overflow-hidden bg-zinc-800 border border-white/10 shrink-0 mb-1">
-                        {msg.sender?.profile?.avatar ? (
-                          <img src={msg.sender.profile.avatar} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center font-mono text-[10px] text-blue-400">
-                            {msg.sender?.profile?.name?.charAt(0) || 'P'}
-                          </div>
-                        )}
-                      </div>
+                      <Identicon name={msg.sender?.profile?.name || 'peer'} size={24} className="mb-1" />
                     )}
 
                     <div className="space-y-1">

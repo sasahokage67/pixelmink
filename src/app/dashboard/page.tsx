@@ -18,6 +18,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Identicon from '@/components/ui/Identicon';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -102,9 +103,6 @@ export default function DashboardPage() {
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
               Good evening, {userName} 👋
             </h1>
-            <span className="font-mono text-xs px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400">
-              Verified Mentor
-            </span>
           </div>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">
             Learning Goal: <span className="text-white font-medium">English for IT</span> & <span className="text-white font-medium">Prompt Engineering</span> — Intermediate → Advanced
@@ -168,21 +166,10 @@ export default function DashboardPage() {
                     {/* Header */}
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full overflow-hidden bg-zinc-800 border border-white/10 shrink-0">
-                          {candidate?.profile?.avatar ? (
-                            <img src={candidate.profile.avatar} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center font-mono font-bold text-blue-400">
-                              {candidate?.profile?.name?.charAt(0) || 'P'}
-                            </div>
-                          )}
-                        </div>
+                        <Identicon name={candidate?.profile?.name || candidate?.email || 'peer'} size={40} />
                         <div>
-                          <div className="text-xs font-semibold text-white tracking-tight flex items-center gap-1.5">
+                          <div className="text-xs font-semibold text-white tracking-tight">
                             {candidate?.profile?.name}
-                            {candidate?.profile?.verified && (
-                              <CheckCircle2 className="w-3 h-3 text-blue-400" />
-                            )}
                           </div>
                           <div className="text-[10px] font-mono text-zinc-500">
                             ⭐️ {candidate?.profile?.rating || '4.9'} • {candidate?.profile?.location || 'Remote'}
@@ -212,6 +199,17 @@ export default function DashboardPage() {
                     <p className="text-[11px] text-zinc-400 leading-snug line-clamp-2">
                       {m.reasons?.[0] || 'Direct reciprocal skill exchange match with compatible timezone.'}
                     </p>
+
+                    {m.descriptionKeywordsMatched && m.descriptionKeywordsMatched.length > 0 && (
+                      <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                        <span className="text-[9px] font-mono text-zinc-500">Bio keywords:</span>
+                        {m.descriptionKeywordsMatched.slice(0, 3).map((kw: string) => (
+                          <span key={kw} className="text-[9px] font-mono px-1 py-0.2 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                            #{kw}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Action Buttons */}

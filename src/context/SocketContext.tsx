@@ -5,6 +5,7 @@ import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { useRouter } from 'next/navigation';
 import { Phone, PhoneOff, Video } from 'lucide-react';
+import Identicon from '@/components/ui/Identicon';
 
 interface IncomingCallPayload {
   callerId: string;
@@ -116,15 +117,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       {incomingCall && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#121217] border border-blue-500/40 shadow-2xl rounded-2xl p-5 w-84 max-w-sm animate-in fade-in slide-in-from-bottom-4">
           <div className="flex items-center space-x-3 mb-4">
-            <div className="w-12 h-12 rounded-full overflow-hidden bg-zinc-800 border border-white/10 shrink-0">
-              {incomingCall.callerAvatar ? (
-                <img src={incomingCall.callerAvatar} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center font-mono font-bold text-blue-400">
-                  {incomingCall.callerName.charAt(0)}
-                </div>
-              )}
-            </div>
+            <Identicon name={incomingCall.callerName || 'peer'} size={44} />
             <div>
               <div className="text-xs font-mono uppercase text-blue-400 tracking-wider flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />

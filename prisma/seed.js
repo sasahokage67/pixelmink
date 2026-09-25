@@ -93,7 +93,7 @@ async function main() {
       role: 'MENTOR',
       profile: {
         name: 'Alex Voronov',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Senior Python & PyTorch Engineer at deep-tech lab. Loving math, algorithms and async systems.',
         location: 'Belgrade, Serbia',
         languages: 'English (Fluent), Russian (Native)',
@@ -120,7 +120,7 @@ async function main() {
       role: 'MENTOR',
       profile: {
         name: 'Amina Al-Mansoor',
-        avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'AI Product Specialist & Bilingual Tech Lead. Helping engineers communicate crystal-clear in English.',
         location: 'Dubai, UAE',
         languages: 'English (Native), Arabic (Native), French (B2)',
@@ -147,7 +147,7 @@ async function main() {
       role: 'USER',
       profile: {
         name: 'Daniel Richter',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Systems programmer obsessed with zero-cost abstractions, memory safety and low latency.',
         location: 'Berlin, Germany',
         languages: 'English (Fluent), German (Native)',
@@ -173,7 +173,7 @@ async function main() {
       role: 'MENTOR',
       profile: {
         name: 'Sara Lindqvist',
-        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Principal Product Designer. Minimalist interface craft, typography and design tokens.',
         location: 'Stockholm, Sweden',
         languages: 'English (Fluent), Swedish (Native)',
@@ -200,7 +200,7 @@ async function main() {
       role: 'USER',
       profile: {
         name: 'Marcus Brody',
-        avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Commercial Video Editor & Colorist. Cut spots for tech brands, specializing in DaVinci Resolve.',
         location: 'London, UK',
         languages: 'English (Native)',
@@ -226,7 +226,7 @@ async function main() {
       role: 'USER',
       profile: {
         name: 'Maya Chen',
-        avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: '3D Artist and Technical Animator. Geometry nodes, procedural materials and stylized renders.',
         location: 'Toronto, Canada',
         languages: 'English (Fluent), Mandarin (Native)',
@@ -252,7 +252,7 @@ async function main() {
       role: 'MENTOR',
       profile: {
         name: 'Elena Rostova',
-        avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Staff Frontend Architect. Deep understanding of Next.js App Router, React concurrency & performance.',
         location: 'Vilnius, Lithuania',
         languages: 'English (Fluent), Russian (Native)',
@@ -279,7 +279,7 @@ async function main() {
       role: 'MENTOR',
       profile: {
         name: 'Kenji Sato',
-        avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Site Reliability Engineer & Kubernetes Operator contributor. Keeping clusters resilient 24/7.',
         location: 'Tokyo, Japan',
         languages: 'English (Fluent), Japanese (Native)',
@@ -305,7 +305,7 @@ async function main() {
       role: 'USER',
       profile: {
         name: 'David Vance',
-        avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Computer Vision Engineer. Real-time inference on edge devices (Jetson, Coral) and camera calibrations.',
         location: 'Austin, USA',
         languages: 'English (Native)',
@@ -330,7 +330,7 @@ async function main() {
       role: 'USER',
       profile: {
         name: 'Liam Gallagher',
-        avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Backend engineer building high-throughput payment gateways with Go and distributed locks.',
         location: 'Dublin, Ireland',
         languages: 'English (Native)',
@@ -356,7 +356,7 @@ async function main() {
       role: 'USER',
       profile: {
         name: 'Roman Koster',
-        avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Offensive Security Researcher & Binary Exploitation enthusiast. CTF player.',
         location: 'Warsaw, Poland',
         languages: 'English (Fluent), Polish (Native)',
@@ -381,7 +381,7 @@ async function main() {
       role: 'USER',
       profile: {
         name: 'Anna Kowalska',
-        avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Game Developer creating indie puzzle games in Unity. Passionate about procedural generation.',
         location: 'Krakow, Poland',
         languages: 'English (Fluent), Polish (Native)',
@@ -406,7 +406,7 @@ async function main() {
       role: 'USER',
       profile: {
         name: 'Victor Vance',
-        avatar: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Unreal Engine 5 Technical Artist. Working on AAA game environments, Lumen lighting and Niagara VFX.',
         location: 'Montreal, Canada',
         languages: 'English (Fluent), French (Native)',
@@ -431,7 +431,7 @@ async function main() {
       role: 'MENTOR',
       profile: {
         name: 'Dr. Maria Santos',
-        avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Applied Mathematician & Lecturer. Simplifying complex linear algebra, matrices and eigenvectors.',
         location: 'Madrid, Spain',
         languages: 'English (Fluent), Spanish (Native)',
@@ -456,7 +456,7 @@ async function main() {
       role: 'USER',
       profile: {
         name: 'Artem Sokolov',
-        avatar: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Senior iOS Engineer. Building smooth 120fps animations and CoreData offline-first architectures.',
         location: 'Tbilisi, Georgia',
         languages: 'English (B2), Russian (Native)',
@@ -481,7 +481,7 @@ async function main() {
       role: 'USER',
       profile: {
         name: 'Kira Novak',
-        avatar: 'https://images.unsplash.com/photo-1534751516642-a171edd2521d?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Mobile Product Designer. Creating human interfaces for iOS and Android with Figma tokens.',
         location: 'Prague, Czechia',
         languages: 'English (Fluent), Czech (Native)',
@@ -507,7 +507,7 @@ async function main() {
       role: 'USER',
       profile: {
         name: 'Chloe Dupont',
-        avatar: 'https://images.unsplash.com/photo-1548142813-c348350df52b?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Staff Technical Writer. Writing developer documentation that developers actually love to read.',
         location: 'Paris, France',
         languages: 'English (Fluent), French (Native)',
@@ -533,7 +533,7 @@ async function main() {
       role: 'ADMIN',
       profile: {
         name: 'XCHANGE Admin',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&h=300&fit=crop&crop=face',
+        avatar: '',
         bio: 'Platform Administrator & Safety Moderator. Reach out for system assistance or partnership.',
         location: 'Global Platform',
         languages: 'English, Russian, German',

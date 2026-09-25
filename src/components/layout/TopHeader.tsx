@@ -6,13 +6,13 @@ import { useAuth } from '@/context/AuthContext';
 import { Bell, Search, Video, UserCheck, ChevronDown, CheckCircle2 } from 'lucide-react';
 
 const DEMO_ACCOUNTS = [
-  { name: 'Alex Voronov', email: 'alex@xchange.dev', role: 'Python / AI Mentor' },
-  { name: 'Amina Al-Mansoor', email: 'amina@xchange.dev', role: 'English & LLMs Mentor' },
+  { name: 'Alex Voronov', email: 'alex@xchange.dev', role: 'Python & AI' },
+  { name: 'Amina Al-Mansoor', email: 'amina@xchange.dev', role: 'LLMs & NLP' },
   { name: 'Daniel Richter', email: 'daniel@xchange.dev', role: 'Rust Systems Dev' },
-  { name: 'Sara Lindqvist', email: 'sara@xchange.dev', role: 'UI/UX & Figma Lead' },
+  { name: 'Sara Lindqvist', email: 'sara@xchange.dev', role: 'UI/UX Design Systems' },
   { name: 'Marcus Brody', email: 'marcus@xchange.dev', role: 'Video & DaVinci' },
-  { name: 'Elena Rostova', email: 'elena@xchange.dev', role: 'React/Next.js Architect' },
-  { name: 'XCHANGE Admin', email: 'admin@xchange.dev', role: 'Platform Admin' },
+  { name: 'Elena Rostova', email: 'elena@xchange.dev', role: 'React/Next.js' },
+  { name: 'pixelmink Admin', email: 'admin@xchange.dev', role: 'Platform Admin' },
 ];
 
 export default function TopHeader() {

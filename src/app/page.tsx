@@ -162,7 +162,7 @@ export default function LandingPage() {
             {
               step: '05',
               title: 'Earn XCredits',
-              desc: '1 hour teaching = 1 XCredit earned to unlock learning from any senior mentor.',
+              desc: '1 hour teaching = 1 XCredit earned to unlock learning from any senior peer.',
               icon: Shield,
             },
           ].map((item) => {

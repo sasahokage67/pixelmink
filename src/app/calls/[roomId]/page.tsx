@@ -22,6 +22,7 @@ import {
   Shield,
   Volume2,
 } from 'lucide-react';
+import Identicon from '@/components/ui/Identicon';
 
 export default function CallRoomPage() {
   const params = useParams();
@@ -360,16 +361,12 @@ export default function CallRoomPage() {
           <div className="relative rounded-2xl overflow-hidden bg-[#121217] border border-white/[0.08] flex items-center justify-center">
             <div className="relative w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-900 to-[#121217]">
               <div className="text-center space-y-3">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-emerald-500/40 mx-auto">
-                  <img
-                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&h=300&fit=crop"
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
+                <div className="mx-auto flex justify-center">
+                  <Identicon name="Amina Al-Mansoor" size={84} />
                 </div>
                 <div>
                   <div className="text-sm font-semibold text-white">Amina Al-Mansoor</div>
-                  <div className="text-xs font-mono text-emerald-400">English & LLMs Mentor • Peer Stream</div>
+                  <div className="text-xs font-mono text-zinc-400">English & LLMs • Peer Stream</div>
                 </div>
                 <div className="flex items-center justify-center gap-1">
                   <span className="w-1 h-3 bg-emerald-500 rounded-full animate-bounce" />

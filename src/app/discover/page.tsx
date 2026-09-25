@@ -15,6 +15,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import Identicon from '@/components/ui/Identicon';
 
 export default function DiscoverPage() {
   const router = useRouter();
@@ -156,18 +157,6 @@ export default function DiscoverPage() {
           </button>
         ))}
 
-        {/* Verified checkbox */}
-        <button
-          onClick={() => setVerifiedOnly(!verifiedOnly)}
-          className={`drinkit-pill flex items-center gap-1.5 transition-all ${
-            verifiedOnly
-              ? 'bg-blue-600 text-white border-blue-500'
-              : 'text-zinc-400 hover:text-white'
-          }`}
-        >
-          <CheckCircle2 className="w-3 h-3" />
-          Verified Mentors
-        </button>
       </div>
 
       {/* Peers Grid */}
@@ -207,21 +196,10 @@ export default function DiscoverPage() {
                   {/* Peer Avatar & Rating */}
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full overflow-hidden bg-zinc-800 border border-white/10 shrink-0">
-                        {peer.profile?.avatar ? (
-                          <img src={peer.profile.avatar} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center font-mono font-bold text-blue-400">
-                            {peer.profile?.name?.charAt(0) || 'U'}
-                          </div>
-                        )}
-                      </div>
+                      <Identicon name={peer.profile?.name || peer.email || 'peer'} size={44} />
                       <div>
-                        <div className="text-sm font-semibold text-white tracking-tight flex items-center gap-1.5">
+                        <div className="text-sm font-semibold text-white tracking-tight">
                           {peer.profile?.name}
-                          {peer.profile?.verified && (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
-                          )}
                         </div>
                         <div className="text-[10px] font-mono text-zinc-500 mt-0.5">
                           {peer.profile?.location || 'Remote'} • {peer.profile?.timezone || 'UTC+0'}

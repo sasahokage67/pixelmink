@@ -21,6 +21,7 @@ import {
   X,
   Volume2,
 } from 'lucide-react';
+import Identicon from '@/components/ui/Identicon';
 
 export default function SeminarLivePage() {
   const params = useParams();
@@ -365,12 +366,8 @@ export default function SeminarLivePage() {
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center space-y-4 bg-gradient-to-b from-[#14141a] to-[#09090b]">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-blue-500/40 shadow-xl shadow-blue-500/20">
-                  <img
-                    src={seminar?.host?.profile?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&h=300&fit=crop'}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
+                <div className="flex justify-center">
+                  <Identicon name={seminar?.host?.profile?.name || 'Alex Voronov'} size={88} />
                 </div>
                 <div className="space-y-1">
                   <div className="text-lg font-bold text-white tracking-tight">

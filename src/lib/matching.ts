@@ -7,28 +7,35 @@ export interface MatchResult {
   reasons: string[];
   skillsOfferedToYou: string[];
   skillsWantedFromYou: string[];
+  descriptionKeywordsMatched: string[];
   chainDetails?: {
-    chainPath: string[]; // e.g. ["Alex", "Elena", "Kenji", "Alex"]
+    chainPath: string[];
     exchangeFlow: string;
   };
 }
 
-const LEVEL_WEIGHTS: Record<string, number> = {
-  BEGINNER: 1,
-  INTERMEDIATE: 2,
-  ADVANCED: 3,
-  EXPERT: 4,
-};
+const STOPWORDS = new Set([
+  'and', 'the', 'for', 'with', 'from', 'this', 'that', 'have', 'want', 'what', 'like', 'good', 'will',
+  'into', 'some', 'your', 'about', 'also', 'over', 'both', 'their', 'been', 'were', 'which', 'where',
+  'after', 'before', 'more', 'most', 'very', 'just', 'when', 'then', 'than', 'them', 'these', 'those',
+  'и', 'в', 'на', 'с', 'по', 'к', 'для', 'от', 'до', 'из', 'у', 'о', 'об', 'за', 'при', 'что', 'как', 'так'
+]);
+
+function extractKeywords(text: string): Set<string> {
+  if (!text) return new Set();
+  const words = text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOPWORDS.has(w));
+  return new Set(words);
+}
 
 /**
- * Core Knowledge Exchange Matching Algorithm
- * Calculates deterministic match scores based on:
- * - Reciprocal skills (A can teach what B wants, B can teach what A wants)
- * - Level suitability
- * - Common languages
- * - Timezone compatibility
- * - User ratings and teaching track record
- * - Circular multi-hop chains (A -> B -> C -> A)
+ * Calculates deterministic match percentage based on:
+ * 1. Skills overlap (TEACH <-> LEARN reciprocal match)
+ * 2. Description & Bio semantic keyword intersection
+ * 3. Multi-hop circular exchange chains (A -> B -> C -> A)
  */
 export async function matchUsers(userId: string): Promise<MatchResult[]> {
   const currentUser = await prisma.user.findUnique({
@@ -48,6 +55,14 @@ export async function matchUsers(userId: string): Promise<MatchResult[]> {
 
   const myTeachSkillIds = new Set(myTeaches.map((s) => s.skillId));
   const myLearnSkillIds = new Set(myLearns.map((s) => s.skillId));
+
+  // Current user's text corpus (bio, skill descriptions, learning goals)
+  const myTextCorpus = [
+    currentUser.profile?.bio || '',
+    ...myTeaches.map((s) => `${s.skill.name} ${s.description}`),
+    ...myLearns.map((s) => `${s.skill.name} ${s.learningGoal}`),
+  ].join(' ');
+  const myKeywords = extractKeywords(myTextCorpus);
 
   const allCandidates = await prisma.user.findMany({
     where: {
@@ -75,71 +90,56 @@ export async function matchUsers(userId: string): Promise<MatchResult[]> {
     // What I can teach candidate (my TEACH in their LEARN)
     const skillsITeachThem = myTeaches.filter((s) => candLearnSkillIds.has(s.skillId));
 
-    let score = 30; // base score for discovery
-    const reasons: string[] = [];
-
     const isReciprocal = skillsTheyTeachMe.length > 0 && skillsITeachThem.length > 0;
     const isOneWay = skillsTheyTeachMe.length > 0 || skillsITeachThem.length > 0;
 
+    let score = 25;
+    const reasons: string[] = [];
+
+    // --- 1. SKILLS OVERLAP SCORE (max 50 pts) ---
     if (isReciprocal) {
-      score += 42;
+      score += 45;
       reasons.push(
-        `Perfect Reciprocal Exchange: They teach ${skillsTheyTeachMe.map((s) => s.skill.name).join(', ')}, while you teach ${skillsITeachThem.map((s) => s.skill.name).join(', ')}`
+        `Reciprocal: Teaches ${skillsTheyTeachMe.map((s) => s.skill.name).join(', ')} ↔ Wants ${skillsITeachThem.map((s) => s.skill.name).join(', ')}`
       );
     } else if (isOneWay) {
       score += 20;
       if (skillsTheyTeachMe.length > 0) {
-        reasons.push(`Direct Mentorship: Teaches ${skillsTheyTeachMe.map((s) => s.skill.name).join(', ')}`);
+        reasons.push(`Teaches ${skillsTheyTeachMe.map((s) => s.skill.name).join(', ')}`);
       } else {
-        reasons.push(`Knowledge Request: Wants to learn ${skillsITeachThem.map((s) => s.skill.name).join(', ')} from you`);
-      }
-    } else {
-      // General skill category synergy
-      const myCategories = new Set(currentUser.userSkills.map((s) => s.skill.category));
-      const candCategories = candidate.userSkills.filter((s) => myCategories.has(s.skill.category));
-      if (candCategories.length > 0) {
-        score += 10;
-        reasons.push(`Domain Alignment in ${candCategories[0].skill.category}`);
+        reasons.push(`Wants ${skillsITeachThem.map((s) => s.skill.name).join(', ')}`);
       }
     }
 
-    // Level check
-    for (const st of skillsTheyTeachMe) {
-      const myTarget = myLearns.find((l) => l.skillId === st.skillId);
-      if (myTarget) {
-        const teacherLvl = LEVEL_WEIGHTS[st.level] || 2;
-        const myTargetLvl = LEVEL_WEIGHTS[myTarget.level] || 1;
-        if (teacherLvl >= myTargetLvl) {
-          score += 8;
-          reasons.push(`Level Match: Teacher is ${st.level}, ready for your target`);
-          break;
-        }
+    // --- 2. DESCRIPTION & BIO OVERLAP SCORE (max 25 pts) ---
+    const candTextCorpus = [
+      candidate.profile?.bio || '',
+      ...candTeaches.map((s) => `${s.skill.name} ${s.description}`),
+      ...candLearns.map((s) => `${s.skill.name} ${s.learningGoal}`),
+    ].join(' ');
+    const candKeywords = extractKeywords(candTextCorpus);
+
+    const commonKeywords: string[] = [];
+    myKeywords.forEach((kw) => {
+      if (candKeywords.has(kw) && kw.length > 3) {
+        commonKeywords.push(kw);
       }
+    });
+
+    const keywordBonus = Math.min(commonKeywords.length * 4, 20);
+    score += keywordBonus;
+    if (commonKeywords.length > 0) {
+      reasons.push(`Bio/Goal match: [${commonKeywords.slice(0, 4).join(', ')}]`);
     }
 
-    // Language compatibility
+    // Languages overlap
     const myLangs = (currentUser.profile?.languages || '').toLowerCase();
     const candLangs = (candidate.profile?.languages || '').toLowerCase();
-    const commonLangs = ['english', 'russian', 'german', 'spanish', 'french'].filter(
-      (lang) => myLangs.includes(lang) && candLangs.includes(lang)
-    );
-    if (commonLangs.length > 0) {
-      score += 8;
-      reasons.push(`Shared Languages: ${commonLangs.map((l) => l.toUpperCase()).join(', ')}`);
+    if (myLangs && candLangs && (myLangs.includes('english') && candLangs.includes('english'))) {
+      score += 5;
     }
 
-    // Rating check
-    if (candidate.profile && candidate.profile.rating >= 4.8) {
-      score += 6;
-    }
-
-    // Verified badge bonus
-    if (candidate.profile && candidate.profile.verified) {
-      score += 4;
-    }
-
-    // Clamp score
-    const finalScore = Math.min(Math.max(score, 45), 98);
+    const finalScore = Math.min(Math.max(score, 40), 98);
 
     matches.push({
       candidateUser: candidate,
@@ -148,14 +148,13 @@ export async function matchUsers(userId: string): Promise<MatchResult[]> {
       reasons,
       skillsOfferedToYou: skillsTheyTeachMe.map((s) => s.skill.name),
       skillsWantedFromYou: skillsITeachThem.map((s) => s.skill.name),
+      descriptionKeywordsMatched: commonKeywords,
     });
   }
 
-  // Detect circular 3-way chain matches: A -> B -> C -> A
-  // A teaches B, B teaches C, C teaches A
+  // --- 3. CIRCULAR CHAINS (A -> B -> C -> A) ---
   if (myTeaches.length > 0 && myLearns.length > 0) {
     for (const userB of allCandidates) {
-      // Does A teach B?
       const aTeachesB = myTeaches.some((s) =>
         userB.userSkills.some((bs) => bs.type === 'LEARN' && bs.skillId === s.skillId)
       );
@@ -163,13 +162,11 @@ export async function matchUsers(userId: string): Promise<MatchResult[]> {
 
       for (const userC of allCandidates) {
         if (userC.id === userB.id) continue;
-        // Does B teach C?
         const bTeachesC = userB.userSkills.some(
           (bs) =>
             bs.type === 'TEACH' &&
             userC.userSkills.some((cs) => cs.type === 'LEARN' && cs.skillId === bs.skillId)
         );
-        // Does C teach A?
         const cTeachesA = userC.userSkills.some(
           (cs) =>
             cs.type === 'TEACH' &&
@@ -179,10 +176,10 @@ export async function matchUsers(userId: string): Promise<MatchResult[]> {
         if (bTeachesC && cTeachesA) {
           matches.push({
             candidateUser: userB,
-            score: 93,
+            score: 94,
             matchType: 'CIRCULAR_CHAIN',
             reasons: [
-              `Knowledge Exchange Chain (3-Hop): You teach ${userB.profile?.name}, they teach ${userC.profile?.name}, and ${userC.profile?.name} teaches you!`,
+              `3-way chain: You → ${userB.profile?.name} → ${userC.profile?.name} → You`,
             ],
             skillsOfferedToYou: userC.userSkills
               .filter((s) => s.type === 'TEACH' && myLearnSkillIds.has(s.skillId))
@@ -190,6 +187,7 @@ export async function matchUsers(userId: string): Promise<MatchResult[]> {
             skillsWantedFromYou: myTeaches
               .filter((s) => userB.userSkills.some((bs) => bs.type === 'LEARN' && bs.skillId === s.skillId))
               .map((s) => s.skill.name),
+            descriptionKeywordsMatched: [],
             chainDetails: {
               chainPath: [
                 currentUser.profile?.name || 'You',
@@ -206,6 +204,5 @@ export async function matchUsers(userId: string): Promise<MatchResult[]> {
     }
   }
 
-  // Sort by score descending
   return matches.sort((a, b) => b.score - a.score);
 }

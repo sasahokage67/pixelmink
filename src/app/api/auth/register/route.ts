@@ -5,7 +5,17 @@ import { hashPassword, signToken } from '@/lib/auth';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, password, name, role = 'USER', teachSkill, learnSkill } = body;
+    const {
+      email,
+      password,
+      name,
+      role = 'USER',
+      bio,
+      teachSkills = [],
+      learnSkills = [],
+      teachSkill,
+      learnSkill,
+    } = body;
 
     if (!email || !password || !name) {
       return NextResponse.json({ error: 'Email, password, and name are required' }, { status: 400 });
@@ -18,6 +28,8 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await hashPassword(password);
 
+    const userBio = bio?.trim() || 'Computer Science engineer & peer knowledge contributor';
+
     const user = await prisma.user.create({
       data: {
         email,
@@ -26,7 +38,7 @@ export async function POST(req: NextRequest) {
         profile: {
           create: {
             name,
-            bio: 'Tech learner & knowledge contributor',
+            bio: userBio,
             location: 'Remote',
             languages: 'English',
             xCredits: 5, // Welcome bonus
@@ -36,35 +48,77 @@ export async function POST(req: NextRequest) {
       include: { profile: true },
     });
 
-    // Optionally attach initial skills if selected
-    if (teachSkill) {
-      const skill = await prisma.skill.findFirst({ where: { name: { contains: teachSkill } } });
-      if (skill) {
-        await prisma.userSkill.create({
+    // Normalize teach and learn skills
+    const teachList: string[] = Array.isArray(teachSkills) && teachSkills.length > 0
+      ? teachSkills
+      : (teachSkill ? [teachSkill] : ['Python']);
+
+    const learnList: string[] = Array.isArray(learnSkills) && learnSkills.length > 0
+      ? learnSkills
+      : (learnSkill ? [learnSkill] : ['Rust']);
+
+    for (const skillName of teachList) {
+      if (!skillName) continue;
+      let skill = await prisma.skill.findFirst({
+        where: { name: { equals: skillName } },
+      });
+      if (!skill) {
+        skill = await prisma.skill.findFirst({
+          where: { name: { contains: skillName } },
+        });
+      }
+      if (!skill) {
+        skill = await prisma.skill.create({
           data: {
-            userId: user.id,
-            skillId: skill.id,
-            type: 'TEACH',
-            level: 'INTERMEDIATE',
-            description: `Ready to teach ${teachSkill}`,
+            name: skillName,
+            category: 'COMPUTER_SCIENCE',
+            description: `Computer science topic: ${skillName}`,
+            icon: 'code',
           },
         });
       }
+
+      await prisma.userSkill.create({
+        data: {
+          userId: user.id,
+          skillId: skill.id,
+          type: 'TEACH',
+          level: 'INTERMEDIATE',
+          description: `Ready to teach ${skillName}. Focus: deep dive and code review.`,
+        },
+      });
     }
 
-    if (learnSkill) {
-      const skill = await prisma.skill.findFirst({ where: { name: { contains: learnSkill } } });
-      if (skill) {
-        await prisma.userSkill.create({
+    for (const skillName of learnList) {
+      if (!skillName) continue;
+      let skill = await prisma.skill.findFirst({
+        where: { name: { equals: skillName } },
+      });
+      if (!skill) {
+        skill = await prisma.skill.findFirst({
+          where: { name: { contains: skillName } },
+        });
+      }
+      if (!skill) {
+        skill = await prisma.skill.create({
           data: {
-            userId: user.id,
-            skillId: skill.id,
-            type: 'LEARN',
-            level: 'BEGINNER',
-            learningGoal: `Wants to master ${learnSkill}`,
+            name: skillName,
+            category: 'COMPUTER_SCIENCE',
+            description: `Computer science topic: ${skillName}`,
+            icon: 'code',
           },
         });
       }
+
+      await prisma.userSkill.create({
+        data: {
+          userId: user.id,
+          skillId: skill.id,
+          type: 'LEARN',
+          level: 'BEGINNER',
+          learningGoal: `Wants to master ${skillName} through peer collaboration.`,
+        },
+      });
     }
 
     // Add bonus welcome credit transaction
@@ -82,9 +136,9 @@ export async function POST(req: NextRequest) {
       data: {
         userId: user.id,
         type: 'MATCH',
-        title: 'Welcome to XCHANGE',
-        message: 'Your profile is active. Find your first peer match in the Discover tab.',
-        link: '/discover',
+        title: 'Welcome to pixelmink',
+        message: 'Your profile is active. Check peer matches in Discover & Matches tab.',
+        link: '/matches',
       },
     });
 
