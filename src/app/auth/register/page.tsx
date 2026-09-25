@@ -4,8 +4,10 @@ import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import Logo from '@/components/ui/Logo';
 import Identicon from '@/components/ui/Identicon';
+import LanguageSwitcher from '@/components/ui/LanguageSwitcher';
 import {
   Lock,
   Mail,
@@ -76,6 +78,7 @@ const STOPWORDS = new Set([
 export default function RegisterPage() {
   const router = useRouter();
   const { register } = useAuth();
+  const { t, lang } = useLanguage();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [name, setName] = useState('');
@@ -150,7 +153,13 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (teachSkills.length === 0 || learnSkills.length === 0) {
-      setError('Select at least one skill to teach and one to learn.');
+      setError(
+        lang === 'ru'
+          ? 'Выберите как минимум 1 навык для обучения и 1 для изучения.'
+          : lang === 'kz'
+          ? 'Кем дегенде 1 үйрететін және 1 оқитын дағдыны таңдаңыз.'
+          : 'Select at least one skill to teach and one to learn.'
+      );
       return;
     }
 
@@ -171,457 +180,484 @@ export default function RegisterPage() {
     if (ok) {
       router.push('/dashboard');
     } else {
-      setError('Registration failed. Email may already be in use.');
+      setError(
+        lang === 'ru'
+          ? 'Ошибка регистрации. Возможно, email уже используется.'
+          : lang === 'kz'
+          ? 'Тіркелу қатесі. Бұл email әлдеқашан тіркелген болуы мүмкін.'
+          : 'Registration failed. Email may already be in use.'
+      );
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-[92vh] flex items-center justify-center py-10 px-4">
-      <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* LEFT COLUMN: BRAND MANIFESTO & LIVE MATCH PREVIEW (DRINKIT MINIMALISM) */}
-        <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
-          <div className="space-y-3">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2.5 font-pixel text-xl font-bold text-white group tracking-tight"
-            >
-              <Logo size={32} />
-              <span>
-                pixelmink<span className="text-blue-500">.</span>
-              </span>
-            </Link>
+    <div className="min-h-screen flex flex-col justify-between bg-[#09090b]">
+      {/* Top minimal bar with Language Switcher & Home link */}
+      <header className="px-4 md:px-8 py-3.5 border-b border-white/[0.08] flex items-center justify-between">
+        <Link href="/" className="inline-flex items-center gap-2 group">
+          <Logo size={24} />
+          <span className="font-pixel text-sm font-bold text-white group-hover:text-blue-400 transition-colors">
+            pixelmink
+          </span>
+          <span className="hidden sm:inline text-xs font-mono text-zinc-500 border-l border-white/10 pl-3 ml-1">
+            {t('slogan')}
+          </span>
+        </Link>
 
-            <div className="text-xs font-mono text-zinc-400">
-              “Your skills for theirs. No money, just knowledge.”
-            </div>
-
-            <p className="text-xs font-mono text-zinc-500 leading-relaxed pt-1">
-              Join the barter protocol for Computer Science & Engineering. Zero fiat currency, zero platform cuts.
-              1 hour of deep technical mentorship earned = 1 hour unlocked across the peer network.
-            </p>
-          </div>
-
-          {/* Real-time Match Radar Card */}
-          <div className="drinkit-card p-5 bg-[#0e0e13] border border-white/10 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2">
-                <Identicon name={name || 'you'} size={32} />
-                <div>
-                  <div className="text-xs font-bold text-white font-mono">
-                    {name || 'New Peer'}
-                  </div>
-                  <div className="text-[10px] font-mono text-blue-400">
-                    Live Identicon Preview
-                  </div>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
-                  {matchScore}% Match
-                </span>
-              </div>
-            </div>
-
-            {/* Match Power Bar */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
-                <span className="flex items-center gap-1 text-zinc-300">
-                  <Sparkles className="w-3 h-3 text-blue-400" />
-                  Calculated Peer Match Power
-                </span>
-                <span className="font-bold text-blue-400">{matchScore}%</span>
-              </div>
-              <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 transition-all duration-300"
-                  style={{ width: `${matchScore}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Instant Peer Overlap Teaser */}
-            <div className="space-y-2 pt-1">
-              <div className="text-[10px] font-mono uppercase text-zinc-500 tracking-wider">
-                Instant Network Overlap:
-              </div>
-              <div className="space-y-1.5 text-xs font-mono">
-                <div className="flex items-center justify-between p-2 rounded bg-white/[0.02] border border-white/[0.04]">
-                  <span className="text-zinc-300">Teaching ({teachSkills.length}):</span>
-                  <span className="text-emerald-400 font-semibold truncate max-w-[160px]">
-                    {teachSkills.slice(0, 2).join(', ') || 'Select skills'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded bg-white/[0.02] border border-white/[0.04]">
-                  <span className="text-zinc-300">Learning ({learnSkills.length}):</span>
-                  <span className="text-blue-400 font-semibold truncate max-w-[160px]">
-                    {learnSkills.slice(0, 2).join(', ') || 'Select skills'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Extracted Bio Keywords Preview */}
-            {extractedKeywords.length > 0 && (
-              <div className="pt-2 border-t border-white/[0.06] space-y-1.5">
-                <div className="text-[10px] font-mono text-zinc-500">
-                  Extracted Bio Keywords (used in matching):
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {extractedKeywords.map((kw) => (
-                    <span
-                      key={kw}
-                      className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20"
-                    >
-                      #{kw}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Protocol Welcome Perk */}
-            <div className="flex items-center gap-2 p-2.5 rounded bg-blue-600/10 border border-blue-500/20 text-xs font-mono text-blue-300">
-              <Zap className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-              <span>Includes +5 XCredits to immediately book your first 1-on-1 session.</span>
-            </div>
-          </div>
+        <div className="flex items-center gap-3">
+          <LanguageSwitcher />
+          <Link
+            href="/"
+            className="text-xs font-mono text-zinc-400 hover:text-white transition-colors"
+          >
+            ← {t('nav_landing')}
+          </Link>
         </div>
+      </header>
 
-        {/* RIGHT COLUMN: STEPPED REGISTRATION FORM */}
-        <div className="lg:col-span-7">
-          <div className="drinkit-card p-6 md:p-8 bg-[#0d0d12] border border-white/10 shadow-2xl space-y-6">
-            {/* Step Selector Bar */}
-            <div className="grid grid-cols-3 gap-2 pb-4 border-b border-white/[0.08]">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className={`py-2 px-2 text-center rounded text-xs font-mono transition-all ${
-                  step === 1
-                    ? 'bg-blue-600 text-white font-bold border border-blue-400'
-                    : 'text-zinc-400 hover:text-white bg-[#141419]'
-                }`}
-              >
-                01 // Identity
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (name && email && password) setStep(2);
-                  else setError('Please fill in your credentials first.');
-                }}
-                className={`py-2 px-2 text-center rounded text-xs font-mono transition-all ${
-                  step === 2
-                    ? 'bg-blue-600 text-white font-bold border border-blue-400'
-                    : 'text-zinc-400 hover:text-white bg-[#141419]'
-                }`}
-              >
-                02 // CS Skills
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (name && email && password) setStep(3);
-                  else setError('Please fill in your credentials first.');
-                }}
-                className={`py-2 px-2 text-center rounded text-xs font-mono transition-all ${
-                  step === 3
-                    ? 'bg-blue-600 text-white font-bold border border-blue-400'
-                    : 'text-zinc-400 hover:text-white bg-[#141419]'
-                }`}
-              >
-                03 // Bio & Match
-              </button>
+      {/* Main split-screen registration canvas */}
+      <div className="flex-1 flex items-center justify-center py-8 px-4">
+        <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* LEFT COLUMN: BRAND MANIFESTO & LIVE MATCH PREVIEW (DRINKIT MINIMALISM) */}
+          <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-20">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#111115] border border-white/10 text-xs font-mono text-blue-400">
+                <Binary className="w-3.5 h-3.5 text-blue-400" />
+                <span>{t('protocol_tag')}</span>
+              </div>
+
+              <div className="text-xl sm:text-2xl font-pixel font-bold text-white leading-tight">
+                {t('hero_title_1')}<br />
+                <span className="text-zinc-500">{t('hero_title_2')}</span>
+              </div>
+
+              <p className="text-xs font-mono text-zinc-400 leading-relaxed pt-1">
+                {t('hero_desc')}
+              </p>
             </div>
 
-            {error && (
-              <div className="p-3 rounded bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono text-center">
-                {error}
-              </div>
-            )}
-
-            {/* STEP 1: CREDENTIALS */}
-            {step === 1 && (
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-base font-bold text-white font-mono tracking-tight">
-                    Developer Credentials
-                  </h2>
-                  <p className="text-xs font-mono text-zinc-400 mt-0.5">
-                    Your handle is paired with a GitHub-style Identicon. No real photo required.
-                  </p>
+            {/* Real-time Match Radar Card */}
+            <div className="drinkit-card p-5 bg-[#0e0e13] border border-white/10 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2.5">
+                  <Identicon name={name || 'you'} size={36} />
+                  <div>
+                    <div className="text-xs font-bold text-white font-mono">
+                      {name || 'Kim Alexandr'}
+                    </div>
+                    <div className="text-[10px] font-mono text-blue-400">
+                      {t('reg_identicon_preview')}
+                    </div>
+                  </div>
                 </div>
+                <div className="text-right">
+                  <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+                    {matchScore}% Match
+                  </span>
+                </div>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-zinc-300 mb-1.5">
-                    Full Name or Engineering Handle
-                  </label>
+              {/* Match Power Bar */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
+                  <span className="flex items-center gap-1 text-zinc-300">
+                    <Sparkles className="w-3 h-3 text-blue-400" />
+                    {t('reg_calc_power')}
+                  </span>
+                  <span className="font-bold text-blue-400">{matchScore}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 transition-all duration-300"
+                    style={{ width: `${matchScore}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Instant Peer Overlap Teaser */}
+              <div className="space-y-2 pt-1">
+                <div className="text-[10px] font-mono uppercase text-zinc-500 tracking-wider">
+                  {t('reg_instant_overlap')}
+                </div>
+                <div className="space-y-1.5 text-xs font-mono">
+                  <div className="flex items-center justify-between p-2 rounded bg-white/[0.02] border border-white/[0.04]">
+                    <span className="text-zinc-300">{t('reg_can_teach')} ({teachSkills.length}):</span>
+                    <span className="text-emerald-400 font-semibold truncate max-w-[170px]">
+                      {teachSkills.slice(0, 2).join(', ') || 'Select skills'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded bg-white/[0.02] border border-white/[0.04]">
+                    <span className="text-zinc-300">{t('reg_want_learn')} ({learnSkills.length}):</span>
+                    <span className="text-blue-400 font-semibold truncate max-w-[170px]">
+                      {learnSkills.slice(0, 2).join(', ') || 'Select skills'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Extracted Bio Keywords Preview */}
+              {extractedKeywords.length > 0 && (
+                <div className="pt-2 border-t border-white/[0.06] space-y-1.5">
+                  <div className="text-[10px] font-mono text-zinc-500">
+                    {t('reg_extracted_keywords')}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {extractedKeywords.map((kw) => (
+                      <span
+                        key={kw}
+                        className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20"
+                      >
+                        #{kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Protocol Welcome Perk */}
+              <div className="flex items-center gap-2 p-2.5 rounded bg-blue-600/10 border border-blue-500/20 text-xs font-mono text-blue-300">
+                <Zap className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span>{t('reg_bonus_badge')}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: STEPPED REGISTRATION FORM */}
+          <div className="lg:col-span-7">
+            <div className="drinkit-card p-6 md:p-8 bg-[#0d0d12] border border-white/10 shadow-2xl space-y-6">
+              {/* Step Selector Bar */}
+              <div className="grid grid-cols-3 gap-2 pb-4 border-b border-white/[0.08]">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className={`py-2 px-2 text-center rounded text-xs font-mono transition-all ${
+                    step === 1
+                      ? 'bg-blue-600 text-white font-bold border border-blue-400'
+                      : 'text-zinc-400 hover:text-white bg-[#141419]'
+                  }`}
+                >
+                  {t('reg_identity_step')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (name && email && password) setStep(2);
+                    else setError(lang === 'ru' ? 'Заполните учетные данные.' : 'Fill in credentials first.');
+                  }}
+                  className={`py-2 px-2 text-center rounded text-xs font-mono transition-all ${
+                    step === 2
+                      ? 'bg-blue-600 text-white font-bold border border-blue-400'
+                      : 'text-zinc-400 hover:text-white bg-[#141419]'
+                  }`}
+                >
+                  {t('reg_skills_step')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (name && email && password) setStep(3);
+                    else setError(lang === 'ru' ? 'Заполните учетные данные.' : 'Fill in credentials first.');
+                  }}
+                  className={`py-2 px-2 text-center rounded text-xs font-mono transition-all ${
+                    step === 3
+                      ? 'bg-blue-600 text-white font-bold border border-blue-400'
+                      : 'text-zinc-400 hover:text-white bg-[#141419]'
+                  }`}
+                >
+                  {t('reg_bio_step')}
+                </button>
+              </div>
+
+              {error && (
+                <div className="p-3 rounded bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono text-center">
+                  {error}
+                </div>
+              )}
+
+              {/* STEP 1: CREDENTIALS */}
+              {step === 1 && (
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="text-base font-bold text-white font-mono tracking-tight">
+                      {t('reg_cred_title')}
+                    </h2>
+                    <p className="text-xs font-mono text-zinc-400 mt-0.5">
+                      {t('reg_cred_desc')}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-zinc-300 mb-1.5">
+                      {t('reg_name_label')}
+                    </label>
+                    <div className="relative">
+                      <User className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Kim Alexandr"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full bg-[#16161c] border border-white/[0.1] focus:border-blue-500 rounded px-3 py-2.5 pl-9 text-xs text-white outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-zinc-300 mb-1.5">
+                      {t('reg_email_label')}
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                      <input
+                        type="email"
+                        required
+                        placeholder="alex@domain.dev"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full bg-[#16161c] border border-white/[0.1] focus:border-blue-500 rounded px-3 py-2.5 pl-9 text-xs text-white outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-zinc-300 mb-1.5">
+                      {t('reg_pass_label')}
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                      <input
+                        type="password"
+                        required
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full bg-[#16161c] border border-white/[0.1] focus:border-blue-500 rounded px-3 py-2.5 pl-9 text-xs text-white outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!name.trim() || !email.trim() || !password.trim()) {
+                          setError(lang === 'ru' ? 'Заполните все поля учетных данных.' : 'Fill in all credential fields.');
+                          return;
+                        }
+                        setError('');
+                        setStep(2);
+                      }}
+                      className="w-full py-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-600/20"
+                    >
+                      <span>{t('reg_btn_to_skills')}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: CS SKILLS SELECTION */}
+              {step === 2 && (
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="text-base font-bold text-white font-mono tracking-tight">
+                      {t('reg_matrix_title')}
+                    </h2>
+                    <p className="text-xs font-mono text-zinc-400 mt-0.5">
+                      {t('reg_matrix_desc')}
+                    </p>
+                  </div>
+
+                  {/* Sub-tab Switcher: Teach vs Learn */}
+                  <div className="flex gap-2 p-1 bg-[#141419] rounded border border-white/5">
+                    <button
+                      type="button"
+                      onClick={() => setActiveSkillTab('TEACH')}
+                      className={`flex-1 py-2 px-3 rounded text-xs font-mono font-medium transition-all flex items-center justify-center gap-2 ${
+                        activeSkillTab === 'TEACH'
+                          ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{t('reg_can_teach')} ({teachSkills.length})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSkillTab('LEARN')}
+                      className={`flex-1 py-2 px-3 rounded text-xs font-mono font-medium transition-all flex items-center justify-center gap-2 ${
+                        activeSkillTab === 'LEARN'
+                          ? 'bg-blue-500/20 border border-blue-500/40 text-blue-300'
+                          : 'text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      <Cpu className="w-3.5 h-3.5 text-blue-400" />
+                      <span>{t('reg_want_learn')} ({learnSkills.length})</span>
+                    </button>
+                  </div>
+
+                  {/* Search Filter */}
                   <div className="relative">
-                    <User className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                     <input
                       type="text"
-                      required
-                      placeholder="e.g. Linus Chen"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full bg-[#16161c] border border-white/[0.1] focus:border-blue-500 rounded px-3 py-2.5 pl-9 text-xs text-white outline-none font-mono"
+                      value={skillSearch}
+                      onChange={(e) => setSkillSearch(e.target.value)}
+                      placeholder={t('reg_search_placeholder')}
+                      className="w-full bg-[#16161c] border border-white/[0.08] focus:border-blue-500 rounded px-3 py-2 pl-9 text-xs text-white outline-none font-mono"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-zinc-300 mb-1.5">
-                    Email Address
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                    <input
-                      type="email"
-                      required
-                      placeholder="linus@domain.dev"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-[#16161c] border border-white/[0.1] focus:border-blue-500 rounded px-3 py-2.5 pl-9 text-xs text-white outline-none font-mono"
-                    />
+                  {/* Skills Grid */}
+                  <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                    {filteredSkills.map((s) => {
+                      const isSelected =
+                        activeSkillTab === 'TEACH'
+                          ? teachSkills.includes(s.name)
+                          : learnSkills.includes(s.name);
+
+                      return (
+                        <button
+                          type="button"
+                          key={s.name}
+                          onClick={() =>
+                            activeSkillTab === 'TEACH'
+                              ? toggleTeachSkill(s.name)
+                              : toggleLearnSkill(s.name)
+                          }
+                          className={`p-2.5 rounded text-left border transition-all text-xs font-mono flex flex-col justify-between ${
+                            isSelected
+                              ? activeSkillTab === 'TEACH'
+                                ? 'bg-emerald-500/15 border-emerald-500/50 text-white'
+                                : 'bg-blue-500/15 border-blue-500/50 text-white'
+                              : 'bg-[#141419] border-white/[0.06] text-zinc-400 hover:border-white/20'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-1">
+                            <span className="font-semibold leading-snug line-clamp-1">{s.name}</span>
+                            {isSelected ? (
+                              <Check
+                                className={`w-3.5 h-3.5 shrink-0 ${
+                                  activeSkillTab === 'TEACH' ? 'text-emerald-400' : 'text-blue-400'
+                                }`}
+                              />
+                            ) : (
+                              <Plus className="w-3.5 h-3.5 shrink-0 text-zinc-600" />
+                            )}
+                          </div>
+                          <div className="mt-1 flex items-center justify-between text-[9px] text-zinc-500">
+                            <span>{s.category}</span>
+                            <span className="px-1 py-0.2 rounded bg-white/5 text-zinc-400">
+                              {s.tag}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-mono text-zinc-300 mb-1.5">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                    <input
-                      type="password"
-                      required
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-[#16161c] border border-white/[0.1] focus:border-blue-500 rounded px-3 py-2.5 pl-9 text-xs text-white outline-none font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!name.trim() || !email.trim() || !password.trim()) {
-                        setError('Fill in all credential fields before continuing.');
-                        return;
-                      }
-                      setError('');
-                      setStep(2);
-                    }}
-                    className="w-full py-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-600/20"
-                  >
-                    <span>Proceed to CS Topics (02)</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* STEP 2: CS SKILLS SELECTION */}
-            {step === 2 && (
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-base font-bold text-white font-mono tracking-tight">
-                    Computer Science Matrix
-                  </h2>
-                  <p className="text-xs font-mono text-zinc-400 mt-0.5">
-                    Select the topics you can mentor in, and the skills you want to learn.
-                  </p>
-                </div>
-
-                {/* Sub-tab Switcher: Teach vs Learn */}
-                <div className="flex gap-2 p-1 bg-[#141419] rounded border border-white/5">
-                  <button
-                    type="button"
-                    onClick={() => setActiveSkillTab('TEACH')}
-                    className={`flex-1 py-2 px-3 rounded text-xs font-mono font-medium transition-all flex items-center justify-center gap-2 ${
-                      activeSkillTab === 'TEACH'
-                        ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>I Can Teach ({teachSkills.length})</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveSkillTab('LEARN')}
-                    className={`flex-1 py-2 px-3 rounded text-xs font-mono font-medium transition-all flex items-center justify-center gap-2 ${
-                      activeSkillTab === 'LEARN'
-                        ? 'bg-blue-500/20 border border-blue-500/40 text-blue-300'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <Cpu className="w-3.5 h-3.5 text-blue-400" />
-                    <span>I Want to Learn ({learnSkills.length})</span>
-                  </button>
-                </div>
-
-                {/* Search Filter */}
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                  <input
-                    type="text"
-                    value={skillSearch}
-                    onChange={(e) => setSkillSearch(e.target.value)}
-                    placeholder="Search CS skills (e.g. Rust, PyTorch, Concurrency)..."
-                    className="w-full bg-[#16161c] border border-white/[0.08] focus:border-blue-500 rounded px-3 py-2 pl-9 text-xs text-white outline-none font-mono"
-                  />
-                </div>
-
-                {/* Skills Grid */}
-                <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
-                  {filteredSkills.map((s) => {
-                    const isSelected =
-                      activeSkillTab === 'TEACH'
-                        ? teachSkills.includes(s.name)
-                        : learnSkills.includes(s.name);
-
-                    return (
-                      <button
-                        type="button"
-                        key={s.name}
-                        onClick={() =>
-                          activeSkillTab === 'TEACH'
-                            ? toggleTeachSkill(s.name)
-                            : toggleLearnSkill(s.name)
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setStep(1)}
+                      className="px-4 py-2.5 rounded bg-zinc-800 hover:bg-zinc-700 text-white font-mono text-xs transition-all flex items-center gap-1.5"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>{t('btn_back')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (teachSkills.length === 0 || learnSkills.length === 0) {
+                          setError(lang === 'ru' ? 'Выберите 1 навык для обучения и 1 для изучения.' : 'Pick at least 1 teaching and 1 learning skill.');
+                          return;
                         }
-                        className={`p-2.5 rounded text-left border transition-all text-xs font-mono flex flex-col justify-between ${
-                          isSelected
-                            ? activeSkillTab === 'TEACH'
-                              ? 'bg-emerald-500/15 border-emerald-500/50 text-white'
-                              : 'bg-blue-500/15 border-blue-500/50 text-white'
-                            : 'bg-[#141419] border-white/[0.06] text-zinc-400 hover:border-white/20'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-1">
-                          <span className="font-semibold leading-snug line-clamp-1">{s.name}</span>
-                          {isSelected ? (
-                            <Check
-                              className={`w-3.5 h-3.5 shrink-0 ${
-                                activeSkillTab === 'TEACH' ? 'text-emerald-400' : 'text-blue-400'
-                              }`}
-                            />
-                          ) : (
-                            <Plus className="w-3.5 h-3.5 shrink-0 text-zinc-600" />
-                          )}
-                        </div>
-                        <div className="mt-1 flex items-center justify-between text-[9px] text-zinc-500">
-                          <span>{s.category}</span>
-                          <span className="px-1 py-0.2 rounded bg-white/5 text-zinc-400">
-                            {s.tag}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
+                        setError('');
+                        setStep(3);
+                      }}
+                      className="flex-1 py-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all flex items-center justify-center gap-2"
+                    >
+                      <span>{t('reg_btn_to_bio')}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
+              )}
 
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="px-4 py-2.5 rounded bg-zinc-800 hover:bg-zinc-700 text-white font-mono text-xs transition-all flex items-center gap-1.5"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    <span>Back</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (teachSkills.length === 0 || learnSkills.length === 0) {
-                        setError('Pick at least 1 teaching skill and 1 learning skill.');
-                        return;
-                      }
-                      setError('');
-                      setStep(3);
-                    }}
-                    className="flex-1 py-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all flex items-center justify-center gap-2"
-                  >
-                    <span>Proceed to Bio & Matching (03)</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+              {/* STEP 3: BIO & CONFIRMATION */}
+              {step === 3 && (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <h2 className="text-base font-bold text-white font-mono tracking-tight">
+                      {t('reg_bio_title')}
+                    </h2>
+                    <p className="text-xs font-mono text-zinc-400 mt-0.5">
+                      {t('reg_bio_desc')}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-zinc-300 mb-1.5">
+                      {t('reg_bio_label')}
+                    </label>
+                    <textarea
+                      rows={4}
+                      required
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                      placeholder={t('reg_bio_placeholder')}
+                      className="w-full bg-[#16161c] border border-white/[0.1] focus:border-blue-500 rounded p-3 text-xs text-white outline-none font-mono resize-none leading-relaxed"
+                    />
+                  </div>
+
+                  {/* Summary Box */}
+                  <div className="p-4 rounded bg-[#111116] border border-white/[0.08] space-y-2 text-xs font-mono">
+                    <div className="text-zinc-400">
+                      {t('reg_can_teach')}:{' '}
+                      <span className="text-emerald-400 font-semibold">
+                        {teachSkills.join(', ')}
+                      </span>
+                    </div>
+                    <div className="text-zinc-400">
+                      {t('reg_want_learn')}:{' '}
+                      <span className="text-blue-400 font-semibold">
+                        {learnSkills.join(', ')}
+                      </span>
+                    </div>
+                    <div className="text-zinc-400">
+                      {t('reg_calc_power')}:{' '}
+                      <span className="text-white font-bold">{matchScore}%</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setStep(2)}
+                      className="px-4 py-2.5 rounded bg-zinc-800 hover:bg-zinc-700 text-white font-mono text-xs transition-all flex items-center gap-1.5"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>{t('btn_back')}</span>
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="flex-1 py-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 disabled:opacity-50"
+                    >
+                      {loading ? 'Creating Account...' : t('reg_submit_btn')}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              <div className="text-center text-xs font-mono text-zinc-500 pt-2 border-t border-white/[0.06]">
+                {t('reg_already_have')}{' '}
+                <Link href="/auth/login" className="text-blue-400 hover:underline">
+                  {t('nav_signin')}
+                </Link>
               </div>
-            )}
-
-            {/* STEP 3: BIO & CONFIRMATION */}
-            {step === 3 && (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <h2 className="text-base font-bold text-white font-mono tracking-tight">
-                    Engineering Bio & Semantic Match
-                  </h2>
-                  <p className="text-xs font-mono text-zinc-400 mt-0.5">
-                    Describe your tech background. The engine performs token intersection against other peers.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-zinc-300 mb-1.5">
-                    Engineering Bio / Current Focus
-                  </label>
-                  <textarea
-                    rows={4}
-                    required
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    placeholder="Describe what you are engineering or studying (e.g. distributed Raft consensus in Rust, PyTorch transformer fine-tuning)..."
-                    className="w-full bg-[#16161c] border border-white/[0.1] focus:border-blue-500 rounded p-3 text-xs text-white outline-none font-mono resize-none leading-relaxed"
-                  />
-                </div>
-
-                {/* Summary Box */}
-                <div className="p-4 rounded bg-[#111116] border border-white/[0.08] space-y-2 text-xs font-mono">
-                  <div className="text-zinc-400">
-                    Teaching:{' '}
-                    <span className="text-emerald-400 font-semibold">
-                      {teachSkills.join(', ')}
-                    </span>
-                  </div>
-                  <div className="text-zinc-400">
-                    Learning:{' '}
-                    <span className="text-blue-400 font-semibold">
-                      {learnSkills.join(', ')}
-                    </span>
-                  </div>
-                  <div className="text-zinc-400">
-                    Calculated Peer Match:{' '}
-                    <span className="text-white font-bold">{matchScore}%</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
-                    className="px-4 py-2.5 rounded bg-zinc-800 hover:bg-zinc-700 text-white font-mono text-xs transition-all flex items-center gap-1.5"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" />
-                    <span>Back</span>
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex-1 py-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 disabled:opacity-50"
-                  >
-                    {loading ? 'Creating Account...' : 'Complete Profile & Claim 5 XC'}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            <div className="text-center text-xs font-mono text-zinc-500 pt-2 border-t border-white/[0.06]">
-              Already have an account?{' '}
-              <Link href="/auth/login" className="text-blue-400 hover:underline">
-                Sign In
-              </Link>
             </div>
           </div>
         </div>

@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { Bell, Search, Video, UserCheck, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { Bell, Search, Video, UserCheck, ChevronDown, CheckCircle2, Globe } from 'lucide-react';
+import LanguageSwitcher from '@/components/ui/LanguageSwitcher';
 
 const DEMO_ACCOUNTS = [
   { name: 'Alex Voronov', email: 'alex@xchange.dev', role: 'Python & AI' },
@@ -61,6 +62,19 @@ export default function TopHeader() {
 
       {/* Right Actions */}
       <div className="flex items-center gap-3">
+        {/* Landing Page Link */}
+        <Link
+          href="/"
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-[11px] font-mono text-zinc-400 hover:text-white transition-colors"
+          title="Return to Public Landing Page"
+        >
+          <Globe className="w-3 h-3 text-zinc-400" />
+          <span>Landing</span>
+        </Link>
+
+        {/* Trilingual Switcher (RU / KZ / EN) */}
+        <LanguageSwitcher />
+
         {/* Instant 1-Click Demo Account Switcher */}
         <div className="relative">
           <button

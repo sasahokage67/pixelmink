@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { AuthProvider } from '@/context/AuthContext';
 import { SocketProvider } from '@/context/SocketContext';
+import { LanguageProvider } from '@/context/LanguageContext';
 import AppShell from '@/components/layout/AppShell';
 
 export const metadata: Metadata = {
@@ -20,11 +21,13 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="bg-[#09090b] text-[#fafafa] min-h-[100dvh] flex flex-col font-sans antialiased selection:bg-blue-600/30 selection:text-blue-200">
-        <AuthProvider>
-          <SocketProvider>
-            <AppShell>{children}</AppShell>
-          </SocketProvider>
-        </AuthProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <SocketProvider>
+              <AppShell>{children}</AppShell>
+            </SocketProvider>
+          </AuthProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

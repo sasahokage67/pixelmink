@@ -20,6 +20,7 @@ import {
   ShieldAlert,
   LogOut,
   Zap,
+  Globe,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -88,8 +89,16 @@ export default function Sidebar() {
           );
         })}
 
-        {/* Admin Link */}
-        <div className="pt-2 border-t border-white/[0.06] mt-2">
+        {/* Public & Admin Links */}
+        <div className="pt-2 border-t border-white/[0.06] mt-2 space-y-1">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 px-3 py-2 rounded text-xs transition-all text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]"
+          >
+            <Globe className="w-3.5 h-3.5 text-zinc-500" />
+            <span>Public Landing</span>
+          </Link>
+
           <Link
             href="/admin"
             className={`flex items-center gap-2.5 px-3 py-2 rounded text-xs transition-all ${
