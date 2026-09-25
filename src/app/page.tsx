@@ -123,24 +123,24 @@ export default function LandingPage() {
     <div className="min-h-screen bg-[#09090b]">
       {/* DRINKIT-STYLE LANDING NAVBAR */}
       <header className="sticky top-0 z-40 bg-[#09090b]/90 backdrop-blur-md border-b border-white/[0.08] px-4 md:px-8 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-6 z-10">
           <Link href="/" className="flex items-center gap-2.5 group">
             <Logo size={28} />
             <span className="font-pixel text-xs sm:text-sm text-white group-hover:text-blue-400 transition-colors">
               pixelmink
             </span>
           </Link>
-          <span className="hidden lg:inline text-xs font-mono text-zinc-500 border-l border-white/10 pl-4">
+          <span className="hidden xl:inline text-xs font-mono text-zinc-500 border-l border-white/10 pl-4">
             {t('slogan')}
           </span>
         </div>
 
-        <nav className="hidden md:flex items-center gap-6 text-xs font-mono text-zinc-400">
+        <nav className="hidden md:flex items-center gap-6 text-xs font-mono text-zinc-400 absolute left-1/2 -translate-x-1/2">
           <a href="#disciplines" className="hover:text-white transition-colors">{t('nav_matrix')}</a>
           <a href="#how-it-works" className="hover:text-white transition-colors">{t('nav_rules')}</a>
         </nav>
 
-        <div className="flex items-center gap-3 font-mono text-xs">
+        <div className="flex items-center gap-3 font-mono text-xs z-10">
           {/* Language Switcher RU / KZ / EN */}
           <LanguageSwitcher />
 
