@@ -2,9 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { AuthProvider } from '@/context/AuthContext';
 import { SocketProvider } from '@/context/SocketContext';
-import Sidebar from '@/components/layout/Sidebar';
-import TopHeader from '@/components/layout/TopHeader';
-import MobileNav from '@/components/layout/MobileNav';
+import AppShell from '@/components/layout/AppShell';
 
 export const metadata: Metadata = {
   title: 'pixelmink — Your skills for theirs. No money, just knowledge.',
@@ -24,16 +22,7 @@ export default function RootLayout({
       <body className="bg-[#09090b] text-[#fafafa] min-h-[100dvh] flex flex-col font-sans antialiased selection:bg-blue-600/30 selection:text-blue-200">
         <AuthProvider>
           <SocketProvider>
-            <div className="flex flex-1 min-h-screen">
-              <Sidebar />
-              <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
-                <TopHeader />
-                <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto">
-                  {children}
-                </main>
-              </div>
-            </div>
-            <MobileNav />
+            <AppShell>{children}</AppShell>
           </SocketProvider>
         </AuthProvider>
       </body>

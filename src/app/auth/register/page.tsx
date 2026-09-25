@@ -104,7 +104,7 @@ export default function RegisterPage() {
     if (!bio) return [];
     const words = bio
       .toLowerCase()
-      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .replace(/[^a-zA-Z0-9\u0400-\u04FF]+/g, ' ')
       .split(/\s+/)
       .filter((w) => w.length > 3 && !STOPWORDS.has(w));
     return Array.from(new Set(words)).slice(0, 6);

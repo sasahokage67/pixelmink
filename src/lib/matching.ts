@@ -25,7 +25,7 @@ function extractKeywords(text: string): Set<string> {
   if (!text) return new Set();
   const words = text
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/[^a-zA-Z0-9\u0400-\u04FF]+/g, ' ')
     .split(/\s+/)
     .filter((w) => w.length > 2 && !STOPWORDS.has(w));
   return new Set(words);

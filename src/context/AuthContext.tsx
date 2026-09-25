@@ -53,18 +53,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
       }
-      // Auto-fallback: if no active cookie, default to Alex Voronov for frictionless testing
-      const loginRes = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'alex@xchange.dev', password: 'password123' }),
-      });
-      if (loginRes.ok) {
-        const loginData = await loginRes.json();
-        setUser(loginData.user);
-      }
+      setUser(null);
     } catch (err) {
       console.error('Auth check error:', err);
+      setUser(null);
     } finally {
       setLoading(false);
     }

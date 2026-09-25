@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
 import Logo from '@/components/ui/Logo';
 import Identicon from '@/components/ui/Identicon';
 import {
@@ -98,21 +99,73 @@ const RECENT_EXCHANGES = [
 ];
 
 export default function LandingPage() {
+  const { user } = useAuth();
   const [selectedDemoSkill, setSelectedDemoSkill] = useState<'rust' | 'ai' | 'systems'>('rust');
 
   return (
-    <div className="space-y-24 py-6">
-      {/* 1. HERO SECTION: DRINKIT-STYLE EDITORIAL TYPOGRAPHY & ZERO SLOP */}
-      <section className="relative pt-6 pb-16 border-b border-white/[0.08]">
-        <div className="max-w-4xl space-y-6">
-          {/* Status Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#111115] border border-white/10 text-xs font-mono text-zinc-300">
-            <Logo size={18} />
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-            <span className="text-white font-bold tracking-tight">pixelmink</span>
-            <span className="text-zinc-600">•</span>
-            <span className="text-blue-400">Computer Science Barter Protocol</span>
-          </div>
+    <div className="min-h-screen bg-[#09090b]">
+      {/* DRINKIT-STYLE LANDING NAVBAR */}
+      <header className="sticky top-0 z-40 bg-[#09090b]/90 backdrop-blur-md border-b border-white/[0.08] px-4 md:px-8 py-3.5 flex items-center justify-between">
+        <div className="flex items-center gap-6">
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <Logo size={28} />
+            <span className="font-pixel text-sm font-bold text-white group-hover:text-blue-400 transition-colors">
+              pixelmink
+            </span>
+          </Link>
+          <span className="hidden lg:inline text-xs font-mono text-zinc-500 border-l border-white/10 pl-4">
+            “Your skills for theirs. No money, just knowledge.”
+          </span>
+        </div>
+
+        <nav className="hidden md:flex items-center gap-6 text-xs font-mono text-zinc-400">
+          <a href="#simulator" className="hover:text-white transition-colors">Protocol Simulator</a>
+          <a href="#disciplines" className="hover:text-white transition-colors">CS Matrix</a>
+          <a href="#how-it-works" className="hover:text-white transition-colors">Rules</a>
+          <a href="#activity" className="hover:text-white transition-colors">Live Barters</a>
+        </nav>
+
+        <div className="flex items-center gap-3 font-mono text-xs">
+          {user ? (
+            <Link
+              href="/dashboard"
+              className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all shadow-md shadow-blue-600/20 flex items-center gap-1.5"
+            >
+              <span>Workspace</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/auth/login"
+                className="px-3 py-1.5 text-zinc-400 hover:text-white transition-colors"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/auth/register"
+                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all shadow-md shadow-blue-600/20"
+              >
+                Register
+              </Link>
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* MAIN LANDING BODY */}
+      <div className="max-w-6xl mx-auto px-4 md:px-8 space-y-24 py-8">
+        {/* 1. HERO SECTION: DRINKIT-STYLE EDITORIAL TYPOGRAPHY & ZERO SLOP */}
+        <section className="relative pt-6 pb-16 border-b border-white/[0.08]">
+          <div className="max-w-4xl space-y-6">
+            {/* Status Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#111115] border border-white/10 text-xs font-mono text-zinc-300">
+              <Logo size={18} />
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+              <span className="text-white font-bold tracking-tight">pixelmink</span>
+              <span className="text-zinc-600">•</span>
+              <span className="text-blue-400">Computer Science Barter Protocol</span>
+            </div>
 
           {/* Slogan & Bold Statement */}
           <div className="space-y-3">
@@ -179,7 +232,7 @@ export default function LandingPage() {
       </section>
 
       {/* 2. INTERACTIVE MATCHING SIMULATOR BENTO */}
-      <section className="space-y-6">
+      <section id="simulator" className="space-y-6 scroll-mt-20">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
           <div>
             <div className="text-[10px] font-mono uppercase text-blue-400 tracking-wider flex items-center gap-1.5">
@@ -339,7 +392,7 @@ export default function LandingPage() {
       </section>
 
       {/* 3. COMPUTER SCIENCE DISCIPLINE MATRIX (BENTO GRID) */}
-      <section className="space-y-6">
+      <section id="disciplines" className="space-y-6 scroll-mt-20">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-[10px] font-mono uppercase text-emerald-400 tracking-wider">
@@ -395,7 +448,7 @@ export default function LandingPage() {
       </section>
 
       {/* 4. PROTOCOL ARCHITECTURE (HOW IT WORKS) */}
-      <section className="space-y-6">
+      <section id="how-it-works" className="space-y-6 scroll-mt-20">
         <div>
           <div className="text-[10px] font-mono uppercase text-blue-400 tracking-wider">
             Protocol Rules
@@ -453,7 +506,7 @@ export default function LandingPage() {
       </section>
 
       {/* 5. LIVE NETWORK ACTIVITY TICKER */}
-      <section className="space-y-4">
+      <section id="activity" className="space-y-4 scroll-mt-20">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
@@ -546,5 +599,6 @@ export default function LandingPage() {
         </div>
       </footer>
     </div>
+  </div>
   );
 }
