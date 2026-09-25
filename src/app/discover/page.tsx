@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -195,17 +196,21 @@ export default function DiscoverPage() {
                 <div className="space-y-3">
                   {/* Peer Avatar & Rating */}
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
+                    <Link
+                      href={`/profile?userId=${peer.id}`}
+                      className="flex items-center gap-3 group"
+                      title="Перейти в профиль инженера"
+                    >
                       <Identicon name={peer.profile?.name || peer.email || 'peer'} size={44} />
                       <div>
-                        <div className="text-sm font-semibold text-white tracking-tight">
-                          {peer.profile?.name}
+                        <div className="text-sm font-semibold text-white tracking-tight group-hover:text-blue-400 transition-colors">
+                          {peer.profile?.name || peer.email?.split('@')[0]}
                         </div>
                         <div className="text-[10px] font-mono text-zinc-500 mt-0.5">
                           {peer.profile?.location || 'Remote'} • {peer.profile?.timezone || 'UTC+0'}
                         </div>
                       </div>
-                    </div>
+                    </Link>
 
                     <div className="flex items-center gap-1 font-mono text-xs text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">
                       <Star className="w-3 h-3 fill-amber-400" />

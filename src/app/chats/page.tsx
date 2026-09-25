@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
@@ -337,7 +338,11 @@ export default function ChatsPage() {
         <div className="flex-1 flex flex-col min-w-0 bg-[#0c0c10]">
           {/* Header */}
           <div className="p-4 border-b border-white/[0.08] flex items-center justify-between bg-[#111114]">
-            <div className="flex items-center gap-3 min-w-0">
+            <Link
+              href={otherMember ? `/profile?userId=${otherMember.id}` : '/profile'}
+              className="flex items-center gap-3 min-w-0 group hover:opacity-90 transition-opacity"
+              title="Перейти в личный кабинет собеседника"
+            >
               <div className="relative">
                 <Identicon name={otherMember?.profile?.name || 'peer'} size={36} />
                 {isPeerOnline && (
@@ -346,8 +351,8 @@ export default function ChatsPage() {
               </div>
 
               <div className="min-w-0">
-                <div className="text-xs font-semibold text-white tracking-tight truncate">
-                  {otherMember?.profile?.name || 'Tech Peer'}
+                <div className="text-xs font-semibold text-white tracking-tight truncate group-hover:text-blue-400 transition-colors">
+                  {otherMember?.profile?.name || otherMember?.email?.split('@')[0] || 'Tech Peer'}
                 </div>
                 <div className="text-[10px] font-mono text-zinc-400 flex items-center gap-1.5">
                   <span className={isPeerOnline ? 'text-emerald-400' : 'text-zinc-500'}>
@@ -357,7 +362,7 @@ export default function ChatsPage() {
                   <span>{otherMember?.profile?.timezone || 'UTC+0'}</span>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Real WebRTC Call Buttons */}
             <div className="flex items-center gap-2">
@@ -392,7 +397,9 @@ export default function ChatsPage() {
                 >
                   <div className="flex items-end gap-2 max-w-[85%] md:max-w-[70%]">
                     {!isMine && (
-                      <Identicon name={msg.sender?.profile?.name || 'peer'} size={24} className="mb-1" />
+                      <Link href={`/profile?userId=${msg.senderId}`} title="Перейти в личный кабинет">
+                        <Identicon name={msg.sender?.profile?.name || 'peer'} size={24} className="mb-1 hover:ring-1 hover:ring-blue-400 rounded-full transition-all" />
+                      </Link>
                     )}
 
                     <div className="space-y-1">

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { Bell, Search, Video, UserCheck, Globe } from 'lucide-react';
 import LanguageSwitcher from '@/components/ui/LanguageSwitcher';
+import Identicon from '@/components/ui/Identicon';
 
 export default function TopHeader() {
   const { user } = useAuth();
@@ -68,10 +69,11 @@ export default function TopHeader() {
         {user && (
           <Link
             href="/profile"
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#141418] hover:bg-[#1a1a20] border border-white/[0.1] text-xs font-mono text-zinc-300 tap-active transition-all"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-[#141418] hover:bg-[#1a1a20] border border-white/[0.1] text-xs font-mono text-zinc-300 tap-active transition-all"
+            title="Перейти в личный кабинет"
           >
-            <UserCheck className="w-3.5 h-3.5 text-blue-400" />
-            <span className="hidden sm:inline">{user?.profile?.name || user.email}</span>
+            <Identicon name={user?.profile?.name || user.email} size={22} />
+            <span className="hidden sm:inline font-semibold">{user?.profile?.name || user.email.split('@')[0]}</span>
           </Link>
         )}
 

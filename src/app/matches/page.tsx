@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Sparkles,
@@ -212,17 +213,21 @@ export default function MatchesPage() {
                 >
                   <div className="space-y-3">
                     <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
+                      <Link
+                        href={`/profile?userId=${candidate?.id}`}
+                        className="flex items-center gap-3 group"
+                        title="Перейти в личный кабинет кандидата"
+                      >
                         <Identicon name={candidate?.profile?.name || candidate?.email || 'peer'} size={44} />
                         <div>
-                          <div className="text-sm font-semibold text-white tracking-tight">
-                            {candidate?.profile?.name}
+                          <div className="text-sm font-semibold text-white tracking-tight group-hover:text-blue-400 transition-colors">
+                            {candidate?.profile?.name || candidate?.email?.split('@')[0]}
                           </div>
                           <div className="text-[10px] font-mono text-zinc-500">
                             ⭐️ {candidate?.profile?.rating || '4.9'} • {candidate?.profile?.location || 'Remote'}
                           </div>
                         </div>
-                      </div>
+                      </Link>
 
                       <div className="font-mono text-xs font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-full">
                         {m.score}% MATCH

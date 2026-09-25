@@ -21,6 +21,7 @@ import {
   LogOut,
   Zap,
   Globe,
+  User,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -30,7 +31,7 @@ const NAV_ITEMS = [
   { href: '/chats', label: 'Chats', icon: MessageSquare },
   { href: '/calls', label: 'Calls', icon: Video },
   { href: '/seminars', label: 'Seminars', icon: GraduationCap },
-  { href: '/progress', label: 'Progress', icon: TrendingUp },
+  { href: '/profile', label: 'Личный кабинет', icon: User },
   { href: '/skills', label: 'My Skills', icon: Layers },
   { href: '/tests', label: 'Proof Tests', icon: Award },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
@@ -117,13 +118,13 @@ export default function Sidebar() {
       <div className="p-3 border-t border-white/[0.08] bg-[#0c0c0f]">
         <div className="flex items-center justify-between p-1.5 rounded hover:bg-white/[0.03] transition-colors">
           <Link href="/profile" className="flex items-center gap-2.5 min-w-0 flex-1">
-            <Identicon name={user?.profile?.name || user?.email || 'me'} size={28} />
+            <Identicon name={user?.profile?.name || user?.email || 'User'} size={28} />
             <div className="min-w-0">
               <div className="text-xs text-white truncate">
-                {user?.profile?.name || 'Alex'}
+                {user?.profile?.name || user?.email?.split('@')[0] || 'My Profile'}
               </div>
               <div className="text-[10px] text-zinc-500 truncate">
-                {user?.email || 'alex@xchange.dev'}
+                {user?.email || 'Active Peer'}
               </div>
             </div>
           </Link>

@@ -165,17 +165,21 @@ export default function DashboardPage() {
                   <div className="space-y-3">
                     {/* Header */}
                     <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
+                      <Link
+                        href={`/profile?userId=${candidate?.id}`}
+                        className="flex items-center gap-3 group"
+                        title="Перейти в личный кабинет кандидата"
+                      >
                         <Identicon name={candidate?.profile?.name || candidate?.email || 'peer'} size={40} />
                         <div>
-                          <div className="text-xs font-semibold text-white tracking-tight">
-                            {candidate?.profile?.name}
+                          <div className="text-xs font-semibold text-white tracking-tight group-hover:text-blue-400 transition-colors">
+                            {candidate?.profile?.name || candidate?.email?.split('@')[0]}
                           </div>
                           <div className="text-[10px] font-mono text-zinc-500">
                             ⭐️ {candidate?.profile?.rating || '4.9'} • {candidate?.profile?.location || 'Remote'}
                           </div>
                         </div>
-                      </div>
+                      </Link>
 
                       {/* Match Score Badge */}
                       <div className="text-right">
