@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import Logo from '@/components/ui/Logo';
-import Identicon from '@/components/ui/Identicon';
 import LanguageSwitcher from '@/components/ui/LanguageSwitcher';
 import {
   Lock,
@@ -17,16 +16,12 @@ import {
   Database,
   Shield,
   Layers,
-  Sparkles,
   Check,
   Plus,
   ArrowRight,
   ArrowLeft,
-  Binary,
-  Flame,
   Search,
   CheckCircle2,
-  Zap,
   Globe,
 } from 'lucide-react';
 
@@ -85,13 +80,6 @@ const CS_SKILL_CATALOG: SkillItem[] = [
   { name: 'Computer Vision & OpenCV', category: 'AI', popularityRank: 5, tag: '#5 Нишевое • Распознавание объектов' },
 ];
 
-const STOPWORDS = new Set([
-  'and', 'the', 'for', 'with', 'from', 'this', 'that', 'have', 'want', 'what', 'like', 'good', 'will',
-  'into', 'some', 'your', 'about', 'also', 'over', 'both', 'their', 'been', 'were', 'which', 'where',
-  'after', 'before', 'more', 'most', 'very', 'just', 'when', 'then', 'than', 'them', 'these', 'those',
-  'и', 'в', 'на', 'с', 'по', 'к', 'для', 'от', 'до', 'из', 'у', 'о', 'об', 'за', 'при', 'что', 'как', 'так'
-]);
-
 export default function RegisterPage() {
   const router = useRouter();
   const { register } = useAuth();
@@ -101,35 +89,16 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [bio, setBio] = useState(
-    'Systems programmer building high-throughput microservices and distributed databases. Looking to exchange Rust knowledge for PyTorch deep learning architecture.'
-  );
+  const [bio, setBio] = useState('');
 
-  const [teachSkills, setTeachSkills] = useState<string[]>([
-    'Python',
-    'Algorithms & Data Structures',
-  ]);
-  const [learnSkills, setLearnSkills] = useState<string[]>([
-    'Rust',
-    'PyTorch & AI',
-  ]);
+  const [teachSkills, setTeachSkills] = useState<string[]>([]);
+  const [learnSkills, setLearnSkills] = useState<string[]>([]);
 
   const [activeSkillTab, setActiveSkillTab] = useState<'TEACH' | 'LEARN'>('TEACH');
   const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'Coding' | 'Design' | 'Video' | 'AI'>('ALL');
   const [skillSearch, setSkillSearch] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // Extract keywords dynamically from bio
-  const extractedKeywords = useMemo(() => {
-    if (!bio) return [];
-    const words = bio
-      .toLowerCase()
-      .replace(/[^a-zA-Z0-9\u0400-\u04FF]+/g, ' ')
-      .split(/\s+/)
-      .filter((w) => w.length > 3 && !STOPWORDS.has(w));
-    return Array.from(new Set(words)).slice(0, 6);
-  }, [bio]);
 
   // Filter skills by category and search, strictly sorted by popularity rank (1 to N)
   const filteredSkills = useMemo(() => {
@@ -164,15 +133,6 @@ export default function RegisterPage() {
       setLearnSkills([...learnSkills, skillName]);
     }
   };
-
-  // Real-time match estimation
-  const matchScore = useMemo(() => {
-    const base = 45;
-    const teachBonus = Math.min(teachSkills.length * 9, 27);
-    const learnBonus = Math.min(learnSkills.length * 9, 27);
-    const kwBonus = Math.min(extractedKeywords.length * 3, 15);
-    return Math.min(base + teachBonus + learnBonus + kwBonus, 98);
-  }, [teachSkills, learnSkills, extractedKeywords]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -240,112 +200,21 @@ export default function RegisterPage() {
         </div>
       </header>
 
-      {/* Main split-screen registration canvas */}
+      {/* Centered Registration Canvas */}
       <div className="flex-1 flex items-center justify-center py-8 px-4">
-        <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* LEFT COLUMN: BRAND MANIFESTO & LIVE MATCH PREVIEW (DRINKIT MINIMALISM) */}
-          <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-20">
-            <div className="space-y-3">
-              <div className="text-base sm:text-lg font-pixel text-white leading-relaxed">
-                {t('hero_title_1')}<br />
-                <span className="text-zinc-500">{t('hero_title_2')}</span>
-              </div>
-
-              <p className="text-xs font-sans text-zinc-400 leading-relaxed pt-1">
-                {t('hero_desc')}
-              </p>
-            </div>
-
-            {/* Real-time Match Radar Card */}
-            <div className="drinkit-card p-5 bg-[#0e0e13] border border-white/10 space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
-                <div className="flex items-center gap-2.5">
-                  <Identicon name={name || 'you'} size={36} />
-                  <div>
-                    <div className="text-xs font-bold text-white font-mono">
-                      {name || 'Kim Alexandr'}
-                    </div>
-                    <div className="text-[10px] font-mono text-blue-400">
-                      {t('reg_identicon_preview')}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
-                    {matchScore}% Match
-                  </span>
-                </div>
-              </div>
-
-              {/* Match Power Bar */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
-                  <span className="flex items-center gap-1 text-zinc-300">
-                    <Sparkles className="w-3 h-3 text-blue-400" />
-                    {t('reg_calc_power')}
-                  </span>
-                  <span className="font-bold text-blue-400">{matchScore}%</span>
-                </div>
-                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 transition-all duration-300"
-                    style={{ width: `${matchScore}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Instant Peer Overlap Teaser */}
-              <div className="space-y-2 pt-1">
-                <div className="text-[10px] font-mono uppercase text-zinc-500 tracking-wider">
-                  {t('reg_instant_overlap')}
-                </div>
-                <div className="space-y-1.5 text-xs font-mono">
-                  <div className="flex items-center justify-between p-2 rounded bg-white/[0.02] border border-white/[0.04]">
-                    <span className="text-zinc-300">{t('reg_can_teach')} ({teachSkills.length}):</span>
-                    <span className="text-emerald-400 font-semibold truncate max-w-[170px]">
-                      {teachSkills.slice(0, 2).join(', ') || 'Select skills'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between p-2 rounded bg-white/[0.02] border border-white/[0.04]">
-                    <span className="text-zinc-300">{t('reg_want_learn')} ({learnSkills.length}):</span>
-                    <span className="text-blue-400 font-semibold truncate max-w-[170px]">
-                      {learnSkills.slice(0, 2).join(', ') || 'Select skills'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Extracted Bio Keywords Preview */}
-              {extractedKeywords.length > 0 && (
-                <div className="pt-2 border-t border-white/[0.06] space-y-1.5">
-                  <div className="text-[10px] font-mono text-zinc-500">
-                    {t('reg_extracted_keywords')}
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {extractedKeywords.map((kw) => (
-                      <span
-                        key={kw}
-                        className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20"
-                      >
-                        #{kw}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Protocol Welcome Perk */}
-              <div className="flex items-center gap-2 p-2.5 rounded bg-blue-600/10 border border-blue-500/20 text-xs font-mono text-blue-300">
-                <Zap className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span>{t('reg_bonus_badge')}</span>
-              </div>
-            </div>
+        <div className="max-w-2xl w-full space-y-6">
+          <div className="text-center space-y-2">
+            <h1 className="text-base sm:text-lg font-pixel text-white leading-relaxed">
+              {t('hero_title_1')}<br />
+              <span className="text-zinc-500">{t('hero_title_2')}</span>
+            </h1>
+            <p className="text-xs font-sans text-zinc-400 max-w-md mx-auto leading-relaxed">
+              {t('hero_desc')}
+            </p>
           </div>
 
-          {/* RIGHT COLUMN: STEPPED REGISTRATION FORM */}
-          <div className="lg:col-span-7">
-            <div className="drinkit-card p-6 md:p-8 bg-[#0d0d12] border border-white/10 shadow-2xl space-y-6">
-              {/* Step Selector Bar */}
+          <div className="drinkit-card p-6 md:p-8 bg-[#0d0d12] border border-white/10 shadow-2xl space-y-6">
+            {/* Step Selector Bar */}
               <div className="grid grid-cols-3 gap-2 pb-4 border-b border-white/[0.08]">
                 <button
                   type="button"
@@ -713,6 +582,5 @@ export default function RegisterPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }
