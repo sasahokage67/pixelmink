@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -20,6 +20,7 @@ import {
   Check,
   Globe,
   Sparkles,
+  ChevronDown,
 } from 'lucide-react';
 
 const CS_DOMAINS = [
@@ -118,6 +119,30 @@ const CS_DOMAINS = [
 export default function LandingPage() {
   const { user } = useAuth();
   const { lang, t } = useLanguage();
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  const FAQ_ITEMS = [
+    {
+      q: t('faq_q1'),
+      a: t('faq_a1'),
+    },
+    {
+      q: t('faq_q2'),
+      a: t('faq_a2'),
+    },
+    {
+      q: t('faq_q3'),
+      a: t('faq_a3'),
+    },
+    {
+      q: t('faq_q4'),
+      a: t('faq_a4'),
+    },
+    {
+      q: t('faq_q5'),
+      a: t('faq_a5'),
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-[#09090b]">
@@ -138,6 +163,7 @@ export default function LandingPage() {
         <nav className="hidden md:flex items-center gap-6 text-xs font-mono text-zinc-400 absolute left-1/2 -translate-x-1/2">
           <a href="#disciplines" className="hover:text-white transition-colors">{t('nav_matrix')}</a>
           <a href="#how-it-works" className="hover:text-white transition-colors">{t('nav_rules')}</a>
+          <a href="#faq" className="hover:text-white transition-colors">{t('footer_faq')}</a>
         </nav>
 
         <div className="flex items-center gap-3 font-mono text-xs z-10">
@@ -342,6 +368,55 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* 5. FREQUENTLY ASKED QUESTIONS (FAQ) */}
+        <section id="faq" className="space-y-6 scroll-mt-20">
+          <div className="text-center max-w-xl mx-auto space-y-1">
+            <div className="text-[10px] font-mono uppercase text-emerald-400 tracking-wider">
+              {t('faq_tag')}
+            </div>
+            <h2 className="text-sm sm:text-base md:text-lg font-pixel text-white leading-relaxed mt-1">
+              {t('faq_title')}
+            </h2>
+            <p className="text-xs font-mono text-zinc-400 pt-1">
+              {t('faq_desc')}
+            </p>
+          </div>
+
+          <div className="max-w-3xl mx-auto space-y-3">
+            {FAQ_ITEMS.map((item, idx) => {
+              const isOpen = openFaq === idx;
+              return (
+                <div
+                  key={idx}
+                  className="drinkit-card overflow-hidden bg-[#0d0d12] border border-white/[0.08] transition-all"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaq(isOpen ? null : idx)}
+                    className="w-full p-4 sm:p-5 text-left flex items-center justify-between gap-4 tap-active"
+                  >
+                    <span className="font-mono text-xs sm:text-sm font-bold text-white tracking-tight flex items-center gap-2.5">
+                      <span className="text-blue-400 text-xs">0{idx + 1}.</span>
+                      {item.q}
+                    </span>
+                    <ChevronDown
+                      className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform duration-200 ${
+                        isOpen ? 'rotate-180 text-blue-400' : ''
+                      }`}
+                    />
+                  </button>
+
+                  {isOpen && (
+                    <div className="px-4 sm:px-5 pb-5 pt-1 text-xs font-mono text-zinc-400 leading-relaxed border-t border-white/[0.04]">
+                      {item.a}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
         {/* 6. CALL TO ACTION MANIFESTO */}
         <section className="drinkit-card p-8 md:p-12 text-center space-y-6 bg-gradient-to-b from-[#111116] to-[#09090b] border border-white/10">
           <div className="max-w-xl mx-auto space-y-3">
@@ -373,34 +448,123 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* 7. FOOTER */}
-        <footer className="pt-8 pb-12 border-t border-white/[0.08] flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-zinc-500">
-          <div className="flex items-center gap-2">
-            <Logo size={18} />
-            <span className="text-white font-bold tracking-tight">pixelmink</span>
-            <span>•</span>
-            <span>{t('slogan')}</span>
+        {/* 7. BOTTOM PANEL & COMPREHENSIVE FOOTER */}
+        <footer className="pt-12 pb-16 border-t border-white/[0.08] space-y-10">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 text-xs font-mono">
+            {/* Brand Column */}
+            <div className="md:col-span-5 space-y-3">
+              <div className="flex items-center gap-2.5">
+                <Logo size={26} />
+                <span className="font-pixel text-xs sm:text-sm text-white">pixelmink</span>
+              </div>
+              <p className="text-zinc-400 font-sans leading-relaxed text-xs max-w-sm">
+                {t('footer_brand_desc')}
+              </p>
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-white/5 border border-white/10 text-[11px] text-zinc-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>Zero Commercialization • Peer-to-Peer</span>
+              </div>
+            </div>
+
+            {/* Platform Navigation */}
+            <div className="md:col-span-2 space-y-3">
+              <div className="text-[10px] uppercase font-bold text-white tracking-wider">
+                {t('footer_col_platform')}
+              </div>
+              <ul className="space-y-2 text-zinc-400">
+                <li>
+                  <a href="#disciplines" className="hover:text-white transition-colors">
+                    {t('nav_matrix')}
+                  </a>
+                </li>
+                <li>
+                  <a href="#how-it-works" className="hover:text-white transition-colors">
+                    {t('nav_rules')}
+                  </a>
+                </li>
+                <li>
+                  <a href="#faq" className="hover:text-white transition-colors">
+                    {t('footer_faq')}
+                  </a>
+                </li>
+                <li>
+                  <Link href="/discover" className="hover:text-white transition-colors">
+                    {t('hero_btn_explore')}
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Legal & Privacy */}
+            <div className="md:col-span-3 space-y-3">
+              <div className="text-[10px] uppercase font-bold text-white tracking-wider">
+                {t('footer_col_legal')}
+              </div>
+              <ul className="space-y-2 text-zinc-400">
+                <li>
+                  <Link
+                    href="/privacy"
+                    className="hover:text-white text-zinc-300 font-medium transition-colors flex items-center gap-1.5"
+                  >
+                    <Shield className="w-3.5 h-3.5 text-blue-400" />
+                    <span>{t('footer_privacy')}</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/privacy" className="hover:text-white transition-colors">
+                    {t('footer_terms')}
+                  </Link>
+                </li>
+                <li>
+                  <a
+                    href="https://github.com/sasahokage67/pixelmink/blob/main/LICENSE"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-white transition-colors"
+                  >
+                    MIT License
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Resources & Language Switcher */}
+            <div className="md:col-span-2 space-y-3">
+              <div className="text-[10px] uppercase font-bold text-white tracking-wider">
+                {t('footer_col_resources')}
+              </div>
+              <div className="space-y-2.5">
+                <LanguageSwitcher />
+                <a
+                  href="https://github.com/sasahokage67/pixelmink"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors pt-1"
+                >
+                  <Globe className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>GitHub Repo</span>
+                </a>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <LanguageSwitcher />
-            <span>•</span>
-            <a
-              href="https://github.com/sasahokage67/pixelmink"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-zinc-400 hover:text-white transition-colors"
-            >
-              GitHub
-            </a>
-            <span>•</span>
-            <Link href="/auth/login" className="text-zinc-400 hover:text-white transition-colors">
-              {t('nav_signin')}
-            </Link>
-            <span>•</span>
-            <Link href="/auth/register" className="text-blue-400 hover:underline">
-              {t('nav_register')}
-            </Link>
+          {/* Bottom Bar */}
+          <div className="pt-6 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] font-mono text-zinc-500">
+            <div>
+              © 2026 pixelmink. {t('footer_rights')}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-600">Built for Computer Science Engineers</span>
+              <span>•</span>
+              <a
+                href="https://github.com/sasahokage67/pixelmink"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:underline"
+              >
+                v1.0 Public Release
+              </a>
+            </div>
           </div>
         </footer>
       </div>

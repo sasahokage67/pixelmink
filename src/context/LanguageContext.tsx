@@ -520,6 +520,177 @@ export const DICTIONARY: Translations = {
     ru: 'Зарегистрироваться и получить 5 XC',
     kz: 'Тіркеліп, 5 XC алу',
   },
+
+  // FAQ Section
+  faq_tag: {
+    en: 'Knowledge Base & Questions',
+    ru: 'База знаний и частые вопросы',
+    kz: 'Білім базасы және жиі қойылатын сұрақтар',
+  },
+  faq_title: {
+    en: 'Frequently Asked Questions',
+    ru: 'Часто задаваемые вопросы',
+    kz: 'Жиі қойылатын сұрақтар',
+  },
+  faq_desc: {
+    en: 'Clear answers on how the barter protocol works, how peer safety is ensured, and how knowledge exchange operates.',
+    ru: 'Подробные ответы о принципах бартерного протокола, безопасности участников и регламенте обмена знаниями.',
+    kz: 'Бартерлік протокол қағидалары, қатысушылар қауіпсіздігі және білім алмасу ережелері бойынша нақты жауаптар.',
+  },
+  faq_q1: {
+    en: 'How does moneyless skill exchange work?',
+    ru: 'Как работает обмен навыками без денег?',
+    kz: 'Ақшасыз дағды алмасу қалай жұмыс істейді?',
+  },
+  faq_a1: {
+    en: 'The platform operates on a strict 1:1 time barter rule. For every hour you mentor or teach a peer in your strong domain (e.g., Rust, Python, System Architecture), you earn 1 credit to receive an hour of 1-on-1 mentorship in any technology you want to learn (e.g., PyTorch, DevOps, 3D). No subscriptions, no fiat payments.',
+    ru: 'Платформа действует по строгому правилу взаимного бартера времени 1:1. За каждый час обучения другого инженера вашей ключевой технологии (например, Rust, Python, архитектура) вы получаете 1 час персонального менторства по интересующей вас теме (PyTorch, DevOps, UI/UX). Никаких подписок или фиатных платежей.',
+    kz: 'Платформа уақытты 1:1 қатаң өзара бартерлік қағидасы бойынша жұмыс істейді. Басқа инженерге өз салаңыздан (мысалы, Rust, Python, жүйелік архитектура) 1 сағат үйреткеніңіз үшін, өзіңіз үйренгіңіз келетін тақырып бойынша (PyTorch, DevOps, UI/UX) 1 сағат жеке менторлық аласыз. Жазылымдар немесе ақшалай төлемдер мүлдем жоқ.',
+  },
+  faq_q2: {
+    en: 'How are competence and skills verified?',
+    ru: 'Как подтверждается квалификация участников?',
+    kz: 'Қатысушылардың біліктілігі қалай расталады?',
+  },
+  faq_a2: {
+    en: 'Skills are confirmed through practical technical assessments, public GitHub repository verification, and mutual peer reviews after each completed session. Low-quality or inactive participants lose platform match priority.',
+    ru: 'Компетенции подтверждаются практическими тестами, привязкой публичных репозиториев GitHub и двусторонними рецензиями после каждой сессии. Недобросовестные участники теряют приоритет в алгоритме матчинга.',
+    kz: 'Дағдылар тәжірибелік сынақтар, ашық GitHub репозиторийлері және әр өткізілген сессиядан кейінгі екіжақты бағалау арқылы расталады. Белсенді емес немесе жауапсыз қатысушылар сәйкестендіру алгоритміндегі басымдығын жоғалтады.',
+  },
+  faq_q3: {
+    en: 'How do 1-on-1 exchange sessions take place?',
+    ru: 'Как проходят сессии обмена?',
+    kz: 'Алмасу сессиялары қалай өтеді?',
+  },
+  faq_a3: {
+    en: 'Sessions are hosted directly in your browser via secure P2P WebRTC video calls with built-in interactive code sharing, screen demonstration, and shared notes. No third-party software installation required.',
+    ru: 'Сессии проходят непосредственно в браузере через защищенный P2P WebRTC видеозвонок со встроенным совместным редактором кода, демонстрацией экрана и заметками. Установка сторонних программ не требуется.',
+    kz: 'Сессиялар тікелей браузер ішінде қауіпсіз P2P WebRTC бейнебайланысы, бірлескен код редакторы, экран көрсету және жазбалар арқылы өтеді. Бөтен бағдарламаларды орнату қажет емес.',
+  },
+  faq_q4: {
+    en: 'What if two engineers do not match directly?',
+    ru: 'Что если у нас нет прямого совпадения навыков?',
+    kz: 'Егер екі қатысушының дағдылары тікелей сәйкес келмесе ше?',
+  },
+  faq_a4: {
+    en: 'pixelmink supports circular 3-way and multi-party routing (Node A teaches Node B, Node B teaches Node C, and Node C teaches Node A). You can always exchange time credits with the wider network even without a direct pair.',
+    ru: 'pixelmink поддерживает кольцевую маршрутизацию (Узел A обучает Узел B, Узел B обучает Узел C, а Узел C обучает Узел A). Вы всегда можете обменять полученные часы со всей инженерной сетью платформы.',
+    kz: 'pixelmink көп түйінді сақиналы бағыттауды қолдайды (A түйіні B-ге үйретеді, B түйіні C-ге үйретеді, ал C түйіні A-ға үйретеді). Тікелей сәйкестік болмаған күннің өзінде жиналған уақытты жалпы желімен оңай алмастыра аласыз.',
+  },
+  faq_q5: {
+    en: 'How is user privacy and data protected?',
+    ru: 'Как защищены мои персональные данные?',
+    kz: 'Жеке деректер қалай қорғалады?',
+  },
+  faq_a5: {
+    en: 'We collect minimal necessary profile data solely for matchmaking. Media streams during video sessions are strictly peer-to-peer and never recorded on our servers. Your data is never sold or shared with advertisers.',
+    ru: 'Мы собираем только минимально необходимые данные профиля исключительно для алгоритма подбора менторов. Медиапотоки во время звонков передаются peer-to-peer и не записываются на серверах. Данные никогда не передаются рекламодателям.',
+    kz: 'Біз тек менторларды таңдау үшін қажетті ең аз деректерді ғана жинаймыз. Қоңыраулар кезіндегі медиаағындар тек peer-to-peer арқылы беріледі және серверлерде жазылмайды. Деректер жарнама берушілерге ешқашан сатылмайды.',
+  },
+
+  // Bottom Panel & Footer Navigation
+  footer_brand_desc: {
+    en: 'P2P Computer Science & Skill Barter Platform. Your skills for theirs. No money, just knowledge.',
+    ru: 'P2P-платформа обмена навыками в Computer Science. Ваши навыки в обмен на их. Никаких денег, только знания.',
+    kz: 'Computer Science саласындағы P2P дағды алмасу платформасы. Сіздің біліміңіз олардың біліміне. Ақшасыз, тек таза білім.',
+  },
+  footer_col_platform: {
+    en: 'Platform',
+    ru: 'Платформа',
+    kz: 'Платформа',
+  },
+  footer_col_legal: {
+    en: 'Legal & Privacy',
+    ru: 'Конфиденциальность и право',
+    kz: 'Құпиялылық және құқық',
+  },
+  footer_col_resources: {
+    en: 'Resources',
+    ru: 'Ресурсы',
+    kz: 'Ресурстар',
+  },
+  footer_privacy: {
+    en: 'Privacy Policy',
+    ru: 'Условия конфиденциальности',
+    kz: 'Құпиялылық саясаты',
+  },
+  footer_terms: {
+    en: 'Terms of Use',
+    ru: 'Правила платформы',
+    kz: 'Пайдалану ережелері',
+  },
+  footer_faq: {
+    en: 'FAQ',
+    ru: 'FAQ & Вопросы',
+    kz: 'Жиі қойылатын сұрақтар',
+  },
+  footer_rights: {
+    en: 'All rights reserved.',
+    ru: 'Все права защищены.',
+    kz: 'Барлық құқықтар қорғалған.',
+  },
+  footer_open_source: {
+    en: 'Open Source on GitHub',
+    ru: 'Открытый код на GitHub',
+    kz: 'GitHub-тағы ашық бастапқы код',
+  },
+
+  // Privacy Policy Page
+  privacy_title: {
+    en: 'Privacy Policy & Terms',
+    ru: 'Условия конфиденциальности',
+    kz: 'Құпиялылық саясаты мен шарттары',
+  },
+  privacy_subtitle: {
+    en: 'How pixelmink protects your privacy, personal information, and peer-to-peer data.',
+    ru: 'Как pixelmink защищает вашу приватность, персональные данные и P2P-сессии.',
+    kz: 'pixelmink сіздің құпиялылығыңызды, жеке деректеріңізді және P2P-сессияларыңызды қалай қорғайды.',
+  },
+  privacy_last_updated: {
+    en: 'Effective date: September 2026',
+    ru: 'Действует с: Сентябрь 2026',
+    kz: 'Қолданылу мерзімі: Қыркүйек 2026',
+  },
+  privacy_sec1_title: {
+    en: '1. Core Principles & Zero Commercialization',
+    ru: '1. Основные принципы и отказ от коммерциализации',
+    kz: '1. Негізгі қағидаттар және коммерцияландырудан бас тарту',
+  },
+  privacy_sec1_desc: {
+    en: 'pixelmink is built around moneyless, peer-to-peer engineering skill barter. We do not monetize your data, run commercial ad-tracking, or sell user records to third-party data brokers.',
+    ru: 'pixelmink построен вокруг некоммерческого P2P-обмена инженерными знаниями. Мы не монетизируем ваши данные, не внедряем коммерческие рекламные трекеры и не передаем сведения брокерам данных.',
+    kz: 'pixelmink инженерлік білімді ақшасыз P2P алмасуға негізделген. Біз деректеріңізді сатпаймыз, коммерциялық жарнамалық трекерлерді қолданбаймыз және үшінші тарапқа мәліметтерді бермейміз.',
+  },
+  privacy_sec2_title: {
+    en: '2. What Data We Collect',
+    ru: '2. Собираемые данные',
+    kz: '2. Жиналатын деректер',
+  },
+  privacy_sec2_desc: {
+    en: 'We collect only the bare minimum required for platform operation: your display name/handle, account email, specified technical skills (to teach and to learn), and your self-written engineer bio.',
+    ru: 'Мы собираем исключительно минимальный объем данных для работы платформы: имя или никнейм, рабочий email, выбранные компетенции (для обучения и изучения) и текст инженерного описания (bio).',
+    kz: 'Біз тек платформа жұмысына қажетті ең аз деректерді жинаймыз: көрсетілетін есім немесе лақап ат, электрондық пошта, таңдалған дағдылар (үйрету және оқу үшін) және инженерлік сипаттама (bio).',
+  },
+  privacy_sec3_title: {
+    en: '3. WebRTC Direct P2P Video & Screen Sharing',
+    ru: '3. P2P WebRTC звонки и шеринг экрана',
+    kz: '3. P2P WebRTC бейнебайланысы және экран көрсету',
+  },
+  privacy_sec3_desc: {
+    en: 'All video, voice, and interactive screen-sharing sessions connect directly peer-to-peer using WebRTC. Audio and video streams are transmitted encrypted directly between peers and are never recorded or stored on platform servers.',
+    ru: 'Все видеозвонки, аудиосвязь и совместный редактор кода передаются напрямую между участниками по протоколу WebRTC. Медиапотоки шифруются и никогда не записываются и не сохраняются на наших серверах.',
+    kz: 'Барлық бейнебайланыс, дыбыс және экран бөлісу сессиялары қатысушылар арасында WebRTC арқылы тікелей peer-to-peer форматында жүреді. Медиаағындар шифрланады және серверлерімізде ешқашан жазылмайды.',
+  },
+  privacy_sec4_title: {
+    en: '4. User Rights & Account Deletion',
+    ru: '4. Права пользователей и удаление аккаунта',
+    kz: '4. Пайдаланушы құқықтары және аккаунтты өшіру',
+  },
+  privacy_sec4_desc: {
+    en: 'You retain full ownership of your data. You may modify your skills, profile, or request immediate and irreversible account and data deletion at any time through platform settings.',
+    ru: 'Вы сохраняете полное право распоряжаться своими данными. Вы можете в любой момент обновить навыки, изменить профиль или запросить немедленное и необратимое удаление аккаунта в настройках.',
+    kz: 'Сіз өз деректеріңіздің толық иесі болып қаласыз. Кез келген уақытта дағдыларыңызды жаңарта аласыз, профиліңізді өзгерте аласыз немесе параметрлер арқылы аккаунтты толық жоюды сұрай аласыз.',
+  },
 };
 
 interface LanguageContextType {

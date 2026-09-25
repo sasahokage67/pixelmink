@@ -569,6 +569,17 @@ export default function RegisterPage() {
                       {loading ? 'Creating Account...' : t('reg_submit_btn')}
                     </button>
                   </div>
+
+                  <p className="text-[11px] font-mono text-zinc-500 text-center pt-1">
+                    {lang === 'ru'
+                      ? 'Регистрируясь, вы соглашаетесь с '
+                      : lang === 'kz'
+                      ? 'Тіркелу арқылы келісесіз: '
+                      : 'By registering, you agree to the '}
+                    <Link href="/privacy" className="text-blue-400 hover:underline">
+                      {t('footer_privacy')}
+                    </Link>
+                  </p>
                 </form>
               )}
 
