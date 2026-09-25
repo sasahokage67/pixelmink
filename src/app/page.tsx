@@ -1,15 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import Logo from '@/components/ui/Logo';
-import Identicon from '@/components/ui/Identicon';
 import LanguageSwitcher from '@/components/ui/LanguageSwitcher';
 import {
   ArrowRight,
-  Sparkles,
   Terminal,
   Cpu,
   Shield,
@@ -18,15 +16,10 @@ import {
   Users,
   CheckCircle2,
   Database,
-  Binary,
-  GitBranch,
-  Code2,
-  Radio,
-  Clock,
   ArrowUpRight,
-  Flame,
   Check,
   Globe,
+  Sparkles,
 } from 'lucide-react';
 
 const CS_DOMAINS = [
@@ -122,37 +115,9 @@ const CS_DOMAINS = [
   },
 ];
 
-const RECENT_EXCHANGES = [
-  {
-    userA: 'Alex Voronov',
-    skillA: 'Python & AI',
-    userB: 'Amina Al-Mansoor',
-    skillB: 'Prompt Engineering',
-    status: 'LIVE CALL',
-    score: '96%',
-  },
-  {
-    userA: 'Daniel Richter',
-    skillA: 'Rust Systems',
-    userB: 'Elena Rostova',
-    skillB: 'React & Next.js',
-    status: 'COMPLETED',
-    score: '94%',
-  },
-  {
-    userA: 'Marcus Brody',
-    skillA: 'DaVinci Resolve',
-    userB: 'Sara Lindqvist',
-    skillB: 'UI/UX Design Systems',
-    status: 'SCHEDULED',
-    score: '92%',
-  },
-];
-
 export default function LandingPage() {
   const { user } = useAuth();
   const { lang, t } = useLanguage();
-  const [selectedDemoSkill, setSelectedDemoSkill] = useState<'rust' | 'ai' | 'systems'>('rust');
 
   return (
     <div className="min-h-screen bg-[#09090b]">
@@ -171,10 +136,8 @@ export default function LandingPage() {
         </div>
 
         <nav className="hidden md:flex items-center gap-6 text-xs font-mono text-zinc-400">
-          <a href="#simulator" className="hover:text-white transition-colors">{t('nav_simulator')}</a>
           <a href="#disciplines" className="hover:text-white transition-colors">{t('nav_matrix')}</a>
           <a href="#how-it-works" className="hover:text-white transition-colors">{t('nav_rules')}</a>
-          <a href="#activity" className="hover:text-white transition-colors">{t('nav_activity')}</a>
         </nav>
 
         <div className="flex items-center gap-3 font-mono text-xs">
@@ -252,18 +215,10 @@ export default function LandingPage() {
                 <span>{t('hero_btn_explore')}</span>
                 <ArrowUpRight className="w-3.5 h-3.5 text-zinc-500" />
               </Link>
-
-              <Link
-                href="/matches"
-                className="inline-flex items-center gap-2 px-4 py-3 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white font-mono text-xs transition-all"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                <span>{t('hero_btn_matches')}</span>
-              </Link>
             </div>
 
-            {/* Protocol Startup Spec Bar (Authentic, no fake metrics) */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6 border-t border-white/[0.08]">
+            {/* Protocol Startup Spec Bar (Authentic, 3-column) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-6 border-t border-white/[0.08]">
               <div className="p-3.5 rounded-xl bg-[#111114] border border-white/[0.08]">
                 <div className="text-[11px] font-mono uppercase text-zinc-500 tracking-wider">{t('spec_stage_title')}</div>
                 <div className="text-sm font-mono font-bold text-white mt-1">{t('spec_stage_val')}</div>
@@ -276,171 +231,7 @@ export default function LandingPage() {
                 <div className="text-[11px] font-mono uppercase text-zinc-500 tracking-wider">{t('spec_cost_title')}</div>
                 <div className="text-sm font-mono font-bold text-blue-400 mt-1">{t('spec_cost_val')}</div>
               </div>
-              <div className="p-3.5 rounded-xl bg-[#111114] border border-white/[0.08]">
-                <div className="text-[11px] font-mono uppercase text-zinc-500 tracking-wider">{t('spec_stack_title')}</div>
-                <div className="text-sm font-mono font-bold text-zinc-300 mt-1">{t('spec_stack_val')}</div>
-              </div>
             </div>
-          </div>
-        </section>
-
-        {/* 2. INTERACTIVE MATCHING SIMULATOR BENTO */}
-        <section id="simulator" className="space-y-6 scroll-mt-20">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
-            <div>
-              <div className="text-[10px] font-mono uppercase text-blue-400 tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3" />
-                {t('sim_badge')}
-              </div>
-              <h2 className="text-sm sm:text-base md:text-lg font-pixel text-white leading-relaxed mt-1">
-                {t('sim_title')}
-              </h2>
-            </div>
-            <p className="text-xs font-mono text-zinc-400 max-w-md">
-              {t('sim_desc')}
-            </p>
-          </div>
-
-          {/* Interactive Simulator Shell */}
-          <div className="drinkit-card p-6 md:p-8 bg-[#0c0c10] border border-white/10 space-y-6">
-            {/* Skill Selector Tabs */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-white/[0.06]">
-              <span className="text-xs font-mono text-zinc-500 shrink-0 mr-2">{t('sim_scenario_label')}</span>
-              <button
-                onClick={() => setSelectedDemoSkill('rust')}
-                className={`px-3 py-1.5 rounded text-xs font-mono transition-all ${
-                  selectedDemoSkill === 'rust'
-                    ? 'bg-blue-600 text-white font-bold'
-                    : 'bg-[#141419] text-zinc-400 hover:text-white border border-white/5'
-                }`}
-              >
-                {t('sim_scen_1')}
-              </button>
-              <button
-                onClick={() => setSelectedDemoSkill('ai')}
-                className={`px-3 py-1.5 rounded text-xs font-mono transition-all ${
-                  selectedDemoSkill === 'ai'
-                    ? 'bg-blue-600 text-white font-bold'
-                    : 'bg-[#141419] text-zinc-400 hover:text-white border border-white/5'
-                }`}
-              >
-                {t('sim_scen_2')}
-              </button>
-              <button
-                onClick={() => setSelectedDemoSkill('systems')}
-                className={`px-3 py-1.5 rounded text-xs font-mono transition-all ${
-                  selectedDemoSkill === 'systems'
-                    ? 'bg-blue-600 text-white font-bold'
-                    : 'bg-[#141419] text-zinc-400 hover:text-white border border-white/5'
-                }`}
-              >
-                {t('sim_scen_3')}
-              </button>
-            </div>
-
-            {/* Interactive Simulation Diagram */}
-            {selectedDemoSkill !== 'systems' ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-                {/* Peer A Card */}
-                <div className="p-5 rounded-lg bg-[#111116] border border-white/[0.08] space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Identicon name="Peer_A_Linus" size={44} />
-                    <div>
-                      <div className="text-xs font-bold text-white">Linus (You)</div>
-                      <div className="text-[10px] font-mono text-zinc-500">Remote • 4.98 Rating</div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 text-xs font-mono pt-1">
-                    <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                      <span className="text-[10px] uppercase block text-emerald-500 font-semibold">{t('reg_can_teach')}:</span>
-                      {selectedDemoSkill === 'rust' ? 'Rust & Concurrency' : 'LLMs & Prompt Engineering'}
-                    </div>
-                    <div className="p-2 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">
-                      <span className="text-[10px] uppercase block text-blue-500 font-semibold">{t('reg_want_learn')}:</span>
-                      {selectedDemoSkill === 'rust' ? 'PyTorch & AI' : 'PostgreSQL & Distributed SQL'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Central Matching Logic Gauge */}
-                <div className="text-center p-5 rounded-lg bg-[#14141c] border border-blue-500/30 space-y-3">
-                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-mono">
-                    <Flame className="w-3 h-3 text-blue-400" />
-                    {t('sim_match_tag')}
-                  </div>
-
-                  <div className="text-4xl font-mono font-bold text-white tracking-tight">
-                    98<span className="text-blue-400">%</span>
-                  </div>
-
-                  <div className="text-[11px] font-mono text-zinc-400 leading-snug">
-                    {t('sim_match_detail')}
-                  </div>
-
-                  <div className="flex items-center justify-center gap-1.5 text-[10px] font-mono text-zinc-500 pt-1">
-                    <span className="px-1.5 py-0.5 rounded bg-white/5">#zero-money</span>
-                    <span className="px-1.5 py-0.5 rounded bg-white/5">#webrtc</span>
-                    <span className="px-1.5 py-0.5 rounded bg-white/5">#code-share</span>
-                  </div>
-                </div>
-
-                {/* Peer B Card */}
-                <div className="p-5 rounded-lg bg-[#111116] border border-white/[0.08] space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Identicon name="Peer_B_Amina" size={44} />
-                    <div>
-                      <div className="text-xs font-bold text-white">Amina (Matched Peer)</div>
-                      <div className="text-[10px] font-mono text-zinc-500">London • 4.95 Rating</div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 text-xs font-mono pt-1">
-                    <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                      <span className="text-[10px] uppercase block text-emerald-500 font-semibold">{t('reg_can_teach')}:</span>
-                      {selectedDemoSkill === 'rust' ? 'PyTorch & AI' : 'PostgreSQL & Distributed SQL'}
-                    </div>
-                    <div className="p-2 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">
-                      <span className="text-[10px] uppercase block text-blue-500 font-semibold">{t('reg_want_learn')}:</span>
-                      {selectedDemoSkill === 'rust' ? 'Rust & Concurrency' : 'LLMs & Prompt Engineering'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* 3-Way Loop Visualization */
-              <div className="p-6 rounded-lg bg-[#111116] border border-white/[0.08] space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
-                  <div className="text-xs font-bold text-white font-mono flex items-center gap-2">
-                    <GitBranch className="w-4 h-4 text-purple-400" />
-                    {t('sim_circular_title')}
-                  </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                    {t('sim_circular_badge')}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                  <div className="p-4 rounded bg-black/40 border border-white/[0.06] text-xs font-mono space-y-1">
-                    <div className="text-blue-400 font-bold">Node A (You)</div>
-                    <div className="text-zinc-400">Teaches Rust → to Node B</div>
-                    <div className="text-emerald-400">Receives AI from Node C</div>
-                  </div>
-
-                  <div className="p-4 rounded bg-black/40 border border-white/[0.06] text-xs font-mono space-y-1">
-                    <div className="text-purple-400 font-bold">Node B (Daniel)</div>
-                    <div className="text-zinc-400">Teaches DevOps → to Node C</div>
-                    <div className="text-emerald-400">Receives Rust from Node A</div>
-                  </div>
-
-                  <div className="p-4 rounded bg-black/40 border border-white/[0.06] text-xs font-mono space-y-1">
-                    <div className="text-pink-400 font-bold">Node C (Sara)</div>
-                    <div className="text-zinc-400">Teaches AI/Design → to Node A</div>
-                    <div className="text-emerald-400">Receives DevOps from Node B</div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </section>
 
@@ -555,39 +346,6 @@ export default function LandingPage() {
                 </div>
               );
             })}
-          </div>
-        </section>
-
-        {/* 5. LIVE NETWORK ACTIVITY TICKER */}
-        <section id="activity" className="space-y-4 scroll-mt-20">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-              <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                {t('ticker_title')}
-              </span>
-            </div>
-            <span className="text-[10px] font-mono text-zinc-500">{t('ticker_sub')}</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {RECENT_EXCHANGES.map((ex, idx) => (
-              <div
-                key={idx}
-                className="drinkit-card p-4 space-y-2.5 bg-[#0e0e12] border border-white/[0.08]"
-              >
-                <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-zinc-300 font-semibold">{ex.userA} ⇄ {ex.userB}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                    {ex.status}
-                  </span>
-                </div>
-                <div className="text-[11px] font-mono text-zinc-400 flex items-center justify-between">
-                  <span>{ex.skillA} ↔ {ex.skillB}</span>
-                  <span className="text-blue-400 font-bold">{ex.score}</span>
-                </div>
-              </div>
-            ))}
           </div>
         </section>
 
