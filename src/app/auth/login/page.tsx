@@ -1,0 +1,128 @@
+'use client';
+
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import Logo from '@/components/ui/Logo';
+import { ArrowRight, Lock, Mail, Sparkles, CheckCircle2 } from 'lucide-react';
+
+export default function LoginPage() {
+  const router = useRouter();
+  const { login } = useAuth();
+  const [email, setEmail] = useState('alex@xchange.dev');
+  const [password, setPassword] = useState('password123');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    const ok = await login(email, password);
+    if (ok) {
+      router.push('/dashboard');
+    } else {
+      setError('Invalid email or password.');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
+      <div className="max-w-md w-full space-y-6">
+        <div className="text-center space-y-2">
+          <Link href="/" className="inline-flex items-center gap-2 font-mono text-2xl font-bold text-white tracking-tight group">
+            <Logo size={32} />
+            <span>pixelmink<span className="text-blue-500">.</span></span>
+          </Link>
+          <div className="text-xs font-mono text-zinc-400">
+            “Your skills for theirs. No money, just knowledge.”
+          </div>
+          <h1 className="text-lg font-bold tracking-tight text-white pt-1">Sign in to your account</h1>
+        </div>
+
+        {error && (
+          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono text-center">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="drinkit-card p-6 space-y-4 shadow-2xl">
+          <div>
+            <label className="block text-xs font-mono text-zinc-400 mb-1">Email Address</label>
+            <div className="relative">
+              <Mail className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-[#18181f] border border-white/[0.08] focus:border-blue-500 rounded-lg pl-9 pr-3 py-2 text-xs text-white outline-none font-mono"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono text-zinc-400 mb-1">Password</label>
+            <div className="relative">
+              <Lock className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-[#18181f] border border-white/[0.08] focus:border-blue-500 rounded-lg pl-9 pr-3 py-2 text-xs text-white outline-none font-mono"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-semibold tap-active transition-all shadow-md shadow-blue-600/20"
+          >
+            {loading ? 'Authenticating...' : 'Sign In'}
+          </button>
+        </form>
+
+        {/* 1-Click Fast Login for Demo Evaluation */}
+        <div className="drinkit-card p-5 space-y-3">
+          <div className="text-[10px] font-mono uppercase text-zinc-500 tracking-wider">
+            1-Click Demo Peer Profiles
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+            {[
+              { name: 'Alex (Python/AI)', email: 'alex@xchange.dev' },
+              { name: 'Amina (English/LLM)', email: 'amina@xchange.dev' },
+              { name: 'Daniel (Rust Dev)', email: 'daniel@xchange.dev' },
+              { name: 'Sara (UI/UX Lead)', email: 'sara@xchange.dev' },
+            ].map((d) => (
+              <button
+                key={d.email}
+                type="button"
+                onClick={() => {
+                  setEmail(d.email);
+                  setPassword('password123');
+                  login(d.email, 'password123').then(() => router.push('/dashboard'));
+                }}
+                className="p-2 rounded-lg bg-[#18181f] hover:bg-white/[0.05] border border-white/[0.06] text-left text-zinc-300 transition-colors"
+              >
+                <div className="font-semibold text-white">{d.name}</div>
+                <div className="text-[9px] text-zinc-500">{d.email}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="text-center text-xs font-mono text-zinc-400">
+          Don&apos;t have an account?{' '}
+          <Link href="/auth/register" className="text-blue-400 hover:underline">
+            Register here
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}

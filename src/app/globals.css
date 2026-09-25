@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-ibm-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-ibm-mono: 'IBM Plex Mono', monospace;
+  --background: #09090b;
+  --foreground: #fafafa;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-ibm-sans);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Minimalist Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Code & monospace helper */
+.font-mono {
+  font-family: var(--font-ibm-mono);
+}
+
+/* Subtle border utility */
+.border-subtle {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Drinkit Clean Card */
+.drinkit-card {
+  background-color: #111114;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  transition: border-color 0.15s ease-out, transform 0.15s ease-out;
+}
+
+.drinkit-card:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Drinkit Pill */
+.drinkit-pill {
+  font-family: var(--font-ibm-mono);
+  font-size: 11px;
+  letter-spacing: -0.02em;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Active micro-press */
+.tap-active:active {
+  transform: scale(0.98);
+}

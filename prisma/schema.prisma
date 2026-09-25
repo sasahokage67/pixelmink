@@ -1,0 +1,379 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User model for Auth & Account
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  role          String    @default("USER") // USER, MENTOR, HOST, MODERATOR, ADMIN
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  profile       Profile?
+  userSkills    UserSkill[]
+  sentMatches   Match[]   @relation("UserAMatches")
+  recvMatches   Match[]   @relation("UserBMatches")
+  convMembers   ConversationMember[]
+  messages      Message[]
+  reactions     MessageReaction[]
+  initiatedCalls Call[]   @relation("CallerCalls")
+  receivedCalls  Call[]   @relation("ReceiverCalls")
+  taughtSessions Session[] @relation("TeacherSessions")
+  learnedSessions Session[] @relation("StudentSessions")
+  hostedSeminars Seminar[]
+  seminarAttendances SeminarParticipant[]
+  seminarMessages SeminarMessage[]
+  seminarQuestions SeminarQuestion[]
+  testAttempts   TestAttempt[]
+  progress       Progress[]
+  achievements   UserAchievement[]
+  notifications  Notification[]
+  reviewsGiven   Review[]  @relation("Reviewer")
+  reviewsReceived Review[] @relation("Reviewee")
+  reportsFiled   Report[]  @relation("Reporter")
+  reportsAgainst Report[]  @relation("ReportedUser")
+  creditTransactions XCreditTransaction[]
+}
+
+model Profile {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  avatar        String   @default("")
+  bio           String   @default("")
+  location      String   @default("Remote")
+  languages     String   @default("English, Russian")
+  teachingHours Float    @default(0.0)
+  learningHours Float    @default(0.0)
+  rating        Float    @default(5.0)
+  reviewsCount  Int      @default(0)
+  verified      Boolean  @default(false)
+  timezone      String   @default("UTC+3")
+  xCredits      Int      @default(5)
+  availability  String   @default("Mon-Fri 18:00-21:00")
+  updatedAt     DateTime @updatedAt
+}
+
+model Skill {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  category    String      // CODING, AI_ML, DESIGN, VIDEO_EDITING, COMPUTER_SCIENCE, DEVOPS, MATH
+  description String      @default("")
+  icon        String      @default("code")
+  userSkills  UserSkill[]
+  sessions    Session[]
+  tests       Test[]
+  progress    Progress[]
+}
+
+model UserSkill {
+  id                   String   @id @default(uuid())
+  userId               String
+  skillId              String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill                Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  type                 String   // TEACH or LEARN
+  level                String   // BEGINNER, INTERMEDIATE, ADVANCED, EXPERT
+  description          String   @default("")
+  teachingAvailability String   @default("Flexible")
+  learningGoal         String   @default("")
+
+  @@unique([userId, skillId, type])
+}
+
+model Match {
+  id        String   @id @default(uuid())
+  userAId   String
+  userBId   String
+  userA     User     @relation("UserAMatches", fields: [userAId], references: [id], onDelete: Cascade)
+  userB     User     @relation("UserBMatches", fields: [userBId], references: [id], onDelete: Cascade)
+  score     Int      @default(85)
+  status    String   @default("PENDING") // PENDING, ACCEPTED, DECLINED
+  reason    String   @default("Direct skill exchange match")
+  createdAt DateTime @default(now())
+
+  @@unique([userAId, userBId])
+}
+
+model Conversation {
+  id          String               @id @default(uuid())
+  title       String?
+  isGroup     Boolean              @default(false)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  members     ConversationMember[]
+  messages    Message[]
+}
+
+model ConversationMember {
+  id             String       @id @default(uuid())
+  conversationId String
+  userId         String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt       DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String            @id @default(uuid())
+  conversationId String
+  senderId       String
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content        String
+  messageType    String            @default("TEXT") // TEXT, IMAGE, FILE, CODE, CALL_INVITE
+  replyToId      String?
+  isRead         Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  reactions      MessageReaction[]
+}
+
+model MessageReaction {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  emoji     String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+}
+
+model Call {
+  id         String    @id @default(uuid())
+  callerId   String
+  receiverId String?
+  roomId     String    @unique
+  type       String    @default("VIDEO") // AUDIO, VIDEO, GROUP
+  status     String    @default("ACTIVE") // CALLING, ACTIVE, ENDED, REJECTED
+  startedAt  DateTime  @default(now())
+  endedAt    DateTime?
+  duration   Int       @default(0)
+  caller     User      @relation("CallerCalls", fields: [callerId], references: [id], onDelete: Cascade)
+  receiver   User?     @relation("ReceiverCalls", fields: [receiverId], references: [id], onDelete: SetNull)
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  teacherId   String
+  studentId   String
+  skillId     String
+  title       String
+  scheduledAt DateTime
+  duration    Int      @default(60) // minutes
+  format      String   @default("VIDEO") // VIDEO, AUDIO, CHAT
+  status      String   @default("PENDING") // PENDING, CONFIRMED, COMPLETED, CANCELLED
+  notes       String   @default("")
+  meetingLink String   @default("")
+  createdAt   DateTime @default(now())
+  teacher     User     @relation("TeacherSessions", fields: [teacherId], references: [id], onDelete: Cascade)
+  student     User     @relation("StudentSessions", fields: [studentId], references: [id], onDelete: Cascade)
+  skill       Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  reviews     Review[]
+}
+
+model Seminar {
+  id               String               @id @default(uuid())
+  hostId           String
+  title            String
+  description      String
+  category         String               @default("AI & CODING")
+  level            String               @default("All Levels")
+  language         String               @default("English")
+  date             String
+  time             String
+  duration         Int                  @default(60) // minutes
+  maxParticipants  Int                  @default(500)
+  participantCount Int                  @default(0)
+  isLive           Boolean              @default(false)
+  recordingUrl     String?
+  status           String               @default("UPCOMING") // UPCOMING, LIVE, COMPLETED
+  createdAt        DateTime             @default(now())
+  host             User                 @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  participants     SeminarParticipant[]
+  messages         SeminarMessage[]
+  questions        SeminarQuestion[]
+  recordings       SeminarRecording[]
+}
+
+model SeminarParticipant {
+  id              String   @id @default(uuid())
+  seminarId       String
+  userId          String
+  registeredAt    DateTime @default(now())
+  attendedMinutes Int      @default(0)
+  isCertified     Boolean  @default(false)
+  seminar         Seminar  @relation(fields: [seminarId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([seminarId, userId])
+}
+
+model SeminarMessage {
+  id          String   @id @default(uuid())
+  seminarId   String
+  userId      String
+  content     String
+  isPinned    Boolean  @default(false)
+  isModerator Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  seminar     Seminar  @relation(fields: [seminarId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SeminarQuestion {
+  id             String   @id @default(uuid())
+  seminarId      String
+  userId         String
+  question       String
+  upvotes        Int      @default(0)
+  isAnswered     Boolean  @default(false)
+  isAnsweringNow Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  seminar        Seminar  @relation(fields: [seminarId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SeminarRecording {
+  id        String   @id @default(uuid())
+  seminarId String
+  title     String
+  videoUrl  String
+  duration  Int      @default(0)
+  s3Key     String   @default("")
+  createdAt DateTime @default(now())
+  seminar   Seminar  @relation(fields: [seminarId], references: [id], onDelete: Cascade)
+}
+
+model Test {
+  id          String        @id @default(uuid())
+  skillId     String
+  title       String
+  description String
+  level       String        @default("Intermediate")
+  skill       Skill         @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  questions   Question[]
+  attempts    TestAttempt[]
+}
+
+model Question {
+  id            String   @id @default(uuid())
+  testId        String
+  question      String
+  optionA       String
+  optionB       String
+  optionC       String
+  optionD       String
+  correctOption String   // "A", "B", "C", "D"
+  explanation   String   @default("")
+  test          Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+}
+
+model TestAttempt {
+  id          String   @id @default(uuid())
+  testId      String
+  userId      String
+  score       Int
+  maxScore    Int      @default(5)
+  passed      Boolean
+  completedAt DateTime @default(now())
+  test        Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Progress {
+  id              String   @id @default(uuid())
+  userId          String
+  skillId         String
+  progressPercent Int      @default(0)
+  hoursSpent      Float    @default(0.0)
+  streakDays      Int      @default(1)
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill           Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillId])
+}
+
+model Achievement {
+  id          String            @id @default(uuid())
+  code        String            @unique
+  title       String
+  description String
+  icon        String            @default("trophy")
+  category    String            @default("GENERAL")
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(uuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime    @default(now())
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // MATCH, MESSAGE, CALL, SEMINAR, SESSION, TEST, ACHIEVEMENT
+  title     String
+  message   String
+  link      String   @default("")
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Review {
+  id               String   @id @default(uuid())
+  sessionId        String
+  reviewerId       String
+  revieweeId       String
+  rating           Int      @default(5)
+  comment          String   @default("")
+  clarityScore     Int      @default(5)
+  understandScore  Int      @default(5)
+  wouldStudyAgain  Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  session          Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  reviewer         User     @relation("Reviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewee         User     @relation("Reviewee", fields: [revieweeId], references: [id], onDelete: Cascade)
+}
+
+model Report {
+  id             String   @id @default(uuid())
+  reporterId     String
+  reportedUserId String
+  reason         String   // HARASSMENT, SPAM, INAPPROPRIATE, FAKE_PROFILE, SCAM, OTHER
+  description    String
+  status         String   @default("PENDING") // PENDING, RESOLVED, DISMISSED
+  createdAt      DateTime @default(now())
+  reporter       User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUser   User     @relation("ReportedUser", fields: [reportedUserId], references: [id], onDelete: Cascade)
+}
+
+model XCreditTransaction {
+  id          String   @id @default(uuid())
+  userId      String
+  amount      Int      // +1 or -1
+  type        String   // EARNED_TEACHING, SPENT_LEARNING, BONUS, REFUND
+  description String
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
