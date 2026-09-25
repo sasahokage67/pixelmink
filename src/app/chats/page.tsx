@@ -222,7 +222,7 @@ export default function ChatsPage() {
       if (socket) {
         socket.emit('call:initiate', {
           callerId: user?.id,
-          callerName: user?.profile?.name || 'Alex Voronov',
+          callerName: user?.profile?.name || 'Peer Developer',
           callerAvatar: user?.profile?.avatar,
           receiverId: recipient?.userId,
           roomId,

@@ -150,6 +150,10 @@ app.prepare().then(() => {
       io.to(`call_${roomId}`).emit('call:moderated', { targetUserId, action });
     });
 
+    socket.on('call:chat_message', ({ roomId, message }) => {
+      io.to(`call_${roomId}`).emit('call:new_chat_message', message);
+    });
+
     socket.on('call:leave', ({ roomId }) => {
       socket.leave(`call_${roomId}`);
       if (callRooms.has(roomId)) {

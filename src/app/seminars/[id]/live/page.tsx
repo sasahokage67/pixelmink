@@ -367,11 +367,11 @@ export default function SeminarLivePage() {
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center space-y-4 bg-gradient-to-b from-[#14141a] to-[#09090b]">
                 <div className="flex justify-center">
-                  <Identicon name={seminar?.host?.profile?.name || 'Alex Voronov'} size={88} />
+                  <Identicon name={seminar?.host?.profile?.name || 'Seminar Host'} size={88} />
                 </div>
                 <div className="space-y-1">
                   <div className="text-lg font-bold text-white tracking-tight">
-                    {seminar?.host?.profile?.name || 'Alex Voronov'}
+                    {seminar?.host?.profile?.name || 'Seminar Host'}
                   </div>
                   <div className="text-xs font-mono text-blue-400">
                     Host Presenter • Live Broadcast Feed
@@ -603,7 +603,7 @@ export default function SeminarLivePage() {
             </div>
 
             <div className="bg-black/40 p-4 rounded-xl border border-white/[0.06] text-xs font-mono text-zinc-300 space-y-1 text-left">
-              <div>Recipient: {user?.profile?.name || 'Alex Voronov'}</div>
+              <div>Recipient: {user?.profile?.name || user?.email || 'Engineer'}</div>
               <div>Duration: {attendanceMinutes} Minutes Verified</div>
               <div>Host: {seminar?.host?.profile?.name || 'Senior Lead'}</div>
               <div>Credential ID: XCH-CERT-{seminarId.substring(0, 8).toUpperCase()}</div>

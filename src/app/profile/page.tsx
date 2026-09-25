@@ -99,7 +99,7 @@ export default function ProfilePage() {
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                  {p?.name || 'Alex Voronov'}
+                  {p?.name || user?.email || 'Engineer'}
                 </h1>
                 <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
                   {user?.role || 'PEER'}

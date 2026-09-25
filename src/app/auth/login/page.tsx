@@ -102,34 +102,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* 1-Click Fast Login for Demo Evaluation */}
-        <div className="drinkit-card p-5 space-y-3">
-          <div className="text-[10px] font-mono uppercase text-zinc-500 tracking-wider">
-            {t('login_demo_profiles')}
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-            {[
-              { name: 'Alex (Python/AI)', email: 'alex@xchange.dev' },
-              { name: 'Amina (English/LLM)', email: 'amina@xchange.dev' },
-              { name: 'Daniel (Rust Dev)', email: 'daniel@xchange.dev' },
-              { name: 'Sara (UI/UX Lead)', email: 'sara@xchange.dev' },
-            ].map((d) => (
-              <button
-                key={d.email}
-                type="button"
-                onClick={() => {
-                  setEmail(d.email);
-                  setPassword('password123');
-                  login(d.email, 'password123').then(() => router.push('/dashboard'));
-                }}
-                className="p-2 rounded-lg bg-[#18181f] hover:bg-white/[0.05] border border-white/[0.06] text-left text-zinc-300 transition-colors"
-              >
-                <div className="font-semibold text-white">{d.name}</div>
-                <div className="text-[9px] text-zinc-500">{d.email}</div>
-              </button>
-            ))}
-          </div>
-        </div>
 
         <div className="text-center text-xs font-mono text-zinc-400">
           {t('login_dont_have')}{' '}
