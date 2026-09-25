@@ -3,167 +3,433 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Logo from '@/components/ui/Logo';
-import { ArrowRight, Sparkles, Terminal, Code2, Shield, Video, Layers, Users, CheckCircle2 } from 'lucide-react';
+import Identicon from '@/components/ui/Identicon';
+import {
+  ArrowRight,
+  Sparkles,
+  Terminal,
+  Cpu,
+  Shield,
+  Video,
+  Layers,
+  Users,
+  CheckCircle2,
+  Database,
+  Binary,
+  GitBranch,
+  Code2,
+  Radio,
+  Clock,
+  ArrowUpRight,
+  Flame,
+  Check,
+} from 'lucide-react';
+
+const CS_DOMAINS = [
+  {
+    code: '01',
+    title: 'Low-Level Systems & OS',
+    skills: ['Rust', 'C/C++', 'Linux Kernel', 'Concurrency', 'Memory Safety'],
+    desc: 'Systems programming, OS internals, zero-cost abstractions and lock-free data structures.',
+    peers: 14,
+  },
+  {
+    code: '02',
+    title: 'Artificial Intelligence & ML',
+    skills: ['PyTorch', 'LLMs & RAG', 'Computer Vision', 'LoRA Fine-tuning', 'Vector DBs'],
+    desc: 'Deep learning frameworks, training custom models, tensor math and autonomous agents.',
+    peers: 22,
+  },
+  {
+    code: '03',
+    title: 'Distributed Systems & Data',
+    skills: ['PostgreSQL & SQL', 'Raft Consensus', 'Redis', 'Microservices', 'Kafka'],
+    desc: 'High-throughput architectures, fault tolerance, transaction isolation and query optimization.',
+    peers: 18,
+  },
+  {
+    code: '04',
+    title: 'DevOps & Infrastructure',
+    skills: ['Docker', 'Kubernetes', 'CI/CD Pipelines', 'Git Workflows', 'Rootless Containers'],
+    desc: 'Containerization, cloud infrastructure orchestration, automated builds and observability.',
+    peers: 16,
+  },
+  {
+    code: '05',
+    title: 'Algorithms & Core Theory',
+    skills: ['Data Structures', 'Dynamic Programming', 'Linear Algebra', 'Graph Theory'],
+    desc: 'Algorithmic complexity, mathematical foundations of graphics, cryptography and games.',
+    peers: 19,
+  },
+  {
+    code: '06',
+    title: 'Cybersecurity & AppSec',
+    skills: ['Pentest', 'Web Security', 'Reverse Engineering', 'Cryptography', 'Audit'],
+    desc: 'Vulnerability assessment, exploit analysis, secure code reviews and hardened protocols.',
+    peers: 11,
+  },
+];
+
+const RECENT_EXCHANGES = [
+  {
+    userA: 'Alex Voronov',
+    skillA: 'Python & AI',
+    userB: 'Amina Al-Mansoor',
+    skillB: 'Prompt Engineering',
+    status: 'LIVE CALL',
+    score: '96%',
+  },
+  {
+    userA: 'Daniel Richter',
+    skillA: 'Rust Systems',
+    userB: 'Elena Rostova',
+    skillB: 'React & Next.js',
+    status: 'COMPLETED',
+    score: '94%',
+  },
+  {
+    userA: 'Marcus Brody',
+    skillA: 'DaVinci Resolve',
+    userB: 'Sara Lindqvist',
+    skillB: 'UI/UX Design Systems',
+    status: 'SCHEDULED',
+    score: '92%',
+  },
+];
 
 export default function LandingPage() {
-  const [demoSkillA, setDemoSkillA] = useState('Python');
-  const [demoSkillB, setDemoSkillB] = useState('English for IT');
+  const [selectedDemoSkill, setSelectedDemoSkill] = useState<'rust' | 'ai' | 'systems'>('rust');
 
   return (
-    <div className="space-y-24 py-8">
-      {/* Hero Section */}
-      <section className="relative pt-6 pb-12 border-b border-white/[0.08]">
+    <div className="space-y-24 py-6">
+      {/* 1. HERO SECTION: DRINKIT-STYLE EDITORIAL TYPOGRAPHY & ZERO SLOP */}
+      <section className="relative pt-6 pb-16 border-b border-white/[0.08]">
         <div className="max-w-4xl space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 font-mono text-xs">
-            <Logo size={16} />
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse ml-0.5" />
-            PIXELMINK PROTOCOL v1.0 • COMPUTER SCIENCE & AI
+          {/* Status Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#111115] border border-white/10 text-xs font-mono text-zinc-300">
+            <Logo size={18} />
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+            <span className="text-white font-bold tracking-tight">pixelmink</span>
+            <span className="text-zinc-600">•</span>
+            <span className="text-blue-400">Computer Science Barter Protocol</span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl font-bold tracking-tighter text-white leading-tight">
-            Your skills for theirs.<br />
-            <span className="text-zinc-400 font-light">No money, just knowledge.</span>
-          </h1>
+          {/* Slogan & Bold Statement */}
+          <div className="space-y-3">
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-pixel font-bold text-white tracking-tight leading-tight">
+              Your skills for theirs.
+            </h1>
+            <p className="text-2xl sm:text-4xl md:text-5xl font-pixel text-zinc-500 tracking-tight">
+              No money, just knowledge.
+            </p>
+          </div>
 
-          <p className="text-base sm:text-lg text-zinc-400 font-normal max-w-2xl leading-relaxed">
-            Exchange skills directly with senior developers and creators. Learn from peers, teach what you master, and prove real progress through verified 1-on-1 calls, screen sharing, and high-density technical seminars.
+          <p className="text-xs sm:text-sm text-zinc-400 font-mono max-w-2xl leading-relaxed pt-2">
+            The peer-to-peer knowledge exchange for Computer Science, Low-Level Systems, AI/ML, and Software Craft.
+            Teach what you master for 1 hour — unlock 1 hour of 1-on-1 mentorship with another senior peer. Zero currency.
           </p>
 
-          <div className="flex flex-wrap items-center gap-3 pt-2">
+          {/* CTA Buttons */}
+          <div className="flex flex-wrap items-center gap-3 pt-3">
+            <Link
+              href="/auth/register"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold tap-active transition-all shadow-lg shadow-blue-600/20"
+            >
+              <span>Create Profile & Pick CS Skills</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+
+            <Link
+              href="/discover"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded bg-[#131318] hover:bg-[#181820] border border-white/[0.12] text-zinc-300 font-mono text-xs tap-active transition-all"
+            >
+              <span>Explore Active Peers</span>
+              <ArrowUpRight className="w-3.5 h-3.5 text-zinc-500" />
+            </Link>
+
             <Link
               href="/matches"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-semibold tap-active transition-all shadow-lg shadow-blue-600/20"
+              className="inline-flex items-center gap-2 px-4 py-3 rounded bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white font-mono text-xs transition-all"
             >
-              <span>Find a Match</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-
-            <Link
-              href="/seminars"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#141418] hover:bg-[#1a1a20] border border-white/[0.12] text-zinc-200 font-mono text-xs tap-active transition-all"
-            >
-              <span>Explore Seminars</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-red-500/20 text-red-400 border border-red-500/30 font-mono">
-                Live Now
-              </span>
+              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+              <span>Live Matches</span>
             </Link>
           </div>
-        </div>
 
-        {/* Live Matching Simulation Bento Card */}
-        <div className="mt-12 p-6 rounded-2xl bg-[#111115] border border-white/[0.08]">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-white/[0.06]">
-            <div>
-              <div className="font-mono text-xs uppercase text-blue-400 tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                pixelmink Knowledge Exchange Simulator
-              </div>
-              <div className="text-sm font-semibold text-white mt-0.5">
-                MATCH → CHAT → CALL → LEARN → PRACTICE → PROGRESS
-              </div>
+          {/* Protocol Metrics Bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6 border-t border-white/[0.06]">
+            <div className="p-3 rounded bg-[#111114] border border-white/[0.06]">
+              <div className="text-[10px] font-mono uppercase text-zinc-500">Exchanged</div>
+              <div className="text-lg font-mono font-bold text-white mt-0.5">1,420+ hrs</div>
             </div>
-            <div className="font-mono text-xs px-2.5 py-1 rounded-full bg-white/[0.05] border border-white/[0.08] text-zinc-400">
-              Deterministic Matching Engine
+            <div className="p-3 rounded bg-[#111114] border border-white/[0.06]">
+              <div className="text-[10px] font-mono uppercase text-zinc-500">Match Accuracy</div>
+              <div className="text-lg font-mono font-bold text-emerald-400 mt-0.5">97.8%</div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 items-center">
-            {/* User A Box */}
-            <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-950/60 border border-blue-500/30 flex items-center justify-center font-mono font-bold text-blue-400">
-                  A
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-white">Peer Alex</div>
-                  <div className="text-[10px] font-mono text-zinc-500">Belgrade • Rating 4.95</div>
-                </div>
-              </div>
-              <div className="space-y-1.5 pt-2 text-xs font-mono">
-                <div className="text-zinc-400">Teaches: <span className="text-blue-400 font-semibold">{demoSkillA}</span></div>
-                <div className="text-zinc-400">Wants: <span className="text-emerald-400 font-semibold">{demoSkillB}</span></div>
-              </div>
+            <div className="p-3 rounded bg-[#111114] border border-white/[0.06]">
+              <div className="text-[10px] font-mono uppercase text-zinc-500">Cost per Hour</div>
+              <div className="text-lg font-mono font-bold text-blue-400 mt-0.5">$0.00</div>
             </div>
-
-            {/* Central Score Card */}
-            <div className="text-center p-4 rounded-xl bg-blue-950/20 border border-blue-500/30 space-y-2">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-blue-400">
-                🔥 Perfect Reciprocal Match
-              </div>
-              <div className="text-4xl font-mono font-bold tracking-tight text-white">
-                96<span className="text-blue-400">%</span>
-              </div>
-              <div className="text-[11px] text-zinc-400 font-sans">
-                Zero currency needed. 1h teaching Python = 1h learning English via XCredits.
-              </div>
-              <Link
-                href="/matches"
-                className="inline-block mt-2 px-4 py-1.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-mono text-[11px] font-medium transition-all"
-              >
-                Inspect Match Details
-              </Link>
-            </div>
-
-            {/* User B Box */}
-            <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06] space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-emerald-950/60 border border-emerald-500/30 flex items-center justify-center font-mono font-bold text-emerald-400">
-                  B
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-white">Peer Amina</div>
-                  <div className="text-[10px] font-mono text-zinc-500">Dubai • Rating 4.98</div>
-                </div>
-              </div>
-              <div className="space-y-1.5 pt-2 text-xs font-mono">
-                <div className="text-zinc-400">Teaches: <span className="text-emerald-400 font-semibold">{demoSkillB}</span></div>
-                <div className="text-zinc-400">Wants: <span className="text-blue-400 font-semibold">{demoSkillA}</span></div>
-              </div>
+            <div className="p-3 rounded bg-[#111114] border border-white/[0.06]">
+              <div className="text-[10px] font-mono uppercase text-zinc-500">Infrastructure</div>
+              <div className="text-lg font-mono font-bold text-zinc-300 mt-0.5">P2P WebRTC</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* How it Works Section */}
-      <section className="space-y-8">
+      {/* 2. INTERACTIVE MATCHING SIMULATOR BENTO */}
+      <section className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+          <div>
+            <div className="text-[10px] font-mono uppercase text-blue-400 tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3" />
+              Protocol Simulator
+            </div>
+            <h2 className="text-xl sm:text-2xl font-pixel font-bold text-white tracking-tight mt-1">
+              Reciprocal & Semantic Exchange Flow
+            </h2>
+          </div>
+          <p className="text-xs font-mono text-zinc-400 max-w-md">
+            The engine evaluates reciprocal skill overlap and bio keyword similarity. Zero money transactions.
+          </p>
+        </div>
+
+        {/* Interactive Simulator Shell */}
+        <div className="drinkit-card p-6 md:p-8 bg-[#0c0c10] border border-white/10 space-y-6">
+          {/* Skill Selector Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-white/[0.06]">
+            <span className="text-xs font-mono text-zinc-500 shrink-0 mr-2">Select Scenario:</span>
+            <button
+              onClick={() => setSelectedDemoSkill('rust')}
+              className={`px-3 py-1.5 rounded text-xs font-mono transition-all ${
+                selectedDemoSkill === 'rust'
+                  ? 'bg-blue-600 text-white font-bold'
+                  : 'bg-[#141419] text-zinc-400 hover:text-white border border-white/5'
+              }`}
+            >
+              Rust Systems ↔ PyTorch AI
+            </button>
+            <button
+              onClick={() => setSelectedDemoSkill('ai')}
+              className={`px-3 py-1.5 rounded text-xs font-mono transition-all ${
+                selectedDemoSkill === 'ai'
+                  ? 'bg-blue-600 text-white font-bold'
+                  : 'bg-[#141419] text-zinc-400 hover:text-white border border-white/5'
+              }`}
+            >
+              LLM Fine-Tuning ↔ PostgreSQL
+            </button>
+            <button
+              onClick={() => setSelectedDemoSkill('systems')}
+              className={`px-3 py-1.5 rounded text-xs font-mono transition-all ${
+                selectedDemoSkill === 'systems'
+                  ? 'bg-blue-600 text-white font-bold'
+                  : 'bg-[#141419] text-zinc-400 hover:text-white border border-white/5'
+              }`}
+            >
+              3-Way Loop (A → B → C → A)
+            </button>
+          </div>
+
+          {/* Interactive Simulation Diagram */}
+          {selectedDemoSkill !== 'systems' ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+              {/* Peer A Card */}
+              <div className="p-5 rounded-lg bg-[#111116] border border-white/[0.08] space-y-4">
+                <div className="flex items-center gap-3">
+                  <Identicon name="Peer_A_Linus" size={44} />
+                  <div>
+                    <div className="text-xs font-bold text-white">Linus (You)</div>
+                    <div className="text-[10px] font-mono text-zinc-500">Remote • 4.98 Rating</div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs font-mono pt-1">
+                  <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                    <span className="text-[10px] uppercase block text-emerald-500 font-semibold">Teaches:</span>
+                    {selectedDemoSkill === 'rust' ? 'Rust & Concurrency' : 'LLMs & Prompt Engineering'}
+                  </div>
+                  <div className="p-2 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                    <span className="text-[10px] uppercase block text-blue-500 font-semibold">Wants:</span>
+                    {selectedDemoSkill === 'rust' ? 'PyTorch & AI' : 'PostgreSQL & Distributed SQL'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Central Matching Logic Gauge */}
+              <div className="text-center p-5 rounded-lg bg-[#14141c] border border-blue-500/30 space-y-3">
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-mono">
+                  <Flame className="w-3 h-3 text-blue-400" />
+                  PERFECT RECIPROCAL MATCH
+                </div>
+
+                <div className="text-4xl font-mono font-bold text-white tracking-tight">
+                  98<span className="text-blue-400">%</span>
+                </div>
+
+                <div className="text-[11px] font-mono text-zinc-400 leading-snug">
+                  1 hour Rust pair debugging = 1 hour PyTorch RAG architecture session.
+                </div>
+
+                <div className="flex items-center justify-center gap-1.5 text-[10px] font-mono text-zinc-500 pt-1">
+                  <span className="px-1.5 py-0.5 rounded bg-white/5">#zero-money</span>
+                  <span className="px-1.5 py-0.5 rounded bg-white/5">#webrtc</span>
+                  <span className="px-1.5 py-0.5 rounded bg-white/5">#code-share</span>
+                </div>
+              </div>
+
+              {/* Peer B Card */}
+              <div className="p-5 rounded-lg bg-[#111116] border border-white/[0.08] space-y-4">
+                <div className="flex items-center gap-3">
+                  <Identicon name="Peer_B_Amina" size={44} />
+                  <div>
+                    <div className="text-xs font-bold text-white">Amina (Matched Peer)</div>
+                    <div className="text-[10px] font-mono text-zinc-500">London • 4.95 Rating</div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs font-mono pt-1">
+                  <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                    <span className="text-[10px] uppercase block text-emerald-500 font-semibold">Teaches:</span>
+                    {selectedDemoSkill === 'rust' ? 'PyTorch & AI' : 'PostgreSQL & Distributed SQL'}
+                  </div>
+                  <div className="p-2 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                    <span className="text-[10px] uppercase block text-blue-500 font-semibold">Wants:</span>
+                    {selectedDemoSkill === 'rust' ? 'Rust & Concurrency' : 'LLMs & Prompt Engineering'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* 3-Way Loop Visualization */
+            <div className="p-6 rounded-lg bg-[#111116] border border-white/[0.08] space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+                <div className="text-xs font-bold text-white font-mono flex items-center gap-2">
+                  <GitBranch className="w-4 h-4 text-purple-400" />
+                  Circular Knowledge Graph Resolution
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  A → B → C → A Cycle
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                <div className="p-4 rounded bg-black/40 border border-white/[0.06] text-xs font-mono space-y-1">
+                  <div className="text-blue-400 font-bold">Node A (You)</div>
+                  <div className="text-zinc-400">Teaches Rust → to Node B</div>
+                  <div className="text-emerald-400">Receives AI from Node C</div>
+                </div>
+
+                <div className="p-4 rounded bg-black/40 border border-white/[0.06] text-xs font-mono space-y-1">
+                  <div className="text-purple-400 font-bold">Node B (Daniel)</div>
+                  <div className="text-zinc-400">Teaches DevOps → to Node C</div>
+                  <div className="text-emerald-400">Receives Rust from Node A</div>
+                </div>
+
+                <div className="p-4 rounded bg-black/40 border border-white/[0.06] text-xs font-mono space-y-1">
+                  <div className="text-pink-400 font-bold">Node C (Sara)</div>
+                  <div className="text-zinc-400">Teaches AI/Design → to Node A</div>
+                  <div className="text-emerald-400">Receives DevOps from Node B</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 3. COMPUTER SCIENCE DISCIPLINE MATRIX (BENTO GRID) */}
+      <section className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-mono uppercase text-emerald-400 tracking-wider">
+              Knowledge Catalog
+            </div>
+            <h2 className="text-xl sm:text-2xl font-pixel font-bold text-white tracking-tight mt-1">
+              Core Technical Disciplines
+            </h2>
+          </div>
+          <Link
+            href="/skills"
+            className="text-xs font-mono text-blue-400 hover:underline flex items-center gap-1"
+          >
+            <span>View All Skills</span>
+            <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {CS_DOMAINS.map((domain) => (
+            <div
+              key={domain.code}
+              className="drinkit-card p-5 space-y-3 flex flex-col justify-between hover:border-white/20 transition-all"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-blue-500 font-bold">{domain.code} //</span>
+                  <span className="text-[10px] text-zinc-500 px-2 py-0.5 rounded bg-white/5">
+                    {domain.peers} peers active
+                  </span>
+                </div>
+                <h3 className="text-sm font-bold text-white tracking-tight">{domain.title}</h3>
+                <p className="text-[11px] font-mono text-zinc-400 leading-relaxed">
+                  {domain.desc}
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-white/[0.06]">
+                <div className="flex flex-wrap gap-1">
+                  {domain.skills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#181820] text-zinc-300 border border-white/5"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 4. PROTOCOL ARCHITECTURE (HOW IT WORKS) */}
+      <section className="space-y-6">
         <div>
-          <div className="font-mono text-xs uppercase tracking-wider text-blue-400">The Loop</div>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-1">
-            How Knowledge Exchange Works
+          <div className="text-[10px] font-mono uppercase text-blue-400 tracking-wider">
+            Protocol Rules
+          </div>
+          <h2 className="text-xl sm:text-2xl font-pixel font-bold text-white tracking-tight mt-1">
+            How Peer Barter Operates
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             {
               step: '01',
-              title: 'Define Skills',
-              desc: 'Declare what CS & Tech skills you can teach and what topics you aim to master.',
-              icon: Code2,
+              title: 'Vector Registration',
+              desc: 'Select your teaching skills and learning desires from the Computer Science catalog, plus bio focus.',
+              icon: Terminal,
             },
             {
               step: '02',
-              title: 'Get Matched',
-              desc: 'Algorithm finds direct 2-way matches or 3-way circular exchange loops (A→B→C→A).',
-              icon: Users,
+              title: 'Reciprocal Matching',
+              desc: 'Algorithmic scoring computes direct reciprocal overlap or 3-node circular barter loops.',
+              icon: Sparkles,
             },
             {
               step: '03',
-              title: 'Live Call & Screen',
-              desc: 'Ultra low-latency WebRTC calls with screen sharing to review code and debug.',
+              title: 'Live 1-on-1 WebRTC',
+              desc: 'Encrypted peer audio, video, and screen sharing to review code, debug terminals, and study.',
               icon: Video,
             },
             {
               step: '04',
-              title: 'Proof of Learning',
-              desc: 'Take instant technical quizzes after sessions to earn verifiable skill progress (+8%).',
+              title: 'Proof & Credits',
+              desc: 'Complete sessions to earn XCredits (1 hr taught = 1 hr learned) and pass verified mastery quizzes.',
               icon: CheckCircle2,
-            },
-            {
-              step: '05',
-              title: 'Earn XCredits',
-              desc: '1 hour teaching = 1 XCredit earned to unlock learning from any senior peer.',
-              icon: Shield,
             },
           ].map((item) => {
             const Icon = item.icon;
@@ -174,11 +440,11 @@ export default function LandingPage() {
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-blue-500">{item.step}</span>
+                    <span className="font-mono text-xs font-bold text-blue-400">{item.step}</span>
                     <Icon className="w-4 h-4 text-zinc-500" />
                   </div>
-                  <h3 className="text-sm font-semibold text-white mt-4 tracking-tight">{item.title}</h3>
-                  <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">{item.desc}</p>
+                  <h3 className="text-sm font-bold text-white mt-3 tracking-tight">{item.title}</h3>
+                  <p className="text-xs font-mono text-zinc-400 mt-1.5 leading-relaxed">{item.desc}</p>
                 </div>
               </div>
             );
@@ -186,108 +452,99 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Tech Focus Domains Bento Grid */}
-      <section className="space-y-8">
-        <div>
-          <div className="font-mono text-xs uppercase tracking-wider text-blue-400">Curriculum</div>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mt-1">
-            Pure Computer Science & Digital Craft
-          </h2>
+      {/* 5. LIVE NETWORK ACTIVITY TICKER */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+            <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+              Live Network Barters
+            </span>
+          </div>
+          <span className="text-[10px] font-mono text-zinc-500">Real-time peer streams</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="drinkit-card p-6 md:col-span-2 space-y-4">
-            <div className="font-mono text-xs text-blue-400">01 / AI & MACHINE LEARNING</div>
-            <h3 className="text-xl font-bold text-white tracking-tight">
-              PyTorch, Transformers, LLM Fine-Tuning & Quantization
-            </h3>
-            <p className="text-xs text-zinc-400 leading-relaxed max-w-xl">
-              Exchange experience on fine-tuning Llama and Qwen models with LoRA, setting up local inference servers, vector databases (pgvector) and structured output agents.
-            </p>
-            <div className="flex flex-wrap gap-2 pt-2">
-              {['PyTorch', 'HuggingFace', 'LoRA / QLoRA', 'DSPy', 'Ollama', 'vLLM'].map((t) => (
-                <span key={t} className="drinkit-pill text-zinc-300">
-                  {t}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {RECENT_EXCHANGES.map((ex, idx) => (
+            <div
+              key={idx}
+              className="drinkit-card p-4 space-y-2.5 bg-[#0e0e12] border border-white/[0.08]"
+            >
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-zinc-300 font-semibold">{ex.userA} ⇄ {ex.userB}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  {ex.status}
                 </span>
-              ))}
+              </div>
+              <div className="text-[11px] font-mono text-zinc-400 flex items-center justify-between">
+                <span>{ex.skillA} ↔ {ex.skillB}</span>
+                <span className="text-blue-400 font-bold">{ex.score}</span>
+              </div>
             </div>
-          </div>
-
-          <div className="drinkit-card p-6 space-y-4">
-            <div className="font-mono text-xs text-blue-400">02 / SYSTEMS PROGRAMMING</div>
-            <h3 className="text-xl font-bold text-white tracking-tight">
-              Rust & High-Concurrency Golang
-            </h3>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Ownership lifetimes, lock-free queues, Tokio async runtime, eBPF network taps and sub-millisecond servers.
-            </p>
-            <div className="flex flex-wrap gap-2 pt-2">
-              {['Rust', 'Tokio', 'Golang', 'C++', 'Linux Kernel'].map((t) => (
-                <span key={t} className="drinkit-pill text-zinc-300">
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="drinkit-card p-6 space-y-4">
-            <div className="font-mono text-xs text-blue-400">03 / VIDEO EDITING & 3D</div>
-            <h3 className="text-xl font-bold text-white tracking-tight">
-              DaVinci Resolve & Blender 3D
-            </h3>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              ACES color grading, hard-surface geometry nodes, motion graphics, and audio mastering in Fairlight.
-            </p>
-            <div className="flex flex-wrap gap-2 pt-2">
-              {['DaVinci Resolve', 'Blender', 'Unreal Engine 5', 'Shader Math'].map((t) => (
-                <span key={t} className="drinkit-pill text-zinc-300">
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="drinkit-card p-6 md:col-span-2 space-y-4">
-            <div className="font-mono text-xs text-blue-400">04 / PRODUCT & FRONTEND DESIGN</div>
-            <h3 className="text-xl font-bold text-white tracking-tight">
-              Figma Design Systems & Next.js App Router
-            </h3>
-            <p className="text-xs text-zinc-400 leading-relaxed max-w-xl">
-              Drinkit minimalist ergonomics, variable design tokens, micro-interactions, TypeScript strict gymnastics, and zero-slop component architectures.
-            </p>
-            <div className="flex flex-wrap gap-2 pt-2">
-              {['Design Systems', 'Figma Tokens', 'Next.js 14', 'TypeScript', 'Tailwind'].map((t) => (
-                <span key={t} className="drinkit-pill text-zinc-300">
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 
-      {/* Call to action */}
-      <section className="p-8 md:p-12 rounded-2xl bg-[#111115] border border-blue-500/30 text-center space-y-5">
-        <div className="flex items-center justify-center gap-3">
-          <Logo size={36} />
-          <span className="font-mono text-2xl font-bold text-white tracking-tight">pixelmink</span>
+      {/* 6. CALL TO ACTION MANIFESTO */}
+      <section className="drinkit-card p-8 md:p-12 text-center space-y-6 bg-gradient-to-b from-[#111116] to-[#09090b] border border-white/10">
+        <div className="max-w-xl mx-auto space-y-3">
+          <div className="flex justify-center">
+            <Logo size={42} />
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-pixel font-bold text-white tracking-tight">
+            Stop Paying for Courses.<br />
+            Trade Your Engineering Knowledge.
+          </h2>
+          <p className="text-xs font-mono text-zinc-400 leading-relaxed">
+            Join the pixelmink developer network. Connect with engineers worldwide across low-level systems,
+            machine learning, and distributed infrastructure.
+          </p>
         </div>
-        <h2 className="text-3xl font-bold tracking-tight text-white">
-          Your skills for theirs. No money, just knowledge.
-        </h2>
-        <p className="text-sm text-zinc-400 max-w-xl mx-auto leading-relaxed">
-          Join Alex, Amina, Daniel, Sara and 20+ verified peers already running live WebRTC pair programming and seminars.
-        </p>
-        <div className="pt-2">
+
+        <div className="flex justify-center gap-3">
           <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-semibold tap-active transition-all shadow-xl shadow-blue-600/30"
+            href="/auth/register"
+            className="px-6 py-3 rounded bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all shadow-lg shadow-blue-600/20"
           >
-            <span>Launch Dashboard</span>
-            <ArrowRight className="w-4 h-4" />
+            Create Your Account & Claim 5 XC
+          </Link>
+          <Link
+            href="/discover"
+            className="px-6 py-3 rounded bg-[#16161c] hover:bg-[#1c1c24] border border-white/10 text-zinc-300 font-mono text-xs transition-all"
+          >
+            Browse Peer Graph
           </Link>
         </div>
       </section>
+
+      {/* 7. FOOTER */}
+      <footer className="pt-8 pb-12 border-t border-white/[0.08] flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-zinc-500">
+        <div className="flex items-center gap-2">
+          <Logo size={18} />
+          <span className="text-white font-bold tracking-tight">pixelmink</span>
+          <span>•</span>
+          <span>“Your skills for theirs. No money, just knowledge.”</span>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <a
+            href="https://github.com/sasahokage67/pixelmink"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-zinc-400 hover:text-white transition-colors"
+          >
+            GitHub Repository
+          </a>
+          <span>•</span>
+          <Link href="/auth/login" className="text-zinc-400 hover:text-white transition-colors">
+            Sign In
+          </Link>
+          <span>•</span>
+          <Link href="/auth/register" className="text-blue-400 hover:underline">
+            Register
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }

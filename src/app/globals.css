@@ -73,3 +73,23 @@ h1, h2, h3, .font-heading {
 .tap-active:active {
   transform: scale(0.98);
 }
+
+/* Subtle Pixel Matrix Backdrop */
+.pixel-grid-bg {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.pixel-border {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pixel-border:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.font-pixel-title {
+  font-family: var(--font-pixel-heading);
+  letter-spacing: -0.03em;
+}
+
