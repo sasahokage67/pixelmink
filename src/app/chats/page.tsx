@@ -20,7 +20,9 @@ import {
   Code,
   Image as ImageIcon,
   Sparkles,
+  ExternalLink,
 } from 'lucide-react';
+import InChatCall from '@/components/chat/InChatCall';
 
 export default function ChatsPage() {
   const router = useRouter();
@@ -204,6 +206,45 @@ export default function ChatsPage() {
     }
   };
 
+  const [inChatCallRoom, setInChatCallRoom] = useState<string | null>(null);
+  const [inChatCallType, setInChatCallType] = useState<'AUDIO' | 'VIDEO'>('VIDEO');
+
+  const handleStartInChatCall = async (type: 'AUDIO' | 'VIDEO') => {
+    if (!activeConv) return;
+    const recipient = activeConv.members?.find((m: any) => m.userId !== user?.id);
+    const roomId = `call_${activeConv.id}_${Date.now()}`;
+
+    try {
+      if (recipient?.userId) {
+        await fetch('/api/calls', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            receiverId: recipient.userId,
+            roomId,
+            type,
+          }),
+        });
+
+        if (socket) {
+          socket.emit('call:initiate', {
+            callerId: user?.id,
+            callerName: user?.profile?.name || user?.email?.split('@')[0] || 'Peer Developer',
+            callerAvatar: user?.profile?.avatar,
+            receiverId: recipient.userId,
+            roomId,
+            type,
+          });
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
+    setInChatCallType(type);
+    setInChatCallRoom(roomId);
+  };
+
   const handleInitiateCall = async (type: 'AUDIO' | 'VIDEO') => {
     if (!activeConv) return;
     const recipient = activeConv.members?.find((m: any) => m.userId !== user?.id);
@@ -367,23 +408,44 @@ export default function ChatsPage() {
             {/* Real WebRTC Call Buttons */}
             <div className="flex items-center gap-2">
               <button
-                onClick={() => handleInitiateCall('AUDIO')}
-                title="Start Audio WebRTC Call"
-                className="p-2 rounded-full bg-[#18181f] hover:bg-zinc-800 text-zinc-300 hover:text-white border border-white/[0.08] tap-active transition-all"
+                onClick={() => handleStartInChatCall('AUDIO')}
+                title="Аудиосозвон прямо в чате"
+                className="p-2 rounded-xl bg-[#18181f] hover:bg-zinc-800 text-zinc-300 hover:text-white border border-white/[0.08] tap-active transition-all"
               >
-                <Phone className="w-4 h-4 text-blue-400" />
+                <Phone className="w-4 h-4 text-emerald-400" />
+              </button>
+
+              <button
+                onClick={() => handleStartInChatCall('VIDEO')}
+                title="Видеосозвон и шеринг экрана прямо в чате"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold tap-active transition-all shadow-md shadow-blue-600/20"
+              >
+                <Video className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Созвон в чате</span>
               </button>
 
               <button
                 onClick={() => handleInitiateCall('VIDEO')}
-                title="Start Video WebRTC Call with Screen Share"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-medium tap-active transition-all shadow-md shadow-blue-600/20"
+                title="Открыть в отдельной комнате на весь экран"
+                className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white border border-white/[0.08] tap-active transition-all hidden sm:flex"
               >
-                <Video className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Video Call</span>
+                <ExternalLink className="w-4 h-4" />
               </button>
             </div>
           </div>
+
+          {/* In-Chat WebRTC Call Window (Embedded directly above messages) */}
+          {inChatCallRoom && (
+            <InChatCall
+              roomId={inChatCallRoom}
+              activeConvId={activeConv.id}
+              otherMember={otherMember}
+              currentUser={user}
+              socket={socket}
+              initialType={inChatCallType}
+              onClose={() => setInChatCallRoom(null)}
+            />
+          )}
 
           {/* Messages Timeline */}
           <div className="flex-1 p-4 md:p-6 overflow-y-auto space-y-4">

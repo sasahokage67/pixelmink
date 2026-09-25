@@ -7,14 +7,14 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import LanguageSwitcher from '@/components/ui/LanguageSwitcher';
 import Logo from '@/components/ui/Logo';
-import { ArrowRight, Lock, Mail, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Lock, Mail, User, Sparkles, CheckCircle2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
   const { t } = useLanguage();
-  const [email, setEmail] = useState('alex@xchange.dev');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -66,12 +66,13 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="drinkit-card p-6 space-y-4 shadow-2xl">
           <div>
-            <label className="block text-xs font-mono text-zinc-400 mb-1">{t('login_email')}</label>
+            <label className="block text-xs font-mono text-zinc-400 mb-1">Никнейм или Email</label>
             <div className="relative">
-              <Mail className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <User className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
               <input
-                type="email"
+                type="text"
                 required
+                placeholder="e.g. kent, linus или почта"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-[#18181f] border border-white/[0.08] focus:border-blue-500 rounded-lg pl-9 pr-3 py-2 text-xs text-white outline-none font-mono"

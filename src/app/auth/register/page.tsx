@@ -9,7 +9,6 @@ import Logo from '@/components/ui/Logo';
 import LanguageSwitcher from '@/components/ui/LanguageSwitcher';
 import {
   Lock,
-  Mail,
   User,
   Cpu,
   Terminal,
@@ -87,7 +86,6 @@ export default function RegisterPage() {
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [bio, setBio] = useState('');
 
@@ -152,7 +150,6 @@ export default function RegisterPage() {
 
     const ok = await register({
       name,
-      email,
       password,
       bio,
       teachSkills,
@@ -166,10 +163,10 @@ export default function RegisterPage() {
     } else {
       setError(
         lang === 'ru'
-          ? 'Ошибка регистрации. Возможно, email уже используется.'
+          ? 'Ошибка регистрации. Возможно, этот никнейм уже занят.'
           : lang === 'kz'
-          ? 'Тіркелу қатесі. Бұл email әлдеқашан тіркелген болуы мүмкін.'
-          : 'Registration failed. Email may already be in use.'
+          ? 'Тіркелу қатесі. Бұл никнейм бос емес болуы мүмкін.'
+          : 'Registration failed. Nickname may already be taken.'
       );
       setLoading(false);
     }
@@ -230,8 +227,8 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (name && email && password) setStep(2);
-                    else setError(lang === 'ru' ? 'Заполните учетные данные.' : 'Fill in credentials first.');
+                    if (name && password) setStep(2);
+                    else setError(lang === 'ru' ? 'Заполните никнейм и пароль.' : 'Fill in username and password first.');
                   }}
                   className={`py-2 px-2 text-center rounded text-xs font-mono transition-all ${
                     step === 2
@@ -244,8 +241,8 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (name && email && password) setStep(3);
-                    else setError(lang === 'ru' ? 'Заполните учетные данные.' : 'Fill in credentials first.');
+                    if (name && password) setStep(3);
+                    else setError(lang === 'ru' ? 'Заполните никнейм и пароль.' : 'Fill in username and password first.');
                   }}
                   className={`py-2 px-2 text-center rounded text-xs font-mono transition-all ${
                     step === 3
@@ -268,42 +265,29 @@ export default function RegisterPage() {
                 <div className="space-y-4">
                   <div>
                     <h2 className="text-base font-bold text-white font-mono tracking-tight">
-                      {t('reg_cred_title')}
+                      {lang === 'ru' ? 'Ваш профиль' : lang === 'kz' ? 'Сіздің профиліңіз' : 'Your Credentials'}
                     </h2>
                     <p className="text-xs font-mono text-zinc-400 mt-0.5">
-                      {t('reg_cred_desc')}
+                      {lang === 'ru'
+                        ? 'Никаких сложных регистраций и почты — только никнейм и пароль.'
+                        : lang === 'kz'
+                        ? 'Ешқандай поштасыз — тек никнейм мен құпиясөз.'
+                        : 'No email required — just pick a username and password.'}
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-xs font-mono text-zinc-300 mb-1.5">
-                      {t('reg_name_label')}
+                      {lang === 'ru' ? 'Никнейм / Имя' : lang === 'kz' ? 'Никнейм / Аты' : 'Username / Nickname'}
                     </label>
                     <div className="relative">
                       <User className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                       <input
                         type="text"
                         required
-                        placeholder="e.g. Kim Alexandr"
+                        placeholder="e.g. kent, linus, cyber_dev"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-[#16161c] border border-white/[0.1] focus:border-blue-500 rounded px-3 py-2.5 pl-9 text-xs text-white outline-none font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-mono text-zinc-300 mb-1.5">
-                      {t('reg_email_label')}
-                    </label>
-                    <div className="relative">
-                      <Mail className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                      <input
-                        type="email"
-                        required
-                        placeholder="alex@domain.dev"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
                         className="w-full bg-[#16161c] border border-white/[0.1] focus:border-blue-500 rounded px-3 py-2.5 pl-9 text-xs text-white outline-none font-mono"
                       />
                     </div>
@@ -330,8 +314,8 @@ export default function RegisterPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (!name.trim() || !email.trim() || !password.trim()) {
-                          setError(lang === 'ru' ? 'Заполните все поля учетных данных.' : 'Fill in all credential fields.');
+                        if (!name.trim() || !password.trim()) {
+                          setError(lang === 'ru' ? 'Укажите никнейм и пароль.' : 'Enter username and password.');
                           return;
                         }
                         setError('');
@@ -339,7 +323,7 @@ export default function RegisterPage() {
                       }}
                       className="w-full py-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-600/20"
                     >
-                      <span>{t('reg_btn_to_skills')}</span>
+                      <span>{t('reg_btn_skills')}</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>

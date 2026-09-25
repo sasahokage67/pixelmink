@@ -17,13 +17,31 @@ export async function POST(req: NextRequest) {
       learnSkill,
     } = body;
 
-    if (!email || !password || !name) {
-      return NextResponse.json({ error: 'Email, password, and name are required' }, { status: 400 });
+    if (!name || !password) {
+      return NextResponse.json({ error: 'Name and password are required' }, { status: 400 });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      return NextResponse.json({ error: 'User with this email already exists' }, { status: 409 });
+    const cleanHandle = name.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || 'peer';
+    
+    // Check if name or email already taken
+    const existingByName = await prisma.profile.findFirst({
+      where: { name: { equals: name.trim() } },
+    });
+    if (existingByName) {
+      return NextResponse.json({ error: 'Пользователь с таким никнеймом уже зарегистрирован' }, { status: 409 });
+    }
+
+    let userEmail = email?.trim();
+    if (!userEmail) {
+      const existingCount = await prisma.user.count({
+        where: { email: { startsWith: cleanHandle } },
+      });
+      userEmail = existingCount === 0 ? `${cleanHandle}@peer.dev` : `${cleanHandle}_${Date.now().toString(36)}@peer.dev`;
+    } else {
+      const existingByEmail = await prisma.user.findUnique({ where: { email: userEmail } });
+      if (existingByEmail) {
+        return NextResponse.json({ error: 'User with this email already exists' }, { status: 409 });
+      }
     }
 
     const hashedPassword = await hashPassword(password);
@@ -32,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.create({
       data: {
-        email,
+        email: userEmail,
         password: hashedPassword,
         role,
         profile: {
