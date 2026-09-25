@@ -110,7 +110,7 @@ export const DICTIONARY: Translations = {
     kz: 'Платформа кезеңі',
   },
   spec_stage_val: {
-    en: 'Genesis Launch v1.0',
+    en: 'Public Launch v1.0',
     ru: 'Открытый запуск v1.0',
     kz: 'Ашық старт v1.0',
   },

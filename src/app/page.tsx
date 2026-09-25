@@ -176,13 +176,6 @@ export default function LandingPage() {
         {/* 1. HERO SECTION: DRINKIT-STYLE EDITORIAL TYPOGRAPHY & ZERO SLOP */}
         <section className="relative pt-6 pb-16 border-b border-white/[0.08]">
           <div className="max-w-4xl space-y-6">
-            {/* Clean Status Badge (Glitch-free, Drinkit style) */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#111115] border border-white/10 text-xs font-mono text-zinc-400">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-white font-semibold">pixelmink</span>
-              <span className="text-zinc-600">•</span>
-              <span>Genesis Release v1.0</span>
-            </div>
 
             {/* Slogan & Bold Statement (Press Start 2P Retro Pixel Typography) */}
             <div className="space-y-4">
