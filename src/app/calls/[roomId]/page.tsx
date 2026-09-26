@@ -841,7 +841,7 @@ export default function CallRoomPage() {
               }
             } else if (signal.type === 'offer' && signal.sdp) {
               const pc = getOrCreatePeerConnection(fromPeerId);
-              const isPolite = myPeerIdRef.current.localeCompare(fromPeerId) > 0;
+              const isPolite = myPeerIdRef.current.localeCompare(fromPeerId) < 0;
               if (pc.signalingState !== 'stable') {
                 if (!isPolite) continue;
                 try {
@@ -944,7 +944,7 @@ export default function CallRoomPage() {
             }
           } else if (signal.type === 'offer' && signal.sdp) {
             const pc = getOrCreatePeerConnection(fromPeerId);
-            const isPolite = myPeerIdRef.current.localeCompare(fromPeerId) > 0;
+            const isPolite = myPeerIdRef.current.localeCompare(fromPeerId) < 0;
             if (pc.signalingState !== 'stable') {
               if (!isPolite) return;
               try {

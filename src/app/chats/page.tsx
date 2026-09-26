@@ -182,15 +182,31 @@ export default function ChatsPage() {
           const data = await res.json();
           if (data.messages) {
             setMessages((prev) => {
-              const tempMsgs = prev.filter((m) => m.id && typeof m.id === 'string' && m.id.startsWith('temp_'));
-              if (tempMsgs.length === 0) return data.messages;
-              const merged = [...data.messages];
-              tempMsgs.forEach((t) => {
-                if (!merged.some((m) => m.content === t.content && Math.abs(new Date(m.createdAt).getTime() - new Date(t.createdAt).getTime()) < 5000)) {
-                  merged.push(t);
-                }
+              if (!data.messages) return prev;
+              if (data.messages.length === 0 && prev.length > 0) return prev;
+
+              const map = new Map<string, any>();
+              prev.forEach((m) => {
+                if (m.id) map.set(m.id, m);
               });
-              return merged;
+
+              data.messages.forEach((m: any) => {
+                for (const [key, existing] of Array.from(map.entries())) {
+                  if (
+                    typeof existing.id === 'string' &&
+                    existing.id.startsWith('temp_') &&
+                    existing.content === m.content &&
+                    existing.senderId === m.senderId
+                  ) {
+                    map.delete(key);
+                  }
+                }
+                map.set(m.id, m);
+              });
+
+              return Array.from(map.values()).sort(
+                (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+              );
             });
           }
         }
