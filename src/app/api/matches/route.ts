@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth';
 import { matchUsers } from '@/lib/matching';
+import { syncPeersFromCloud } from '@/lib/cloudSync';
 import prisma from '@/lib/prisma';
 
 export async function GET(req: NextRequest) {
   try {
+    // Pull any peers from other laptops/devices into local DB
+    await syncPeersFromCloud();
+
     const user = await getSessionUser(req);
     // If not logged in, pick the first demo user (Alex) as context so the dashboard renders live matching immediately
     let targetUserId = user?.id;

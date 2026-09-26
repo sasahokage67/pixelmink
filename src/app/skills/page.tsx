@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Layers, Plus, CheckCircle2, BookOpen, Clock, Target, X, Trash2 } from 'lucide-react';
+import { Layers, Plus, CheckCircle2, BookOpen, Clock, Target, X, Trash2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function MySkillsPage() {
   const { user, refreshUser } = useAuth();
   const [skillsList, setSkillsList] = useState<any[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Form state
   const [skillName, setSkillName] = useState('');
@@ -15,7 +16,7 @@ export default function MySkillsPage() {
   const [type, setType] = useState<'TEACH' | 'LEARN'>('TEACH');
   const [level, setLevel] = useState('INTERMEDIATE');
   const [description, setDescription] = useState('');
-  const [teachingAvailability, setTeachingAvailability] = useState('Weekday evenings');
+  const [teachingAvailability, setTeachingAvailability] = useState('По будням с 19:00');
   const [learningGoal, setLearningGoal] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -59,6 +60,22 @@ export default function MySkillsPage() {
     }
   };
 
+  const handleDeleteSkill = async (userSkillId: string) => {
+    try {
+      setDeletingId(userSkillId);
+      const res = await fetch(`/api/skills?id=${userSkillId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        await refreshUser();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const teachSkills = skillsList.filter((s) => s.type === 'TEACH');
   const learnSkills = skillsList.filter((s) => s.type === 'LEARN');
 
@@ -69,47 +86,47 @@ export default function MySkillsPage() {
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 font-mono text-xs mb-2">
             <Layers className="w-3.5 h-3.5" />
-            Knowledge Inventory
+            Инвентарь компетенций
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            My Skills & Competencies
+            Мои навыки и стек
           </h1>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Specify what you can teach to earn XCredits and what you want to learn from verified peers.
+            Укажите, чему вы можете обучать для начисления XCredits, и что хотите изучить у проверенных коллег.
           </p>
         </div>
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-semibold tap-active transition-all shadow-lg shadow-blue-600/20"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all shadow-md shadow-blue-600/20 shrink-0"
         >
           <Plus className="w-4 h-4" />
-          <span>Add New Skill</span>
+          <span>Добавить навык</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Skills I Can Teach */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
               <h2 className="text-base font-bold text-white tracking-tight">
-                Skills I Can Teach ({teachSkills.length})
+                Могу обучать ({teachSkills.length})
               </h2>
             </div>
-            <span className="font-mono text-xs text-emerald-400">+1 XCredit / hour</span>
+            <span className="font-mono text-xs text-emerald-400">+1 XC / час</span>
           </div>
 
           <div className="space-y-3">
             {teachSkills.length === 0 ? (
               <div className="drinkit-card p-8 text-center text-zinc-500 font-mono text-xs">
-                No teaching skills registered. Add a skill to get matched with learners!
+                Нет добавленных навыков для преподавания. Добавьте навык, чтобы система подобрала вам учеников!
               </div>
             ) : (
               teachSkills.map((ts) => (
-                <div key={ts.id} className="drinkit-card p-5 space-y-3">
-                  <div className="flex items-start justify-between">
+                <div key={ts.id} className="drinkit-card p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-sm font-bold text-white tracking-tight">
                         {ts.skill?.name}
@@ -119,9 +136,23 @@ export default function MySkillsPage() {
                       </span>
                     </div>
 
-                    <span className="font-mono text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold">
-                      {ts.level}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold">
+                        {ts.level}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteSkill(ts.id)}
+                        disabled={deletingId === ts.id}
+                        className="text-zinc-600 hover:text-red-400 transition-colors p-1"
+                        title="Удалить навык"
+                      >
+                        {deletingId === ts.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   {ts.description && (
@@ -132,7 +163,7 @@ export default function MySkillsPage() {
 
                   <div className="flex items-center gap-1.5 text-[11px] font-mono text-zinc-400 pt-1 border-t border-white/[0.04]">
                     <Clock className="w-3 h-3 text-zinc-500" />
-                    <span>Availability: {ts.teachingAvailability || 'Flexible'}</span>
+                    <span>Доступность: {ts.teachingAvailability || 'По договоренности'}</span>
                   </div>
                 </div>
               ))
@@ -146,21 +177,21 @@ export default function MySkillsPage() {
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
               <h2 className="text-base font-bold text-white tracking-tight">
-                Skills I Want to Learn ({learnSkills.length})
+                Хочу изучить ({learnSkills.length})
               </h2>
             </div>
-            <span className="font-mono text-xs text-blue-400">-1 XCredit / hour</span>
+            <span className="font-mono text-xs text-blue-400">-1 XC / час</span>
           </div>
 
           <div className="space-y-3">
             {learnSkills.length === 0 ? (
               <div className="drinkit-card p-8 text-center text-zinc-500 font-mono text-xs">
-                No learning goals registered. Add what topics you want to explore!
+                Нет добавленных целей обучения. Укажите, что хотите изучить, чтобы найти ментора!
               </div>
             ) : (
               learnSkills.map((ls) => (
-                <div key={ls.id} className="drinkit-card p-5 space-y-3">
-                  <div className="flex items-start justify-between">
+                <div key={ls.id} className="drinkit-card p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-sm font-bold text-white tracking-tight">
                         {ls.skill?.name}
@@ -170,9 +201,23 @@ export default function MySkillsPage() {
                       </span>
                     </div>
 
-                    <span className="font-mono text-[10px] px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 font-semibold">
-                      Target: {ls.level}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-300 border border-blue-500/20 font-semibold">
+                        Цель: {ls.level}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteSkill(ls.id)}
+                        disabled={deletingId === ls.id}
+                        className="text-zinc-600 hover:text-red-400 transition-colors p-1"
+                        title="Удалить навык"
+                      >
+                        {deletingId === ls.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   {ls.learningGoal && (
@@ -183,7 +228,7 @@ export default function MySkillsPage() {
 
                   <div className="flex items-center gap-1.5 text-[11px] font-mono text-zinc-400 pt-1 border-t border-white/[0.04]">
                     <Target className="w-3 h-3 text-blue-400" />
-                    <span>Looking for senior mentors with verified rating</span>
+                    <span>Поиск ментора с подтвержденным рейтингом</span>
                   </div>
                 </div>
               ))
@@ -192,80 +237,94 @@ export default function MySkillsPage() {
         </div>
       </div>
 
-      {/* Add Skill Modal (Requirement 8) */}
+      {/* Add Skill Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-[#121217] border border-white/[0.1] rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
-              <h3 className="text-base font-bold text-white tracking-tight">Add Skill Competency</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-zinc-500 hover:text-white">
+              <h3 className="text-base font-bold text-white tracking-tight">
+                Добавить навык в профиль
+              </h3>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-zinc-500 hover:text-white"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleAddSkill} className="space-y-3">
+            <form onSubmit={handleAddSkill} className="space-y-4">
               {/* Type Switcher */}
               <div className="grid grid-cols-2 gap-2 p-1 bg-[#18181f] rounded-xl border border-white/[0.06]">
                 <button
                   type="button"
                   onClick={() => setType('TEACH')}
                   className={`py-2 rounded-lg text-xs font-mono font-medium transition-all ${
-                    type === 'TEACH' ? 'bg-emerald-600 text-white' : 'text-zinc-400 hover:text-white'
+                    type === 'TEACH'
+                      ? 'bg-emerald-600 text-white font-bold'
+                      : 'text-zinc-400 hover:text-white'
                   }`}
                 >
-                  I Can Teach (Earn XC)
+                  Могу обучать (+XC)
                 </button>
                 <button
                   type="button"
                   onClick={() => setType('LEARN')}
                   className={`py-2 rounded-lg text-xs font-mono font-medium transition-all ${
-                    type === 'LEARN' ? 'bg-blue-600 text-white' : 'text-zinc-400 hover:text-white'
+                    type === 'LEARN'
+                      ? 'bg-blue-600 text-white font-bold'
+                      : 'text-zinc-400 hover:text-white'
                   }`}
                 >
-                  I Want to Learn (Spend XC)
+                  Хочу изучить (-XC)
                 </button>
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-zinc-400 mb-1">Skill Name</label>
+                <label className="block text-xs font-mono text-zinc-400 mb-1">
+                  Название навыка / технологии
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Python, Blender 3D, Rust, DaVinci Resolve..."
+                  placeholder="например: Rust, Python, React, Kubernetes, Blender, Docker..."
                   value={skillName}
                   onChange={(e) => setSkillName(e.target.value)}
-                  className="w-full bg-[#18181f] border border-white/[0.08] focus:border-blue-500 rounded-lg px-3 py-2 text-xs text-white outline-none"
+                  className="w-full bg-[#18181f] border border-white/[0.08] focus:border-blue-500 rounded-xl px-3 py-2 text-xs text-white outline-none font-mono"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-mono text-zinc-400 mb-1">Category</label>
+                  <label className="block text-xs font-mono text-zinc-400 mb-1">Сфера</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full bg-[#18181f] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white outline-none font-mono"
+                    className="w-full bg-[#18181f] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white outline-none font-mono"
                   >
-                    <option value="CODING">Coding & Software</option>
+                    <option value="CODING">Разработка (Backend/Web)</option>
                     <option value="AI_ML">AI & Machine Learning</option>
-                    <option value="DESIGN">UI/UX & Product Design</option>
-                    <option value="VIDEO_EDITING">Video Editing & Media</option>
                     <option value="DEVOPS">DevOps & Cloud</option>
-                    <option value="MATH">Math & Computer Science</option>
+                    <option value="DESIGN">UI/UX & Product Design</option>
+                    <option value="COMPUTER_SCIENCE">CS & Алгоритмы</option>
+                    <option value="MATH">Математика & Крипта</option>
+                    <option value="VIDEO_EDITING">Медиа & Motion</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono text-zinc-400 mb-1">Proficiency Level</label>
+                  <label className="block text-xs font-mono text-zinc-400 mb-1">
+                    Уровень владения
+                  </label>
                   <select
                     value={level}
                     onChange={(e) => setLevel(e.target.value)}
-                    className="w-full bg-[#18181f] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white outline-none font-mono"
+                    className="w-full bg-[#18181f] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white outline-none font-mono"
                   >
-                    <option value="BEGINNER">Beginner</option>
-                    <option value="INTERMEDIATE">Intermediate</option>
-                    <option value="ADVANCED">Advanced</option>
-                    <option value="EXPERT">Expert</option>
+                    <option value="BEGINNER">Junior / Начинающий</option>
+                    <option value="INTERMEDIATE">Middle / Уверенный</option>
+                    <option value="ADVANCED">Senior / Продвинутый</option>
+                    <option value="EXPERT">Lead / Эксперт</option>
                   </select>
                 </div>
               </div>
@@ -273,35 +332,41 @@ export default function MySkillsPage() {
               {type === 'TEACH' ? (
                 <>
                   <div>
-                    <label className="block text-xs font-mono text-zinc-400 mb-1">Teaching Syllabus / Description</label>
+                    <label className="block text-xs font-mono text-zinc-400 mb-1">
+                      План тем / Что готовы объяснить
+                    </label>
                     <textarea
                       rows={2}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="e.g. Profiling asyncio code, memory debugging, metaclasses..."
-                      className="w-full bg-[#18181f] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white outline-none"
+                      placeholder="например: Профилирование памяти, архитектура микросервисов, код-ревью..."
+                      className="w-full bg-[#18181f] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white outline-none font-sans"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-mono text-zinc-400 mb-1">Availability Window</label>
+                    <label className="block text-xs font-mono text-zinc-400 mb-1">
+                      Удобное время для созвонов
+                    </label>
                     <input
                       type="text"
                       value={teachingAvailability}
                       onChange={(e) => setTeachingAvailability(e.target.value)}
-                      placeholder="e.g. Tue, Thu 18:00 - 21:00 CET"
-                      className="w-full bg-[#18181f] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white outline-none font-mono"
+                      placeholder="например: Вт, Чт с 19:00 до 22:00"
+                      className="w-full bg-[#18181f] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white outline-none font-mono"
                     />
                   </div>
                 </>
               ) : (
                 <div>
-                  <label className="block text-xs font-mono text-zinc-400 mb-1">Learning Target / Goal</label>
+                  <label className="block text-xs font-mono text-zinc-400 mb-1">
+                    Цель обучения / Задача
+                  </label>
                   <textarea
                     rows={3}
                     value={learningGoal}
                     onChange={(e) => setLearningGoal(e.target.value)}
-                    placeholder="e.g. Master LoRA fine-tuning and write local evaluation pipelines..."
-                    className="w-full bg-[#18181f] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white outline-none"
+                    placeholder="например: Разобраться с fine-tuning моделей Llama, настроить CI/CD пайплайн..."
+                    className="w-full bg-[#18181f] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white outline-none font-sans"
                   />
                 </div>
               )}
@@ -310,16 +375,16 @@ export default function MySkillsPage() {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-full bg-zinc-800 text-zinc-300 text-xs font-mono"
+                  className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-mono"
                 >
-                  Cancel
+                  Отмена
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-medium tap-active transition-all"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all shadow-md shadow-blue-600/20"
                 >
-                  {isSubmitting ? 'Saving...' : 'Save Skill'}
+                  {isSubmitting ? 'Сохранение...' : 'Сохранить навык'}
                 </button>
               </div>
             </form>

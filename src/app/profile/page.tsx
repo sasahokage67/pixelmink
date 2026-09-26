@@ -510,9 +510,19 @@ function ProfileContent() {
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-              {lang === 'ru' ? 'Навыки, которым обучаю' : lang === 'kz' ? 'Үйрете алатын дағдылар' : 'Skills I Can Teach'}
+              {lang === 'ru' ? 'Навыки, которым обучаю' : 'Skills I Can Teach'}
             </h2>
-            <span className="font-mono text-xs text-zinc-500">{teaches.length}</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs text-zinc-500">{teaches.length}</span>
+              {isOwnProfile && (
+                <Link
+                  href="/skills"
+                  className="font-mono text-[11px] text-blue-400 hover:text-blue-300 ml-2"
+                >
+                  + Настроить
+                </Link>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {teaches.length > 0 ? (
@@ -529,11 +539,13 @@ function ProfileContent() {
                 );
               })
             ) : (
-              <span className="text-xs font-mono text-zinc-500">
-                {isOwnProfile
-                  ? 'Добавьте свои навыки в разделе «My Skills»'
-                  : 'Навыки пока не указаны'}
-              </span>
+              isOwnProfile ? (
+                <Link href="/skills" className="text-xs font-mono text-blue-400 hover:underline">
+                  + Добавить навыки преподавания в инвентарь
+                </Link>
+              ) : (
+                <span className="text-xs font-mono text-zinc-500">Навыки пока не указаны</span>
+              )
             )}
           </div>
         </div>
@@ -544,7 +556,17 @@ function ProfileContent() {
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
               Навыки, которые изучаю
             </h2>
-            <span className="font-mono text-xs text-zinc-500">{learns.length}</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs text-zinc-500">{learns.length}</span>
+              {isOwnProfile && (
+                <Link
+                  href="/skills"
+                  className="font-mono text-[11px] text-blue-400 hover:text-blue-300 ml-2"
+                >
+                  + Настроить
+                </Link>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {learns.length > 0 ? (
@@ -560,11 +582,13 @@ function ProfileContent() {
                 );
               })
             ) : (
-              <span className="text-xs font-mono text-zinc-500">
-                {isOwnProfile
-                  ? 'Укажите желаемые навыки для подбора пар'
-                  : 'Цели пока не указаны'}
-              </span>
+              isOwnProfile ? (
+                <Link href="/skills" className="text-xs font-mono text-blue-400 hover:underline">
+                  + Указать цели обучения для подбора менторов
+                </Link>
+              ) : (
+                <span className="text-xs font-mono text-zinc-500">Цели пока не указаны</span>
+              )
             )}
           </div>
         </div>

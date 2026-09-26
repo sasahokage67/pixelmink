@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { hashPassword, signToken } from '@/lib/auth';
+import { pushPeerToCloud } from '@/lib/cloudSync';
 
 export async function POST(req: NextRequest) {
   try {
@@ -182,6 +183,22 @@ export async function POST(req: NextRequest) {
         link: '/matches',
       },
     });
+
+    // Sync to cloud registry for multi-laptop discovery
+    pushPeerToCloud({
+      id: user.id,
+      email: user.email,
+      name: user.profile?.name || cleanName,
+      role: user.role,
+      bio: userBio,
+      location: user.profile?.location || 'Remote',
+      languages: user.profile?.languages || 'English',
+      rating: 5,
+      xCredits: 5,
+      teachSkills: teachList,
+      learnSkills: learnList,
+      updatedAt: Date.now(),
+    }).catch(() => {});
 
     const token = signToken({
       userId: user.id,

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getSessionUser } from '@/lib/auth';
+import { syncPeersFromCloud } from '@/lib/cloudSync';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    // Pull any peers registered on other laptops / serverless containers
+    await syncPeersFromCloud();
+
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || '';
     const skill = searchParams.get('skill') || '';
