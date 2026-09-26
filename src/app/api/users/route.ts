@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getSessionUser } from '@/lib/auth';
 import { syncPeersFromCloud } from '@/lib/cloudSync';
 import { getCloudRegistry } from '@/lib/matchBlock';
+import { calculateRoleMatch, detectRoles } from '@/lib/matching';
 
 export const dynamic = 'force-dynamic';
 
@@ -201,9 +202,36 @@ export async function GET(req: NextRequest) {
       pendingReceivedIds = Array.from(recvSet);
     }
 
+    const currentUserWithSkills = currentUser
+      ? await prisma.user.findUnique({
+          where: { id: currentUser.id },
+          include: { profile: true, userSkills: { include: { skill: true } } },
+        })
+      : null;
+
+    const usersWithRoles = users.map((u) => {
+      if (currentUserWithSkills) {
+        const matchCalc = calculateRoleMatch(currentUserWithSkills, u);
+        return {
+          ...u,
+          matchScore: matchCalc.score,
+          candidateRole: matchCalc.userBRole,
+          roleSynergyReason: matchCalc.roleSynergyReason,
+        };
+      } else {
+        const roles = detectRoles(u);
+        return {
+          ...u,
+          matchScore: 50,
+          candidateRole: roles.primaryRole,
+          roleSynergyReason: roles.primaryRole,
+        };
+      }
+    });
+
     return NextResponse.json({
       success: true,
-      users,
+      users: usersWithRoles,
       connectedUserIds,
       pendingSentIds,
       pendingReceivedIds,

@@ -28,7 +28,6 @@ const NAV_ITEMS = [
   { href: '/discover', label: 'Каталог', icon: Compass },
   { href: '/matches', label: 'Мэтчи', icon: Users },
   { href: '/chats', label: 'Чаты', icon: MessageSquare },
-  { href: '/calls', label: 'Звонки', icon: Video },
   { href: '/seminars', label: 'Семинары', icon: GraduationCap },
   { href: '/profile', label: 'Личный кабинет', icon: User },
   { href: '/skills', label: 'Мои навыки', icon: Layers },
@@ -91,28 +90,6 @@ export default function Sidebar() {
           );
         })}
 
-        {/* Public & Admin Links */}
-        <div className="pt-2 border-t border-white/[0.06] mt-2 space-y-1">
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 px-3 py-2 rounded text-xs transition-all text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]"
-          >
-            <Globe className="w-3.5 h-3.5 text-zinc-500" />
-            <span>Главная страница</span>
-          </Link>
-
-          <Link
-            href="/admin"
-            className={`flex items-center gap-2.5 px-3 py-2 rounded text-xs transition-all ${
-              pathname.startsWith('/admin')
-                ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
-                : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
-            }`}
-          >
-            <ShieldAlert className="w-3.5 h-3.5 text-zinc-500" />
-            <span>Панель админа</span>
-          </Link>
-        </div>
       </nav>
 
       {/* User Footer Card with GitHub Identicon */}

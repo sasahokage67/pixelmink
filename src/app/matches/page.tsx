@@ -858,9 +858,26 @@ export default function MatchesPage() {
                           </div>
                         </Link>
 
-                        <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">
-                          Бартер
-                        </span>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          {peer.matchScore !== undefined && (
+                            <span
+                              className={`font-mono text-[10px] px-2 py-0.5 rounded-full border font-bold ${
+                                peer.matchScore >= 80
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                  : peer.matchScore >= 50
+                                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                  : peer.matchScore >= 30
+                                  ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                                  : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                              }`}
+                            >
+                              {peer.matchScore}% мэтч
+                            </span>
+                          )}
+                          <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-white/[0.04] text-zinc-400 border border-white/[0.06]">
+                            {peer.candidateRole || 'Инженер'}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Bio */}
@@ -868,6 +885,14 @@ export default function MatchesPage() {
                         {peer.profile?.bio ||
                           'Инженер платформы pixelmink. Готов к бартеру техническими знаниями и парному кодингу.'}
                       </p>
+
+                      {/* Role Synergy */}
+                      {peer.roleSynergyReason && (
+                        <div className="text-[10px] font-mono text-blue-400/90 flex items-center gap-1.5 px-2 py-1 rounded bg-blue-500/[0.06] border border-blue-500/15">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                          <span className="truncate">{peer.roleSynergyReason}</span>
+                        </div>
+                      )}
 
                       {/* Skills Section */}
                       <div className="space-y-2 pt-2 border-t border-white/[0.04] text-[11px] font-mono">
@@ -1094,20 +1119,40 @@ export default function MatchesPage() {
                           </div>
                         </Link>
 
-                        <div className="font-mono text-xs px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-bold">
-                          {m.score}% совместимость
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <span
+                            className={`font-mono text-xs px-2.5 py-1 rounded-full border font-bold ${
+                              m.score >= 80
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                : m.score >= 50
+                                ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                                : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                            }`}
+                          >
+                            {m.score}% мэтч ролей
+                          </span>
+                          {m.candidateRole && (
+                            <span className="font-mono text-[10px] text-zinc-400">
+                              {m.candidateRole}
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      {/* Reasons */}
-                      {m.reasons && m.reasons.length > 0 && (
-                        <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] space-y-1">
-                          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
-                            Точки пересечения:
-                          </span>
-                          <p className="text-xs text-zinc-300 leading-relaxed font-sans">
-                            {m.reasons[0]}
-                          </p>
+                      {/* Reasons & Role Synergy */}
+                      {(m.roleSynergyReason || (m.reasons && m.reasons.length > 0)) && (
+                        <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] space-y-1.5">
+                          {m.roleSynergyReason && (
+                            <div className="text-[11px] font-mono font-bold text-blue-400 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                              <span>{m.roleSynergyReason}</span>
+                            </div>
+                          )}
+                          {m.reasons && m.reasons.length > 0 && (
+                            <p className="text-xs text-zinc-300 leading-relaxed font-sans">
+                              {m.reasons[0]}
+                            </p>
+                          )}
                         </div>
                       )}
 

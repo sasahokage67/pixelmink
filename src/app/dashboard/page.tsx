@@ -10,7 +10,6 @@ import {
   Video,
   Calendar,
   GraduationCap,
-  TrendingUp,
   Award,
   Zap,
   CheckCircle2,
@@ -200,9 +199,22 @@ export default function DashboardPage() {
 
                         {/* Match Score Badge */}
                         <div className="text-right">
-                          <span className="font-mono text-xs font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
-                            {m.score}% Совместимость
+                          <span
+                            className={`font-mono text-xs font-bold border px-2 py-0.5 rounded-full ${
+                              m.score >= 80
+                                ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                                : m.score >= 50
+                                ? 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                                : 'text-zinc-400 bg-zinc-800 border-zinc-700'
+                            }`}
+                          >
+                            {m.score}% Мэтч ролей
                           </span>
+                          {m.candidateRole && (
+                            <div className="text-[10px] font-mono text-zinc-500 mt-0.5">
+                              {m.candidateRole}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -315,119 +327,58 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Recommended Seminars & Active Chats Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recommended Seminars */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-base font-bold text-white tracking-tight flex items-center gap-1.5">
-              <GraduationCap className="w-4 h-4 text-blue-400" />
-              Рекомендуемые воркшопы и семинары
-            </span>
-            <Link href="/seminars" className="text-xs font-mono text-blue-400 hover:text-blue-300">
-              Все семинары
-            </Link>
-          </div>
-
-          <div className="space-y-3">
-            {seminars.length === 0 ? (
-              <div className="drinkit-card p-6 text-center text-zinc-500 font-mono text-xs">
-                Семинары запланированы на ближайшие дни.
-              </div>
-            ) : (
-              seminars.map((sem) => (
-                <div
-                  key={sem.id}
-                  className="drinkit-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                >
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] uppercase px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-400 border border-white/[0.08]">
-                        {sem.category}
-                      </span>
-                      {sem.isLive && (
-                        <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse">
-                          В ЭФИРЕ
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="text-sm font-semibold text-white tracking-tight">{sem.title}</h3>
-                    <div className="text-xs font-mono text-zinc-400">
-                      Ведущий: <span className="text-zinc-200">{sem.host?.profile?.name}</span> •{' '}
-                      {sem.date} в {sem.time} • {sem.participantCount} / {sem.maxParticipants} инженеров
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Link
-                      href={`/seminars/${sem.id}/live`}
-                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-medium tap-active transition-all"
-                    >
-                      {sem.isLive ? 'Подключиться к трансляции' : 'Подробнее'}
-                    </Link>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+      {/* Recommended Seminars */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <span className="text-base font-bold text-white tracking-tight flex items-center gap-1.5">
+            <GraduationCap className="w-4 h-4 text-blue-400" />
+            Рекомендуемые воркшопы и семинары
+          </span>
+          <Link href="/seminars" className="text-xs font-mono text-blue-400 hover:text-blue-300">
+            Все семинары
+          </Link>
         </div>
 
-        {/* Skill Progress Summary */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-base font-bold text-white tracking-tight flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-emerald-400" />
-              Прогресс освоения стека
-            </span>
-            <Link href="/tests" className="text-xs font-mono text-zinc-400 hover:text-white">
-              Тесты
-            </Link>
-          </div>
-
-          <div className="drinkit-card p-5 space-y-4">
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-xs font-mono mb-1">
-                  <span className="text-zinc-300">Архитектура и Backend</span>
-                  <span className="text-blue-400 font-bold">92%</span>
-                </div>
-                <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full" style={{ width: '92%' }} />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-mono mb-1">
-                  <span className="text-zinc-300">Системное программирование</span>
-                  <span className="text-blue-400 font-bold">78%</span>
-                </div>
-                <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full" style={{ width: '78%' }} />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-mono mb-1">
-                  <span className="text-zinc-300">Распределенные системы</span>
-                  <span className="text-blue-400 font-bold">64%</span>
-                </div>
-                <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full" style={{ width: '64%' }} />
-                </div>
-              </div>
+        <div className="space-y-3">
+          {seminars.length === 0 ? (
+            <div className="drinkit-card p-6 text-center text-zinc-500 font-mono text-xs">
+              Семинары запланированы на ближайшие дни.
             </div>
-
-            <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between">
-              <span className="font-mono text-xs text-zinc-500">Серия активности: 8 дней</span>
-              <Link
-                href="/tests"
-                className="text-xs font-mono text-blue-400 hover:text-blue-300 flex items-center gap-1"
+          ) : (
+            seminars.map((sem) => (
+              <div
+                key={sem.id}
+                className="drinkit-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
               >
-                <span>Подтвердить грейд (+8%)</span>
-                <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] uppercase px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-400 border border-white/[0.08]">
+                      {sem.category}
+                    </span>
+                    {sem.isLive && (
+                      <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse">
+                        В ЭФИРЕ
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-sm font-semibold text-white tracking-tight">{sem.title}</h3>
+                  <div className="text-xs font-mono text-zinc-400">
+                    Ведущий: <span className="text-zinc-200">{sem.host?.profile?.name}</span> •{' '}
+                    {sem.date} в {sem.time} • {sem.participantCount} / {sem.maxParticipants} инженеров
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <Link
+                    href={`/seminars/${sem.id}/live`}
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-medium tap-active transition-all"
+                  >
+                    {sem.isLive ? 'Подключиться к трансляции' : 'Подробнее'}
+                  </Link>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

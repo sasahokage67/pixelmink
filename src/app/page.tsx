@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import Logo from '@/components/ui/Logo';
@@ -117,9 +118,24 @@ const CS_DOMAINS = [
 ];
 
 export default function LandingPage() {
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const { lang, t } = useLanguage();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/dashboard');
+    }
+  }, [user, authLoading, router]);
+
+  if (!authLoading && user) {
+    return (
+      <div className="min-h-screen bg-[#09090b] flex items-center justify-center font-mono text-xs text-zinc-500">
+        Перенаправление в рабочий кабинет...
+      </div>
+    );
+  }
 
   const FAQ_ITEMS = [
     {

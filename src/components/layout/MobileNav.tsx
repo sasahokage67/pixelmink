@@ -10,7 +10,6 @@ const MOBILE_ITEMS = [
   { href: '/discover', label: 'Каталог', icon: Compass },
   { href: '/matches', label: 'Мэтчи', icon: Users },
   { href: '/chats', label: 'Чаты', icon: MessageSquare },
-  { href: '/calls', label: 'Звонки', icon: Video },
   { href: '/seminars', label: 'Семинары', icon: GraduationCap },
   { href: '/profile', label: 'Профиль', icon: User },
 ];

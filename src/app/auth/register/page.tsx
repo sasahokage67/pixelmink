@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -81,8 +81,14 @@ const CS_SKILL_CATALOG: SkillItem[] = [
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register } = useAuth();
+  const { register, user, loading: authLoading } = useAuth();
   const { t, lang } = useLanguage();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/dashboard');
+    }
+  }, [user, authLoading, router]);
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [name, setName] = useState('');

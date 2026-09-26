@@ -8,35 +8,234 @@ export interface MatchResult {
   skillsOfferedToYou: string[];
   skillsWantedFromYou: string[];
   descriptionKeywordsMatched: string[];
+  candidateRole?: string;
+  myRole?: string;
+  roleSynergyReason?: string;
   chainDetails?: {
     chainPath: string[];
     exchangeFlow: string;
   };
 }
 
-const STOPWORDS = new Set([
-  'and', 'the', 'for', 'with', 'from', 'this', 'that', 'have', 'want', 'what', 'like', 'good', 'will',
-  'into', 'some', 'your', 'about', 'also', 'over', 'both', 'their', 'been', 'were', 'which', 'where',
-  'after', 'before', 'more', 'most', 'very', 'just', 'when', 'then', 'than', 'them', 'these', 'those',
-  'и', 'в', 'на', 'с', 'по', 'к', 'для', 'от', 'до', 'из', 'у', 'о', 'об', 'за', 'при', 'что', 'как', 'так'
-]);
+export const ROLE_TAXONOMY: Record<string, { label: string; keywords: string[] }> = {
+  BACKEND: {
+    label: 'Backend Engineer',
+    keywords: [
+      'python', 'golang', 'go', 'node', 'nodejs', 'rust', 'java', 'c#', 'php',
+      'sql', 'postgresql', 'postgres', 'redis', 'backend', 'api', 'django',
+      'fastapi', 'spring', 'graphql', 'grpc', 'бэкенд', 'микросервисы'
+    ],
+  },
+  FRONTEND: {
+    label: 'Frontend Developer',
+    keywords: [
+      'react', 'next.js', 'nextjs', 'vue', 'angular', 'typescript', 'javascript',
+      'frontend', 'html', 'css', 'tailwind', 'redux', 'svelte', 'web', 'фронтенд', 'верстка'
+    ],
+  },
+  DEVOPS: {
+    label: 'DevOps & Cloud',
+    keywords: [
+      'docker', 'kubernetes', 'k8s', 'linux', 'ci/cd', 'aws', 'cloud', 'terraform',
+      'devops', 'bash', 'ansible', 'nginx', 'инфраструктура', 'сервер'
+    ],
+  },
+  AIML: {
+    label: 'AI & Machine Learning',
+    keywords: [
+      'pytorch', 'tensorflow', 'ml', 'ai', 'llm', 'deep learning', 'nlp',
+      'data science', 'transformer', 'prompt', 'chatgpt', 'opencv', 'rag',
+      'нейросети', 'ии', 'машинное обучение'
+    ],
+  },
+  SYSTEMS: {
+    label: 'Systems & Low-Level',
+    keywords: [
+      'c++', 'c', 'rust', 'linux kernel', 'kernel', 'assembly', 'embedded',
+      'low-level', 'systems', 'memory', 'ассемблер', 'ядро', 'системное'
+    ],
+  },
+  MOBILE: {
+    label: 'Mobile Developer',
+    keywords: [
+      'ios', 'android', 'swift', 'kotlin', 'flutter', 'react native', 'mobile', 'мобильные'
+    ],
+  },
+  DESIGN: {
+    label: 'UI/UX & Product Design',
+    keywords: [
+      'figma', 'ui/ux', 'design', 'blender', '3d', 'photoshop', 'illustrator',
+      'motion', 'дизайн', 'интерфейс', 'прототип'
+    ],
+  },
+  SECURITY: {
+    label: 'Cybersecurity',
+    keywords: [
+      'security', 'pentest', 'appsec', 'infosec', 'reverse engineering',
+      'cryptography', 'owasp', 'кибербезопасность', 'хакинг'
+    ],
+  },
+};
 
-function extractKeywords(text: string): Set<string> {
-  if (!text) return new Set();
-  const words = text
-    .toLowerCase()
-    .replace(/[^a-zA-Z0-9\u0400-\u04FF]+/g, ' ')
-    .split(/\s+/)
-    .filter((w) => w.length > 2 && !STOPWORDS.has(w));
-  return new Set(words);
+const ROLE_SYNERGY: Record<string, string[]> = {
+  BACKEND: ['FRONTEND', 'DEVOPS', 'AIML', 'SYSTEMS', 'MOBILE'],
+  FRONTEND: ['BACKEND', 'DESIGN', 'MOBILE'],
+  DEVOPS: ['BACKEND', 'AIML', 'SYSTEMS'],
+  AIML: ['BACKEND', 'DEVOPS', 'SYSTEMS'],
+  SYSTEMS: ['BACKEND', 'DEVOPS', 'SECURITY'],
+  MOBILE: ['BACKEND', 'FRONTEND', 'DESIGN'],
+  DESIGN: ['FRONTEND', 'MOBILE'],
+  SECURITY: ['SYSTEMS', 'BACKEND', 'DEVOPS'],
+};
+
+export function detectRoles(user: any): {
+  primaryRole: string;
+  roleKey: string;
+  teachRoleKeys: string[];
+  learnRoleKeys: string[];
+} {
+  const teachSkills = user?.userSkills?.filter((s: any) => s.type === 'TEACH') || [];
+  const learnSkills = user?.userSkills?.filter((s: any) => s.type === 'LEARN') || [];
+  const bio = (user?.profile?.bio || '').toLowerCase();
+
+  const getMatchedKeys = (skills: any[]) => {
+    const keys = new Set<string>();
+    for (const s of skills) {
+      const name = (s.skill?.name || s.name || '').toLowerCase();
+      const cat = (s.skill?.category || s.category || '').toUpperCase();
+      for (const [key, def] of Object.entries(ROLE_TAXONOMY)) {
+        if (cat.includes(key) || def.keywords.some((kw) => name.includes(kw))) {
+          keys.add(key);
+        }
+      }
+    }
+    return Array.from(keys);
+  };
+
+  const teachRoleKeys = getMatchedKeys(teachSkills);
+  const learnRoleKeys = getMatchedKeys(learnSkills);
+
+  for (const [key, def] of Object.entries(ROLE_TAXONOMY)) {
+    if (def.keywords.some((kw) => bio.includes(kw))) {
+      if (!teachRoleKeys.includes(key)) teachRoleKeys.push(key);
+    }
+  }
+
+  const primaryKey = teachRoleKeys[0] || (teachSkills.length > 0 ? 'BACKEND' : 'GENERAL');
+  const primaryRole = ROLE_TAXONOMY[primaryKey]?.label || 'Software Engineer';
+
+  return { primaryRole, roleKey: primaryKey, teachRoleKeys, learnRoleKeys };
 }
 
-/**
- * Calculates deterministic match percentage based on:
- * 1. Skills overlap (TEACH <-> LEARN reciprocal match)
- * 2. Description & Bio semantic keyword intersection
- * 3. Multi-hop circular exchange chains (A -> B -> C -> A)
- */
+export function calculateRoleMatch(userA: any, userB: any): {
+  score: number;
+  matchType: 'DIRECT_PERFECT' | 'DIRECT_STRONG' | 'CIRCULAR_CHAIN';
+  reasons: string[];
+  userARole: string;
+  userBRole: string;
+  roleSynergyReason: string;
+  skillsOfferedToA: string[];
+  skillsWantedFromA: string[];
+} {
+  const roleA = detectRoles(userA);
+  const roleB = detectRoles(userB);
+
+  const aTeaches = userA?.userSkills?.filter((s: any) => s.type === 'TEACH') || [];
+  const aLearns = userA?.userSkills?.filter((s: any) => s.type === 'LEARN') || [];
+  const bTeaches = userB?.userSkills?.filter((s: any) => s.type === 'TEACH') || [];
+  const bLearns = userB?.userSkills?.filter((s: any) => s.type === 'LEARN') || [];
+
+  const aLearnIds = new Set(
+    aLearns.map((s: any) => (s.skill?.name || s.name || s.skillId || '').toLowerCase())
+  );
+  const bLearnIds = new Set(
+    bLearns.map((s: any) => (s.skill?.name || s.name || s.skillId || '').toLowerCase())
+  );
+
+  const skillsBTeachesA = bTeaches.filter((s: any) => {
+    const sName = (s.skill?.name || s.name || s.skillId || '').toLowerCase();
+    return aLearnIds.has(sName);
+  });
+
+  const skillsATeachesB = aTeaches.filter((s: any) => {
+    const sName = (s.skill?.name || s.name || s.skillId || '').toLowerCase();
+    return bLearnIds.has(sName);
+  });
+
+  const hasDirectReciprocalSkills = skillsBTeachesA.length > 0 && skillsATeachesB.length > 0;
+  const hasOneWaySkills = skillsBTeachesA.length > 0 || skillsATeachesB.length > 0;
+
+  const bTeachesARoles = roleB.teachRoleKeys.some((k) => roleA.learnRoleKeys.includes(k));
+  const aTeachesBRoles = roleA.teachRoleKeys.some((k) => roleB.learnRoleKeys.includes(k));
+  const hasReciprocalRoles = bTeachesARoles && aTeachesBRoles;
+
+  const areRolesSynergistic =
+    ROLE_SYNERGY[roleA.roleKey]?.includes(roleB.roleKey) ||
+    ROLE_SYNERGY[roleB.roleKey]?.includes(roleA.roleKey);
+
+  let score = 15;
+  const reasons: string[] = [];
+  let roleSynergyReason = '';
+
+  if (hasDirectReciprocalSkills || hasReciprocalRoles) {
+    score = 82;
+    const skillBonus = Math.min((skillsBTeachesA.length + skillsATeachesB.length) * 5, 16);
+    score += skillBonus;
+    score = Math.min(score, 98);
+
+    roleSynergyReason = `Мэтч ролей: ${roleA.primaryRole} ↔ ${roleB.primaryRole}`;
+    reasons.push(
+      `Взаимный обмен ролями: ${roleA.primaryRole} и ${roleB.primaryRole} идеально дополняют друг друга.`
+    );
+    if (skillsBTeachesA.length > 0) {
+      reasons.push(`Обучает вас: ${skillsBTeachesA.map((s: any) => s.skill?.name || s.name).join(', ')}`);
+    }
+    if (skillsATeachesB.length > 0) {
+      reasons.push(`Изучает у вас: ${skillsATeachesB.map((s: any) => s.skill?.name || s.name).join(', ')}`);
+    }
+  } else if (hasOneWaySkills || bTeachesARoles || aTeachesBRoles) {
+    score = 56;
+    if (bTeachesARoles || skillsBTeachesA.length > 0) {
+      score += 10;
+      roleSynergyReason = `Ментор по роли: ${roleB.primaryRole}`;
+      reasons.push(`${roleB.primaryRole} готов обучать технологиям из ваших целей.`);
+      if (skillsBTeachesA.length > 0) {
+        reasons.push(`Компетенции: ${skillsBTeachesA.map((s: any) => s.skill?.name || s.name).join(', ')}`);
+      }
+    } else {
+      score += 6;
+      roleSynergyReason = `Запрос на вашу роль: ${roleA.primaryRole}`;
+      reasons.push(`Инженер ищет эксперта по вашей роли (${roleA.primaryRole}).`);
+    }
+    if (areRolesSynergistic) score += 6;
+  } else if (areRolesSynergistic) {
+    score = 38;
+    roleSynergyReason = `Смежные роли: ${roleA.primaryRole} + ${roleB.primaryRole}`;
+    reasons.push(`Смежные специализации с потенциалом кросс-функционального обмена.`);
+  } else if (roleA.roleKey === roleB.roleKey && roleA.roleKey !== 'GENERAL') {
+    score = 44;
+    roleSynergyReason = `Коллеги по роли: ${roleA.primaryRole}`;
+    reasons.push(`Общая специализация — совместный code review и углубление в стек.`);
+  } else {
+    score = 14;
+    roleSynergyReason = `Специализации: ${roleA.primaryRole} / ${roleB.primaryRole}`;
+    reasons.push(`Разные направления разработки с низкой текущей совместимостью ролей.`);
+  }
+
+  const matchType = score >= 80 ? 'DIRECT_PERFECT' : 'DIRECT_STRONG';
+
+  return {
+    score,
+    matchType,
+    reasons,
+    userARole: roleA.primaryRole,
+    userBRole: roleB.primaryRole,
+    roleSynergyReason,
+    skillsOfferedToA: skillsBTeachesA.map((s: any) => s.skill?.name || s.name),
+    skillsWantedFromA: skillsATeachesB.map((s: any) => s.skill?.name || s.name),
+  };
+}
+
 export async function matchUsers(userId: string): Promise<MatchResult[]> {
   const currentUser = await prisma.user.findUnique({
     where: { id: userId },
@@ -52,17 +251,7 @@ export async function matchUsers(userId: string): Promise<MatchResult[]> {
 
   const myTeaches = currentUser.userSkills.filter((s) => s.type === 'TEACH');
   const myLearns = currentUser.userSkills.filter((s) => s.type === 'LEARN');
-
-  const myTeachSkillIds = new Set(myTeaches.map((s) => s.skillId));
   const myLearnSkillIds = new Set(myLearns.map((s) => s.skillId));
-
-  // Current user's text corpus (bio, skill descriptions, learning goals)
-  const myTextCorpus = [
-    currentUser.profile?.bio || '',
-    ...myTeaches.map((s) => `${s.skill.name} ${s.description}`),
-    ...myLearns.map((s) => `${s.skill.name} ${s.learningGoal}`),
-  ].join(' ');
-  const myKeywords = extractKeywords(myTextCorpus);
 
   const allCandidates = await prisma.user.findMany({
     where: {
@@ -79,80 +268,23 @@ export async function matchUsers(userId: string): Promise<MatchResult[]> {
   const matches: MatchResult[] = [];
 
   for (const candidate of allCandidates) {
-    const candTeaches = candidate.userSkills.filter((s) => s.type === 'TEACH');
-    const candLearns = candidate.userSkills.filter((s) => s.type === 'LEARN');
-
-    const candTeachSkillIds = new Set(candTeaches.map((s) => s.skillId));
-    const candLearnSkillIds = new Set(candLearns.map((s) => s.skillId));
-
-    // What candidate can teach me (their TEACH in my LEARN)
-    const skillsTheyTeachMe = candTeaches.filter((s) => myLearnSkillIds.has(s.skillId));
-    // What I can teach candidate (my TEACH in their LEARN)
-    const skillsITeachThem = myTeaches.filter((s) => candLearnSkillIds.has(s.skillId));
-
-    const isReciprocal = skillsTheyTeachMe.length > 0 && skillsITeachThem.length > 0;
-    const isOneWay = skillsTheyTeachMe.length > 0 || skillsITeachThem.length > 0;
-
-    let score = 25;
-    const reasons: string[] = [];
-
-    // --- 1. SKILLS OVERLAP SCORE (max 50 pts) ---
-    if (isReciprocal) {
-      score += 45;
-      reasons.push(
-        `Reciprocal: Teaches ${skillsTheyTeachMe.map((s) => s.skill.name).join(', ')} ↔ Wants ${skillsITeachThem.map((s) => s.skill.name).join(', ')}`
-      );
-    } else if (isOneWay) {
-      score += 20;
-      if (skillsTheyTeachMe.length > 0) {
-        reasons.push(`Teaches ${skillsTheyTeachMe.map((s) => s.skill.name).join(', ')}`);
-      } else {
-        reasons.push(`Wants ${skillsITeachThem.map((s) => s.skill.name).join(', ')}`);
-      }
-    }
-
-    // --- 2. DESCRIPTION & BIO OVERLAP SCORE (max 25 pts) ---
-    const candTextCorpus = [
-      candidate.profile?.bio || '',
-      ...candTeaches.map((s) => `${s.skill.name} ${s.description}`),
-      ...candLearns.map((s) => `${s.skill.name} ${s.learningGoal}`),
-    ].join(' ');
-    const candKeywords = extractKeywords(candTextCorpus);
-
-    const commonKeywords: string[] = [];
-    myKeywords.forEach((kw) => {
-      if (candKeywords.has(kw) && kw.length > 3) {
-        commonKeywords.push(kw);
-      }
-    });
-
-    const keywordBonus = Math.min(commonKeywords.length * 4, 20);
-    score += keywordBonus;
-    if (commonKeywords.length > 0) {
-      reasons.push(`Bio/Goal match: [${commonKeywords.slice(0, 4).join(', ')}]`);
-    }
-
-    // Languages overlap
-    const myLangs = (currentUser.profile?.languages || '').toLowerCase();
-    const candLangs = (candidate.profile?.languages || '').toLowerCase();
-    if (myLangs && candLangs && (myLangs.includes('english') && candLangs.includes('english'))) {
-      score += 5;
-    }
-
-    const finalScore = Math.min(Math.max(score, 40), 98);
+    const matchCalc = calculateRoleMatch(currentUser, candidate);
 
     matches.push({
       candidateUser: candidate,
-      score: finalScore,
-      matchType: isReciprocal ? 'DIRECT_PERFECT' : 'DIRECT_STRONG',
-      reasons,
-      skillsOfferedToYou: skillsTheyTeachMe.map((s) => s.skill.name),
-      skillsWantedFromYou: skillsITeachThem.map((s) => s.skill.name),
-      descriptionKeywordsMatched: commonKeywords,
+      score: matchCalc.score,
+      matchType: matchCalc.matchType,
+      reasons: matchCalc.reasons,
+      skillsOfferedToYou: matchCalc.skillsOfferedToA,
+      skillsWantedFromYou: matchCalc.skillsWantedFromA,
+      descriptionKeywordsMatched: [],
+      candidateRole: matchCalc.userBRole,
+      myRole: matchCalc.userARole,
+      roleSynergyReason: matchCalc.roleSynergyReason,
     });
   }
 
-  // --- 3. CIRCULAR CHAINS (A -> B -> C -> A) ---
+  // Multi-hop circular chains
   if (myTeaches.length > 0 && myLearns.length > 0) {
     for (const userB of allCandidates) {
       const aTeachesB = myTeaches.some((s) =>
@@ -174,12 +306,13 @@ export async function matchUsers(userId: string): Promise<MatchResult[]> {
         );
 
         if (bTeachesC && cTeachesA) {
+          const roleB = detectRoles(userB);
           matches.push({
             candidateUser: userB,
             score: 94,
             matchType: 'CIRCULAR_CHAIN',
             reasons: [
-              `3-way chain: You → ${userB.profile?.name} → ${userC.profile?.name} → You`,
+              `3-сторонняя цепочка ролей: Вы → ${userB.profile?.name} (${roleB.primaryRole}) → ${userC.profile?.name} → Вы`,
             ],
             skillsOfferedToYou: userC.userSkills
               .filter((s) => s.type === 'TEACH' && myLearnSkillIds.has(s.skillId))
@@ -188,6 +321,8 @@ export async function matchUsers(userId: string): Promise<MatchResult[]> {
               .filter((s) => userB.userSkills.some((bs) => bs.type === 'LEARN' && bs.skillId === s.skillId))
               .map((s) => s.skill.name),
             descriptionKeywordsMatched: [],
+            candidateRole: roleB.primaryRole,
+            roleSynergyReason: `Кольцевой обмен ролями (A → B → C)`,
             chainDetails: {
               chainPath: [
                 currentUser.profile?.name || 'You',
