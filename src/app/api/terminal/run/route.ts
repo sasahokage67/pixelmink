@@ -7,20 +7,24 @@ import os from 'os';
 
 const execAsync = promisify(exec);
 
-// Wandbox compiler names
+// Wandbox compiler names (verified against live Wandbox API)
 const WANDBOX_MAP: Record<string, string> = {
-  python: 'cpython-3.10.2',
-  rust: 'rust-1.70.0',
-  cpp: 'gcc-13.1.0',
-  'c++': 'gcc-13.1.0',
-  c: 'gcc-13.1.0',
-  go: 'go-1.20.4',
-  golang: 'go-1.20.4',
-  java: 'openjdk-jdk-17.0.3_7',
+  python: 'cpython-3.12.7',
+  py: 'cpython-3.12.7',
+  rust: 'rust-1.82.0',
+  rs: 'rust-1.82.0',
+  cpp: 'gcc-13.2.0',
+  'c++': 'gcc-13.2.0',
+  c: 'gcc-13.2.0',
+  go: 'go-1.23.2',
+  golang: 'go-1.23.2',
+  typescript: 'typescript-5.6.2',
+  ts: 'typescript-5.6.2',
+  javascript: 'nodejs-20.17.0',
+  js: 'nodejs-20.17.0',
   bash: 'bash',
   shell: 'bash',
-  php: 'php-8.2.4',
-  ruby: 'ruby-3.2.0',
+  sh: 'bash',
 };
 
 export async function POST(req: NextRequest) {
@@ -113,8 +117,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. WANDBOX CLOUD COMPILER (RUST, C++, GO, JAVA, BASH, PHP, RUBY)
-    const wandboxCompiler = WANDBOX_MAP[langKey] || 'cpython-3.10.2';
+    // 3. WANDBOX CLOUD COMPILER (PYTHON, C++, RUST, GO, TS/JS, BASH)
+    const wandboxCompiler = WANDBOX_MAP[langKey] || 'cpython-3.12.7';
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 12000);

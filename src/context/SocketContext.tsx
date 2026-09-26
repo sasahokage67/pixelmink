@@ -124,7 +124,46 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     };
   }, [incomingCall]);
 
-  // Cross-device cloud signaling poll for incoming calls (essential for Vercel serverless)
+  // Real-time instant incoming call push listener (SSE)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(`https://ntfy.sh/pixelmink_user_${user.id}/sse`);
+      es.onmessage = (event) => {
+        try {
+          const raw = JSON.parse(event.data);
+          const data = typeof raw.message === 'string' ? JSON.parse(raw.message) : raw;
+          if (data && data.type === 'incoming_call' && data.roomId) {
+            if (typeof window !== 'undefined' && window.location.pathname.startsWith('/calls/')) {
+              return;
+            }
+            if (!dismissedCallsRef.current.has(data.roomId)) {
+              setIncomingCall({
+                roomId: data.roomId,
+                callerId: data.callerId,
+                callerName: data.callerName || 'Инженер',
+                callerAvatar: data.callerAvatar || '',
+                type: data.callType || 'VIDEO',
+              });
+              try {
+                if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                  navigator.vibrate([300, 150, 300, 150, 500]);
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+      };
+    } catch {}
+
+    return () => {
+      if (es) es.close();
+    };
+  }, [user?.id]);
+
+  // Fallback poll for incoming calls
   const dismissedCallsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -156,7 +195,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     };
 
     pollIncomingCalls();
-    const interval = setInterval(pollIncomingCalls, 2500);
+    const interval = setInterval(pollIncomingCalls, 2000);
 
     return () => {
       isMounted = false;
@@ -175,6 +214,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({
           action: 'accept',
           roomId,
+          callerId,
           receiverId: user?.id,
         }),
       });
@@ -197,6 +237,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({
           action: 'reject',
           roomId,
+          callerId,
           receiverId: user?.id,
         }),
       });

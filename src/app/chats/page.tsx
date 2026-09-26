@@ -25,6 +25,7 @@ import {
   ShieldAlert,
   Lock,
   X,
+  ChevronLeft,
 } from 'lucide-react';
 import InChatCall from '@/components/chat/InChatCall';
 
@@ -101,7 +102,7 @@ export default function ChatsPage() {
         if (paramConvId) {
           const match = convList.find((c: any) => c.id === paramConvId);
           if (match) setActiveConv(match);
-        } else if (convList.length > 0 && !activeConv) {
+        } else if (convList.length > 0 && !activeConv && typeof window !== 'undefined' && window.innerWidth >= 768) {
           setActiveConv(convList[0]);
         }
       }
@@ -370,15 +371,15 @@ export default function ChatsPage() {
   });
 
   return (
-    <div className="h-[calc(100vh-8.5rem)] flex rounded-2xl border border-white/[0.08] bg-[#0c0c10] overflow-hidden">
+    <div className="h-[calc(100dvh-8rem)] md:h-[calc(100vh-8.5rem)] flex rounded-2xl border border-white/[0.08] bg-[#0c0c10] overflow-hidden">
       {/* Left Pane: Conversations List */}
-      <div className="w-80 md:w-96 border-r border-white/[0.08] flex flex-col shrink-0 bg-[#09090b]">
+      <div className={`w-full md:w-80 lg:w-96 border-r border-white/[0.08] flex flex-col shrink-0 bg-[#09090b] ${activeConv ? 'hidden md:flex' : 'flex'}`}>
         {/* Header & Search */}
-        <div className="p-4 border-b border-white/[0.08] space-y-3">
+        <div className="p-3 md:p-4 border-b border-white/[0.08] space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="font-mono text-sm font-bold text-white tracking-tight">Chats</span>
             <span className="font-mono text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
-              WebSocket Realtime
+              Live
             </span>
           </div>
 
@@ -398,7 +399,7 @@ export default function ChatsPage() {
         <div className="flex-1 overflow-y-auto divide-y divide-white/[0.04]">
           {filteredConversations.length === 0 ? (
             <div className="p-8 text-center text-xs font-mono text-zinc-500">
-              No conversations found. Connect with peers from Discover or Matches to start exchanging!
+              No conversations found. Connect with peers from Matches to start exchanging!
             </div>
           ) : (
             filteredConversations.map((conv) => {
@@ -411,7 +412,7 @@ export default function ChatsPage() {
                 <button
                   key={conv.id}
                   onClick={() => setActiveConv(conv)}
-                  className={`w-full p-4 text-left flex items-start gap-3 transition-colors ${
+                  className={`w-full p-3.5 md:p-4 text-left flex items-start gap-3 transition-colors ${
                     isSelected ? 'bg-white/[0.06]' : 'hover:bg-white/[0.02]'
                   }`}
                 >
@@ -447,37 +448,48 @@ export default function ChatsPage() {
 
       {/* Right Pane: Active Chat Room */}
       {activeConv ? (
-        <div className="flex-1 flex flex-col min-w-0 bg-[#0c0c10]">
+        <div className="flex-1 flex flex-col min-w-0 bg-[#0c0c10] w-full">
           {/* Header */}
-          <div className="p-4 border-b border-white/[0.08] flex items-center justify-between bg-[#111114]">
-            <Link
-              href={otherMember ? `/profile?userId=${otherMember.id}` : '/profile'}
-              className="flex items-center gap-3 min-w-0 group hover:opacity-90 transition-opacity"
-              title="Перейти в личный кабинет собеседника"
-            >
-              <div className="relative">
-                <Identicon name={otherMember?.profile?.name || 'peer'} size={36} />
-                {isPeerOnline && (
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[#111114]" />
-                )}
-              </div>
+          <div className="p-3 md:p-4 border-b border-white/[0.08] flex items-center justify-between bg-[#111114] gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              {/* Mobile Back Button to return to conversation list */}
+              <button
+                onClick={() => setActiveConv(null)}
+                className="md:hidden p-1.5 -ml-1 text-zinc-400 hover:text-white rounded-lg flex items-center justify-center shrink-0 transition-colors"
+                title="Назад ко всем чатам"
+              >
+                <ChevronLeft className="w-5 h-5 text-white" />
+              </button>
 
-              <div className="min-w-0">
-                <div className="text-xs font-semibold text-white tracking-tight truncate group-hover:text-blue-400 transition-colors">
-                  {otherMember?.profile?.name || otherMember?.email?.split('@')[0] || 'Tech Peer'}
+              <Link
+                href={otherMember ? `/profile?userId=${otherMember.id}` : '/profile'}
+                className="flex items-center gap-2.5 min-w-0 group hover:opacity-90 transition-opacity"
+                title="Перейти в личный кабинет собеседника"
+              >
+                <div className="relative shrink-0">
+                  <Identicon name={otherMember?.profile?.name || 'peer'} size={34} />
+                  {isPeerOnline && (
+                    <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-[#111114]" />
+                  )}
                 </div>
-                <div className="text-[10px] font-mono text-zinc-400 flex items-center gap-1.5">
-                  <span className={isPeerOnline ? 'text-emerald-400' : 'text-zinc-500'}>
-                    {isPeerOnline ? 'Online now' : 'Offline'}
-                  </span>
-                  <span>•</span>
-                  <span>{otherMember?.profile?.timezone || 'UTC+0'}</span>
+
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-white tracking-tight truncate group-hover:text-blue-400 transition-colors">
+                    {otherMember?.profile?.name || otherMember?.email?.split('@')[0] || 'Tech Peer'}
+                  </div>
+                  <div className="text-[10px] font-mono text-zinc-400 flex items-center gap-1.5 truncate">
+                    <span className={isPeerOnline ? 'text-emerald-400' : 'text-zinc-500'}>
+                      {isPeerOnline ? 'Online' : 'Offline'}
+                    </span>
+                    <span>•</span>
+                    <span className="truncate">{otherMember?.profile?.timezone || 'UTC+0'}</span>
+                  </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
+            </div>
 
             {/* Real WebRTC Call Buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => handleStartInChatCall('AUDIO')}
                 title="Аудиосозвон прямо в чате"
@@ -488,11 +500,11 @@ export default function ChatsPage() {
 
               <button
                 onClick={() => handleStartInChatCall('VIDEO')}
-                title="Видеосозвон и шеринг экрана прямо в чате"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold tap-active transition-all shadow-md shadow-blue-600/20"
+                title="Видеосозвон прямо в чате"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold tap-active transition-all shadow-md shadow-blue-600/20"
               >
                 <Video className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Созвон в чате</span>
+                <span className="hidden sm:inline">Созвон</span>
               </button>
 
               <button

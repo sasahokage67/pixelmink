@@ -30,6 +30,7 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
+  Code2,
 } from 'lucide-react';
 import Identicon from '@/components/ui/Identicon';
 import SharedCallTerminal from '@/components/call/SharedCallTerminal';
@@ -690,10 +691,70 @@ export default function CallRoomPage() {
       } catch {}
     };
 
+    // Instant WebRTC signals over ntfy SSE
+    let sseSource: EventSource | null = null;
+    const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    try {
+      sseSource = new EventSource(`https://ntfy.sh/pixelmink_call_${cleanRoomId}/sse`);
+      sseSource.onmessage = async (event) => {
+        try {
+          const raw = JSON.parse(event.data);
+          const item = typeof raw.message === 'string' ? JSON.parse(raw.message) : raw;
+          if (!item || !item.signal) return;
+          if (item.fromPeerId === myPeerIdRef.current) return;
+          if (item.toPeerId && item.toPeerId !== myPeerIdRef.current) return;
+
+          const signal = item.signal;
+          if (signal.userName && !remotePeerName) setRemotePeerName(signal.userName);
+          if (item.fromPeerId && !remotePeerSocketId) setRemotePeerSocketId(item.fromPeerId);
+
+          if (signal.type === 'peer_joined') {
+            setRemotePeerSocketId(item.fromPeerId);
+            if (signal.userName) setRemotePeerName(signal.userName);
+            const pc = getOrCreatePeerConnection(item.fromPeerId);
+            try {
+              const offer = await pc.createOffer();
+              await pc.setLocalDescription(offer);
+              sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, item.fromPeerId);
+            } catch (e) {}
+          } else if (signal.type === 'offer') {
+            const pc = getOrCreatePeerConnection(item.fromPeerId);
+            try {
+              await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              sendRoomSignal({ type: 'answer', sdp: answer, senderName: effectiveUserName }, item.fromPeerId);
+            } catch (e) {}
+          } else if (signal.type === 'answer') {
+            const pc = getOrCreatePeerConnection(item.fromPeerId);
+            try {
+              if (pc.signalingState === 'have-local-offer') {
+                await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+              }
+            } catch (e) {}
+          } else if (signal.type === 'ice-candidate') {
+            const pc = getOrCreatePeerConnection(item.fromPeerId);
+            try {
+              if (signal.candidate) {
+                await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+              }
+            } catch (e) {}
+          } else if (signal.type === 'terminal_opened') {
+            setIsTerminalOpen(true);
+            setTerminalProposal(null);
+            setTerminalRequestSent(false);
+          } else if (signal.type === 'terminal_closed') {
+            setIsTerminalOpen(false);
+          }
+        } catch {}
+      };
+    } catch {}
+
     const interval = setInterval(pollSignals, 1800);
     return () => {
       isMounted = false;
       clearInterval(interval);
+      if (sseSource) sseSource.close();
     };
   }, [roomId, hasEnteredName, isCallFinished, effectiveUserName, sendRoomSignal, sendRoomSignalHttp, getOrCreatePeerConnection, remotePeerName, remotePeerSocketId]);
 
@@ -823,7 +884,7 @@ export default function CallRoomPage() {
     setChatInput('');
   };
 
-  // Terminal Handlers (Mutual Consent)
+  // Terminal Handlers (Instant Real-time Toggle)
   const handleToggleTerminal = () => {
     if (isTerminalOpen) {
       if (socket) {
@@ -833,18 +894,14 @@ export default function CallRoomPage() {
       setIsTerminalOpen(false);
     } else {
       if (socket) {
-        socket.emit('call:terminal_request', {
-          roomId,
-          fromUserId: user?.id || `guest_${Date.now()}`,
-          fromUserName: effectiveUserName,
-        });
+        socket.emit('call:terminal_opened', { byUserName: effectiveUserName });
       }
       sendRoomSignalHttp({
-        type: 'terminal_request',
-        fromUserId: user?.id || `guest_${Date.now()}`,
+        type: 'terminal_opened',
+        accepted: true,
         fromUserName: effectiveUserName,
       });
-      setTerminalRequestSent(true);
+      setIsTerminalOpen(true);
     }
   };
 
@@ -1028,15 +1085,16 @@ export default function CallRoomPage() {
           </button>
 
           <button
-            onClick={handleCopyLink}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
-              copiedLink
-                ? 'bg-emerald-600 text-white border border-emerald-400 shadow-lg shadow-emerald-600/20'
-                : 'bg-blue-600 hover:bg-blue-500 text-white border border-blue-400 shadow-lg shadow-blue-600/20'
+            onClick={handleToggleTerminal}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all shadow-md ${
+              isTerminalOpen
+                ? 'bg-emerald-600 text-white border border-emerald-400 shadow-emerald-600/20'
+                : 'bg-blue-600 hover:bg-blue-500 text-white border border-blue-400 shadow-blue-600/20'
             }`}
+            title="Открыть совместный редактор и компилятор кода (Python, C++, JS, Rust, Go)"
           >
-            {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copiedLink ? 'Скопировано!' : 'Ссылка для кента'}</span>
+            <Code2 className="w-3.5 h-3.5" />
+            <span>{isTerminalOpen ? 'Закрыть компилятор' : 'Компилятор кода'}</span>
           </button>
         </div>
       </header>
@@ -1240,37 +1298,42 @@ export default function CallRoomPage() {
                 </div>
               </>
             ) : (
-              /* Authentic Waiting Screen (Zero Fake Users) */
-              <div className="p-4 md:p-6 text-center space-y-3 max-w-sm">
-                <div className="relative w-12 h-12 md:w-16 md:h-16 rounded-full bg-blue-500/10 border border-blue-500/20 mx-auto flex items-center justify-center text-blue-400">
-                  <Radio className="w-6 h-6 md:w-7 md:h-7 animate-pulse" />
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-ping" />
+              /* Senior Peer Authentic Connecting Screen */
+              <div className="p-4 md:p-6 text-center space-y-4 max-w-sm">
+                <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 mx-auto flex items-center justify-center text-blue-400">
+                  <Radio className="w-7 h-7 animate-pulse" />
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full animate-ping" />
                 </div>
 
-                <div className="space-y-1">
-                  <div className="text-xs md:text-sm font-bold text-white font-mono">
-                    {lang === 'ru'
-                      ? 'Ожидание подключения кента...'
-                      : lang === 'kz'
-                      ? 'Досыңның қосылуын күтуде...'
-                      : 'Waiting for Peer to Join...'}
+                <div className="space-y-1.5">
+                  <div className="text-xs md:text-sm font-bold text-white font-mono flex items-center justify-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                    <span>
+                      {lang === 'ru'
+                        ? 'Вызов собеседника...'
+                        : lang === 'kz'
+                        ? 'Сұхбаттасты шақыру...'
+                        : 'Calling peer...'}
+                    </span>
                   </div>
                   <p className="text-[11px] md:text-xs font-mono text-zinc-400 leading-relaxed">
                     {lang === 'ru'
-                      ? 'Скиньте ссылку на эту комнату другу. Как только он перейдет — начнется созвон.'
+                      ? 'Ожидание подключения к видеоканалу. Собеседнику отправлен входящий звонок.'
                       : lang === 'kz'
-                      ? 'Осы бөлме сілтемесін досыңызға жіберіңіз.'
-                      : 'Share the link with your friend.'}
+                      ? 'Бейнеарнаға қосылу күтілуде. Сұхбаттасқа кіріс қоңырау жіберілді.'
+                      : 'Waiting for peer to establish WebRTC connection.'}
                   </p>
                 </div>
 
-                <button
-                  onClick={handleCopyLink}
-                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 text-white font-mono text-xs font-medium transition-all"
-                >
-                  <Copy className="w-3.5 h-3.5 text-blue-400" />
-                  <span>{copiedLink ? (lang === 'ru' ? 'Скопировано!' : 'Көшірілді!') : (lang === 'ru' ? 'Скопировать ссылку' : 'Сілтемені көшіру')}</span>
-                </button>
+                <div className="pt-2 flex justify-center">
+                  <button
+                    onClick={handleLeaveCall}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 font-mono text-xs font-medium transition-all"
+                  >
+                    <PhoneOff className="w-3.5 h-3.5" />
+                    <span>{lang === 'ru' ? 'Отменить вызов' : 'Қоңырауды тоқтату'}</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>

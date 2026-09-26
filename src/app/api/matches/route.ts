@@ -38,19 +38,29 @@ export async function GET(req: NextRequest) {
 
     const matches = await matchUsers(targetUserId);
 
-    // Fetch local matches
+    // Fetch local matches with full profile and skills
     const dbMatches = await prisma.match.findMany({
       where: {
         OR: [{ userAId: targetUserId }, { userBId: targetUserId }],
       },
       include: {
-        userA: { include: { profile: true } },
-        userB: { include: { profile: true } },
+        userA: {
+          include: {
+            profile: true,
+            userSkills: { include: { skill: true } },
+          },
+        },
+        userB: {
+          include: {
+            profile: true,
+            userSkills: { include: { skill: true } },
+          },
+        },
       },
     });
 
-    // Fetch cloud matches & blocks
-    const cloud = await getCloudRegistry();
+    // Fetch cloud matches & blocks (failsafe)
+    const cloud: any = await getCloudRegistry().catch(() => ({}));
     const cloudMatches = cloud.matches || [];
     const cloudBlocks = cloud.blocks || [];
 
@@ -62,29 +72,35 @@ export async function GET(req: NextRequest) {
     const blockedUserIds = Array.from(
       new Set([
         ...dbBlocks.map((b) => b.blockedId),
-        ...cloudBlocks.filter((b) => b.blockerId === targetUserId).map((b) => b.blockedId),
+        ...cloudBlocks.filter((b: any) => b.blockerId === targetUserId).map((b: any) => b.blockedId),
       ])
     );
 
     // Merge match records
     const connectedUserIds = new Set<string>();
+    const connectedUsersMap = new Map<string, any>();
     const pendingSentIds = new Set<string>();
     const pendingReceivedMap = new Map<string, any>();
 
     // Process DB matches
     for (const m of dbMatches) {
-      const otherId = m.userAId === targetUserId ? m.userBId : m.userAId;
+      const isA = m.userAId === targetUserId;
+      const otherId = isA ? m.userBId : m.userAId;
+      const otherUser = isA ? m.userB : m.userA;
       if (blockedUserIds.includes(otherId)) continue;
 
       if (m.status === 'ACCEPTED') {
         connectedUserIds.add(otherId);
+        if (otherUser) {
+          connectedUsersMap.set(otherId, otherUser);
+        }
       } else if (m.status === 'PENDING') {
-        if (m.userAId === targetUserId) {
-          pendingSentIds.add(m.userBId);
+        if (isA) {
+          pendingSentIds.add(otherId);
         } else {
-          pendingReceivedMap.set(m.userAId, {
+          pendingReceivedMap.set(otherId, {
             id: m.id,
-            user: m.userA,
+            user: otherUser,
             reason: m.reason,
             score: m.score,
             createdAt: m.createdAt,
@@ -92,6 +108,35 @@ export async function GET(req: NextRequest) {
         }
       }
     }
+
+    // Direct conversations are also confirmed contacts
+    try {
+      const directConvs = await prisma.conversation.findMany({
+        where: {
+          isGroup: false,
+          members: { some: { userId: targetUserId } },
+        },
+        include: {
+          members: {
+            include: {
+              user: {
+                include: { profile: true, userSkills: { include: { skill: true } } },
+              },
+            },
+          },
+        },
+      });
+
+      for (const conv of directConvs) {
+        const otherMem = conv.members.find((m) => m.userId !== targetUserId);
+        if (otherMem?.user && !blockedUserIds.includes(otherMem.userId)) {
+          connectedUserIds.add(otherMem.userId);
+          if (!connectedUsersMap.has(otherMem.userId)) {
+            connectedUsersMap.set(otherMem.userId, otherMem.user);
+          }
+        }
+      }
+    } catch {}
 
     // Process Cloud matches
     for (const cm of cloudMatches) {
@@ -128,6 +173,7 @@ export async function GET(req: NextRequest) {
       matches,
       targetUserId,
       connectedUserIds: Array.from(connectedUserIds),
+      connectedUsers: Array.from(connectedUsersMap.values()),
       pendingSentIds: Array.from(pendingSentIds),
       pendingReceived: Array.from(pendingReceivedMap.values()),
       blockedUserIds,

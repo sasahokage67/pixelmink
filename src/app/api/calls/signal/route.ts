@@ -1,40 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isUserBlocked, isUserMatched } from '@/lib/matchBlock';
+import prisma from '@/lib/prisma';
+import { isUserBlocked } from '@/lib/matchBlock';
 
 export const dynamic = 'force-dynamic';
 
-const CLOUD_SIGNALING_ID = 'ff808181a09d98f701a0ddbb49c91d6c';
-const CLOUD_SIGNALING_URL = `https://api.restful-api.dev/objects/${CLOUD_SIGNALING_ID}`;
-
-// In-memory cache for ultra-low latency signaling within same lambda
-const memoryActiveCalls = new Map<string, any>(); // callId -> call
+// In-memory cache for ultra-low latency signaling within same process
+const memoryActiveCalls = new Map<string, any>(); // roomId -> callRecord
 const memoryRoomSignals = new Map<string, any[]>(); // roomId -> signals array
-
-async function fetchCloudData(): Promise<{ activeCalls: any[]; roomSignals: Record<string, any[]> }> {
-  try {
-    const res = await fetch(CLOUD_SIGNALING_URL, { cache: 'no-store' });
-    if (!res.ok) return { activeCalls: [], roomSignals: {} };
-    const json = await res.json();
-    return json.data || { activeCalls: [], roomSignals: {} };
-  } catch {
-    return { activeCalls: [], roomSignals: {} };
-  }
-}
-
-async function updateCloudData(data: { activeCalls: any[]; roomSignals: Record<string, any[]> }): Promise<void> {
-  try {
-    await fetch(CLOUD_SIGNALING_URL, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'pixelmink_calls_signaling_v1',
-        data,
-      }),
-    });
-  } catch (err) {
-    console.warn('updateCloudData error:', err);
-  }
-}
 
 export async function GET(req: NextRequest) {
   try {
@@ -61,20 +33,33 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ incomingCall: memFound });
       }
 
-      // Check cloud registry
-      const cloudData = await fetchCloudData();
-      const freshCalls = (cloudData.activeCalls || []).filter(
-        (c: any) => now - c.createdAt < 45000
-      );
-
-      const found = freshCalls.find(
-        (c: any) => c.receiverId === userId && c.status === 'RINGING'
-      );
-
-      if (found) {
-        memoryActiveCalls.set(found.roomId, found);
-        return NextResponse.json({ incomingCall: found });
-      }
+      // Check DB for active call
+      try {
+        const dbCall = await prisma.call.findFirst({
+          where: {
+            receiverId: userId,
+            status: 'CALLING',
+            startedAt: { gte: new Date(now - 45000) },
+          },
+          include: {
+            caller: { include: { profile: true } },
+          },
+        });
+        if (dbCall) {
+          const formatted = {
+            roomId: dbCall.roomId,
+            callerId: dbCall.callerId,
+            callerName: dbCall.caller?.profile?.name || dbCall.caller?.email?.split('@')[0] || 'Peer',
+            callerAvatar: dbCall.caller?.profile?.avatar || '',
+            receiverId: userId,
+            type: dbCall.type,
+            status: 'RINGING',
+            createdAt: dbCall.startedAt.getTime(),
+          };
+          memoryActiveCalls.set(dbCall.roomId, formatted);
+          return NextResponse.json({ incomingCall: formatted });
+        }
+      } catch {}
 
       return NextResponse.json({ incomingCall: null });
     }
@@ -82,17 +67,8 @@ export async function GET(req: NextRequest) {
     // 2. Poll room WebRTC signals & events
     if (action === 'room_poll' && roomId && peerId) {
       const memSignals = memoryRoomSignals.get(roomId) || [];
-      const cloudData = await fetchCloudData();
-      const cloudRoomSignals = cloudData.roomSignals?.[roomId] || [];
 
-      // Combine signals without duplicates
-      const signalMap = new Map<string, any>();
-      for (const s of [...cloudRoomSignals, ...memSignals]) {
-        if (s.id) signalMap.set(s.id, s);
-      }
-
-      const allSignals = Array.from(signalMap.values());
-      const pendingForPeer = allSignals.filter(
+      const pendingForPeer = memSignals.filter(
         (s) =>
           s.createdAt > since &&
           s.fromPeerId !== peerId &&
@@ -129,25 +105,14 @@ export async function POST(req: NextRequest) {
             { status: 403 }
           );
         }
-
-        const matched = await isUserMatched(callerId, receiverId);
-        if (!matched) {
-          return NextResponse.json(
-            {
-              error: 'Звонки доступны только после взаимного подтверждения мэтча',
-              requireMatch: true,
-            },
-            { status: 403 }
-          );
-        }
       }
 
       const callRecord = {
         id: `call_${roomId}_${now}`,
         roomId,
         callerId,
-        callerName,
-        callerAvatar,
+        callerName: callerName || 'Инженер',
+        callerAvatar: callerAvatar || '',
         receiverId,
         type: type || 'VIDEO',
         status: 'RINGING',
@@ -156,43 +121,116 @@ export async function POST(req: NextRequest) {
 
       memoryActiveCalls.set(roomId, callRecord);
 
-      const cloudData = await fetchCloudData();
-      const filteredCalls = (cloudData.activeCalls || []).filter(
-        (c: any) => now - c.createdAt < 45000 && c.roomId !== roomId
-      );
-      filteredCalls.push(callRecord);
+      // Save to database
+      try {
+        await prisma.call.upsert({
+          where: { roomId },
+          create: {
+            roomId,
+            callerId,
+            receiverId: receiverId || null,
+            type: type || 'VIDEO',
+            status: 'CALLING',
+          },
+          update: {
+            status: 'CALLING',
+          },
+        });
+      } catch {}
 
-      await updateCloudData({
-        ...cloudData,
-        activeCalls: filteredCalls,
-      });
+      // Real-time broadcast to receiver via ntfy (instant ring on all devices)
+      if (receiverId) {
+        fetch(`https://ntfy.sh/pixelmink_user_${receiverId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'incoming_call',
+            roomId,
+            callerId,
+            callerName: callerName || 'Инженер',
+            callerAvatar: callerAvatar || '',
+            callType: type || 'VIDEO',
+            timestamp: now,
+          }),
+        }).catch(() => {});
+      }
 
       return NextResponse.json({ success: true, call: callRecord });
     }
 
     // 2. Accept call
     if (action === 'accept') {
-      const { roomId } = body;
+      const { roomId, callerId } = body;
       const memCall = memoryActiveCalls.get(roomId);
       if (memCall) memCall.status = 'ACCEPTED';
 
-      const cloudData = await fetchCloudData();
-      const updated = (cloudData.activeCalls || []).map((c: any) =>
-        c.roomId === roomId ? { ...c, status: 'ACCEPTED' } : c
-      );
-      await updateCloudData({ ...cloudData, activeCalls: updated });
+      try {
+        await prisma.call.updateMany({
+          where: { roomId },
+          data: { status: 'ACTIVE' },
+        });
+      } catch {}
+
+      const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
+      fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'call_accepted',
+          roomId,
+          timestamp: now,
+        }),
+      }).catch(() => {});
+
+      if (callerId) {
+        fetch(`https://ntfy.sh/pixelmink_user_${callerId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'call_accepted',
+            roomId,
+            timestamp: now,
+          }),
+        }).catch(() => {});
+      }
 
       return NextResponse.json({ success: true });
     }
 
     // 3. Reject / Cancel call
     if (action === 'reject') {
-      const { roomId } = body;
+      const { roomId, callerId } = body;
       memoryActiveCalls.delete(roomId);
 
-      const cloudData = await fetchCloudData();
-      const updated = (cloudData.activeCalls || []).filter((c: any) => c.roomId !== roomId);
-      await updateCloudData({ ...cloudData, activeCalls: updated });
+      try {
+        await prisma.call.updateMany({
+          where: { roomId },
+          data: { status: 'REJECTED' },
+        });
+      } catch {}
+
+      const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
+      fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'call_rejected',
+          roomId,
+          timestamp: now,
+        }),
+      }).catch(() => {});
+
+      if (callerId) {
+        fetch(`https://ntfy.sh/pixelmink_user_${callerId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'call_rejected',
+            roomId,
+            timestamp: now,
+          }),
+        }).catch(() => {});
+      }
 
       return NextResponse.json({ success: true });
     }
@@ -217,18 +255,19 @@ export async function POST(req: NextRequest) {
       memList.push(signalEntry);
       if (memList.length > 50) memList.splice(0, memList.length - 50);
 
-      // Store in cloud object
-      const cloudData = await fetchCloudData();
-      const roomSignals = cloudData.roomSignals || {};
-      const list = roomSignals[roomId] || [];
-      const freshList = list.filter((s: any) => now - s.createdAt < 60000);
-      freshList.push(signalEntry);
-      roomSignals[roomId] = freshList;
-
-      await updateCloudData({
-        ...cloudData,
-        roomSignals,
-      });
+      // Also publish to ntfy room channel for real-time delivery
+      const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
+      fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'room_signal',
+          fromPeerId,
+          toPeerId,
+          signal,
+          createdAt: now,
+        }),
+      }).catch(() => {});
 
       return NextResponse.json({ success: true, signalId: signalEntry.id });
     }

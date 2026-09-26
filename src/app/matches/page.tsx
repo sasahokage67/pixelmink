@@ -97,6 +97,8 @@ export default function MatchesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  const [connectedUsers, setConnectedUsers] = useState<any[]>([]);
+
   const loadMatches = async () => {
     try {
       setLoading(true);
@@ -105,6 +107,7 @@ export default function MatchesPage() {
         const data = await res.json();
         setMatches(data.matches || []);
         if (data.connectedUserIds) setConnectedUserIds(data.connectedUserIds);
+        if (data.connectedUsers) setConnectedUsers(data.connectedUsers);
         if (data.pendingSentIds) setPendingSentIds(data.pendingSentIds);
         if (data.pendingReceived) setPendingReceived(data.pendingReceived);
         if (data.blockedUserIds) setBlockedUserIds(data.blockedUserIds);
@@ -123,6 +126,29 @@ export default function MatchesPage() {
       setLoading(false);
     }
   };
+
+  // Real-time ntfy match sync
+  useEffect(() => {
+    if (!user?.id) return;
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(`https://ntfy.sh/pixelmink_user_${user.id}/sse`);
+      es.onmessage = (event) => {
+        try {
+          const raw = JSON.parse(event.data);
+          const data = typeof raw.message === 'string' ? JSON.parse(raw.message) : raw;
+          if (data.type === 'match_accepted' || data.type === 'match_requested') {
+            loadMatches();
+            loadAllUsers();
+          }
+        } catch {}
+      };
+    } catch {}
+
+    return () => {
+      if (es) es.close();
+    };
+  }, [user?.id]);
 
   const loadAllUsers = async (force = false) => {
     try {
@@ -191,6 +217,10 @@ export default function MatchesPage() {
       const data = await res.json();
       if (res.ok) {
         if (action === 'accept' || data.status === 'ACCEPTED') {
+          const acceptedObj = pendingReceived.find((p) => (p.user?.id || p.id) === targetUserId)?.user;
+          if (acceptedObj) {
+            setConnectedUsers((prev) => [...prev, acceptedObj]);
+          }
           setConnectedUserIds((prev) => Array.from(new Set([...prev, targetUserId])));
           setPendingSentIds((prev) => prev.filter((id) => id !== targetUserId));
           setPendingReceived((prev) => prev.filter((p) => (p.user?.id || p.id) !== targetUserId));
@@ -405,7 +435,11 @@ export default function MatchesPage() {
 
   const directMatches = matches.filter((m) => m.matchType !== 'CIRCULAR_CHAIN');
   const chainMatches = matches.filter((m) => m.matchType === 'CIRCULAR_CHAIN');
-  const connectedPeers = allUsers.filter((peer) => connectedUserIds.includes(peer.id));
+  // Robust connectedPeers calculation (merges allUsers and direct connectedUsers from API)
+  const connectedMap = new Map<string, any>();
+  allUsers.filter((peer) => connectedUserIds.includes(peer.id)).forEach((u) => connectedMap.set(u.id, u));
+  connectedUsers.forEach((u) => connectedMap.set(u.id, u));
+  const connectedPeers: any[] = Array.from(connectedMap.values());
 
   return (
     <div className="space-y-8 animate-in fade-in">

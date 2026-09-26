@@ -156,55 +156,125 @@ export default function SharedCallTerminal({
 
   const isLocalChange = useRef(false);
 
-  // Sync listener from socket
+  // Dual channel sync: Socket.io + ntfy SSE fallback for live cloud coding
   useEffect(() => {
-    if (!socket) return;
+    // 1. Socket.io listeners
+    if (socket) {
+      socket.on('call:terminal_sync', (data: { code: string; language: string; byUserName?: string }) => {
+        isLocalChange.current = true;
+        if (data.code !== undefined) setCode(data.code);
+        if (data.language && data.language !== language) setLanguage(data.language);
+        if (data.byUserName) setLastEditor(data.byUserName);
+        setTimeout(() => {
+          isLocalChange.current = false;
+        }, 50);
+      });
 
-    socket.on('call:terminal_sync', (data: { code: string; language: string; byUserName?: string }) => {
-      isLocalChange.current = true;
-      if (data.code !== undefined) setCode(data.code);
-      if (data.language && data.language !== language) setLanguage(data.language);
-      if (data.byUserName) setLastEditor(data.byUserName);
-      setTimeout(() => {
-        isLocalChange.current = false;
-      }, 50);
-    });
+      socket.on('call:terminal_executing', () => {
+        setIsRunning(true);
+        setStderr('');
+      });
 
-    socket.on('call:terminal_executing', () => {
-      setIsRunning(true);
-      setStderr('');
-    });
+      socket.on('call:terminal_output', (data: any) => {
+        setIsRunning(false);
+        setStdout(data.stdout || '');
+        setStderr(data.stderr || '');
+        setExecutionTime(data.executionTime || 0);
+        setRuntimeLabel(data.runtime || '');
+      });
 
-    socket.on('call:terminal_output', (data: any) => {
-      setIsRunning(false);
-      setStdout(data.stdout || '');
-      setStderr(data.stderr || '');
-      setExecutionTime(data.executionTime || 0);
-      setRuntimeLabel(data.runtime || '');
-    });
+      socket.on('call:terminal_closed', () => {
+        onClose();
+      });
+    }
 
-    socket.on('call:terminal_closed', () => {
-      onClose();
-    });
+    // 2. ntfy SSE listener for cross-platform / Vercel real-time collaboration
+    let eventSource: EventSource | null = null;
+    const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const termTopic = `pixelmink_term_${cleanRoomId}`;
+
+    try {
+      eventSource = new EventSource(`https://ntfy.sh/${termTopic}/sse`);
+      eventSource.onmessage = (event) => {
+        try {
+          const raw = JSON.parse(event.data);
+          const data = typeof raw.message === 'string' ? JSON.parse(raw.message) : raw;
+          if (!data || data.senderId === currentUser?.id) return;
+
+          if (data.type === 'sync') {
+            isLocalChange.current = true;
+            if (data.code !== undefined) setCode(data.code);
+            if (data.language && data.language !== language) setLanguage(data.language);
+            if (data.byUserName) setLastEditor(data.byUserName);
+            setTimeout(() => {
+              isLocalChange.current = false;
+            }, 50);
+          } else if (data.type === 'executing') {
+            setIsRunning(true);
+            setStderr('');
+          } else if (data.type === 'output') {
+            setIsRunning(false);
+            setStdout(data.stdout || '');
+            setStderr(data.stderr || '');
+            setExecutionTime(data.executionTime || 0);
+            setRuntimeLabel(data.runtime || '');
+          } else if (data.type === 'close') {
+            onClose();
+          }
+        } catch {}
+      };
+    } catch {}
 
     return () => {
-      socket.off('call:terminal_sync');
-      socket.off('call:terminal_executing');
-      socket.off('call:terminal_output');
-      socket.off('call:terminal_closed');
+      if (socket) {
+        socket.off('call:terminal_sync');
+        socket.off('call:terminal_executing');
+        socket.off('call:terminal_output');
+        socket.off('call:terminal_closed');
+      }
+      if (eventSource) {
+        eventSource.close();
+      }
     };
-  }, [socket, language, onClose]);
+  }, [socket, language, onClose, roomId, currentUser?.id]);
 
-  // Code change broadcast
+  const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const termTopic = `pixelmink_term_${cleanRoomId}`;
+
+  const publishToCloudTerm = useCallback((payload: any) => {
+    try {
+      fetch(`https://ntfy.sh/${termTopic}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, senderId: currentUser?.id }),
+      }).catch(() => {});
+    } catch {}
+  }, [termTopic, currentUser?.id]);
+
+  // Code change broadcast with debounce
+  const syncTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const handleCodeChange = (newCode: string) => {
     setCode(newCode);
-    if (!isLocalChange.current && socket) {
-      socket.emit('call:terminal_sync', {
-        roomId,
-        code: newCode,
-        language,
-        byUserName: currentUser?.profile?.name || currentUser?.email?.split('@')[0] || 'Peer',
-      });
+    if (!isLocalChange.current) {
+      const myName = currentUser?.profile?.name || currentUser?.email?.split('@')[0] || 'Peer';
+      if (socket) {
+        socket.emit('call:terminal_sync', {
+          roomId,
+          code: newCode,
+          language,
+          byUserName: myName,
+        });
+      }
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      syncTimerRef.current = setTimeout(() => {
+        publishToCloudTerm({
+          type: 'sync',
+          code: newCode,
+          language,
+          byUserName: myName,
+        });
+      }, 100);
     }
   };
 
@@ -213,14 +283,21 @@ export default function SharedCallTerminal({
     setLanguage(newLang);
     const newCode = TEMPLATES[newLang] || `// ${newLang} Environment\n`;
     setCode(newCode);
+    const myName = currentUser?.profile?.name || currentUser?.email?.split('@')[0] || 'Peer';
     if (socket) {
       socket.emit('call:terminal_sync', {
         roomId,
         code: newCode,
         language: newLang,
-        byUserName: currentUser?.profile?.name || currentUser?.email?.split('@')[0] || 'Peer',
+        byUserName: myName,
       });
     }
+    publishToCloudTerm({
+      type: 'sync',
+      code: newCode,
+      language: newLang,
+      byUserName: myName,
+    });
   };
 
   // Execute Code
@@ -233,6 +310,7 @@ export default function SharedCallTerminal({
     if (socket) {
       socket.emit('call:terminal_executing', { roomId });
     }
+    publishToCloudTerm({ type: 'executing' });
 
     try {
       const res = await fetch('/api/terminal/run', {
@@ -248,28 +326,34 @@ export default function SharedCallTerminal({
       setExecutionTime(data.executionTime || 0);
       setRuntimeLabel(data.runtime || '');
 
+      const outPayload = {
+        type: 'output',
+        stdout: data.stdout || '',
+        stderr: data.stderr || '',
+        executionTime: data.executionTime || 0,
+        runtime: data.runtime || '',
+        exitCode: data.exitCode,
+      };
+
       if (socket) {
         socket.emit('call:terminal_output', {
           roomId,
-          output: {
-            stdout: data.stdout || '',
-            stderr: data.stderr || '',
-            executionTime: data.executionTime || 0,
-            runtime: data.runtime || '',
-            exitCode: data.exitCode,
-          },
+          output: outPayload,
         });
       }
+      publishToCloudTerm(outPayload);
     } catch (err: any) {
       setIsRunning(false);
       const errMsg = err.message || 'Execution failed';
       setStderr(errMsg);
+      const errPayload = { type: 'output', stdout: '', stderr: errMsg, executionTime: 0 };
       if (socket) {
         socket.emit('call:terminal_output', {
           roomId,
-          output: { stdout: '', stderr: errMsg, executionTime: 0 },
+          output: errPayload,
         });
       }
+      publishToCloudTerm(errPayload);
     }
   };
 
@@ -283,6 +367,7 @@ export default function SharedCallTerminal({
     if (socket) {
       socket.emit('call:terminal_close', { roomId });
     }
+    publishToCloudTerm({ type: 'close' });
     onClose();
   };
 

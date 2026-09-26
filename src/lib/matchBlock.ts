@@ -47,7 +47,6 @@ export async function isUserBlocked(userAId: string, userBId: string): Promise<b
   if (!userAId || !userBId || userAId === userBId) return false;
 
   try {
-    // 1. Check local DB
     const blockInDb = await prisma.block.findFirst({
       where: {
         OR: [
@@ -58,15 +57,14 @@ export async function isUserBlocked(userAId: string, userBId: string): Promise<b
     });
     if (blockInDb) return true;
 
-    // 2. Check cloud registry
-    const cloud = await getCloudRegistry();
+    // Optional cloud check (failsafe)
+    const cloud: CloudRelationshipData = await getCloudRegistry().catch(() => ({}));
     const blocks = cloud.blocks || [];
-    const isCloudBlocked = blocks.some(
+    return blocks.some(
       (b) =>
         (b.blockerId === userAId && b.blockedId === userBId) ||
         (b.blockerId === userBId && b.blockedId === userAId)
     );
-    return isCloudBlocked;
   } catch {
     return false;
   }
@@ -84,27 +82,39 @@ export async function isUserMatched(userAId: string, userBId: string): Promise<b
   }
 
   try {
-    // 1. Check local DB
+    // 1. Check local DB for accepted match
     const matchInDb = await prisma.match.findFirst({
       where: {
+        status: 'ACCEPTED',
         OR: [
-          { userAId, userBId, status: 'ACCEPTED' },
-          { userAId: userBId, userBId: userAId, status: 'ACCEPTED' },
+          { userAId, userBId },
+          { userAId: userBId, userBId: userAId },
         ],
       },
     });
     if (matchInDb) return true;
 
-    // 2. Check cloud registry
-    const cloud = await getCloudRegistry();
+    // 2. Check if they already share a direct conversation
+    const sharedConv = await prisma.conversation.findFirst({
+      where: {
+        isGroup: false,
+        AND: [
+          { members: { some: { userId: userAId } } },
+          { members: { some: { userId: userBId } } },
+        ],
+      },
+    });
+    if (sharedConv) return true;
+
+    // 3. Fallback cloud registry
+    const cloud: CloudRelationshipData = await getCloudRegistry().catch(() => ({}));
     const matches = cloud.matches || [];
-    const isCloudMatched = matches.some(
+    return matches.some(
       (m) =>
         ((m.userAId === userAId && m.userBId === userBId) ||
           (m.userAId === userBId && m.userBId === userAId)) &&
         m.status === 'ACCEPTED'
     );
-    return isCloudMatched;
   } catch {
     return false;
   }
@@ -267,11 +277,13 @@ export async function handleMatchRequest(
     throw new Error('Невозможно установить мэтч с заблокированным пользователем');
   }
 
-  // Check if reverse match exists
-  const reverseMatch = await prisma.match.findFirst({
+  // Check if any existing match between these two users exists
+  const existingMatch = await prisma.match.findFirst({
     where: {
-      userAId: targetUserId,
-      userBId: senderId,
+      OR: [
+        { userAId: targetUserId, userBId: senderId },
+        { userAId: senderId, userBId: targetUserId },
+      ],
     },
   });
 
@@ -288,41 +300,36 @@ export async function handleMatchRequest(
       },
     }).catch(() => {});
 
-    const cloud = await getCloudRegistry();
-    const matches = (cloud.matches || []).filter(
-      (m) =>
-        !(
-          (m.userAId === senderId && m.userBId === targetUserId) ||
-          (m.userAId === targetUserId && m.userBId === senderId)
-        )
-    );
-    await saveCloudRegistry({ matches });
+    try {
+      const cloud: CloudRelationshipData = await getCloudRegistry().catch(() => ({}));
+      const matches = (cloud.matches || []).filter(
+        (m) =>
+          !(
+            (m.userAId === senderId && m.userBId === targetUserId) ||
+            (m.userAId === targetUserId && m.userBId === senderId)
+          )
+      );
+      await saveCloudRegistry({ matches }).catch(() => {});
+    } catch {}
     return { status: 'NONE', match: null };
   }
 
-  // If reverse match exists (target already sent request) OR action === 'accept'
-  if (reverseMatch || action === 'accept') {
+  // If any match already exists OR action === 'accept'
+  if (existingMatch || action === 'accept') {
     finalStatus = 'ACCEPTED';
-    if (reverseMatch) {
+    if (existingMatch) {
       match = await prisma.match.update({
-        where: { id: reverseMatch.id },
+        where: { id: existingMatch.id },
         data: { status: 'ACCEPTED' },
       });
     } else {
-      match = await prisma.match.upsert({
-        where: {
-          userAId_userBId: {
-            userAId: targetUserId,
-            userBId: senderId,
-          },
-        },
-        create: {
-          userAId: targetUserId,
-          userBId: senderId,
+      match = await prisma.match.create({
+        data: {
+          userAId: senderId,
+          userBId: targetUserId,
           status: 'ACCEPTED',
           reason: 'Mutual skill exchange match',
         },
-        update: { status: 'ACCEPTED' },
       });
     }
 
@@ -351,6 +358,19 @@ export async function handleMatchRequest(
     } catch (convErr) {
       console.error('Error auto-creating conversation on accept:', convErr);
     }
+
+    // Real-time broadcast to peer via ntfy so their client updates in real time!
+    try {
+      fetch(`https://ntfy.sh/pixelmink_user_${targetUserId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'match_accepted',
+          partnerId: senderId,
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    } catch {}
   } else {
     // New pending request from sender to target
     match = await prisma.match.upsert({
@@ -368,24 +388,39 @@ export async function handleMatchRequest(
       },
       update: { status: 'PENDING' },
     });
+
+    // Notify peer of incoming match request
+    try {
+      fetch(`https://ntfy.sh/pixelmink_user_${targetUserId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'match_requested',
+          fromUserId: senderId,
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    } catch {}
   }
 
-  // Sync match to cloud
-  const cloud = await getCloudRegistry();
-  const filteredMatches = (cloud.matches || []).filter(
-    (m) =>
-      !(
-        (m.userAId === senderId && m.userBId === targetUserId) ||
-        (m.userAId === targetUserId && m.userBId === senderId)
-      )
-  );
-  filteredMatches.push({
-    userAId: match.userAId,
-    userBId: match.userBId,
-    status: finalStatus,
-    createdAt: Date.now(),
-  });
-  await saveCloudRegistry({ matches: filteredMatches });
+  // Failsafe sync match to cloud
+  try {
+    const cloud: CloudRelationshipData = await getCloudRegistry().catch(() => ({}));
+    const filteredMatches = (cloud.matches || []).filter(
+      (m) =>
+        !(
+          (m.userAId === senderId && m.userBId === targetUserId) ||
+          (m.userAId === targetUserId && m.userBId === senderId)
+        )
+    );
+    filteredMatches.push({
+      userAId: match.userAId,
+      userBId: match.userBId,
+      status: finalStatus,
+      createdAt: Date.now(),
+    });
+    await saveCloudRegistry({ matches: filteredMatches }).catch(() => {});
+  } catch {}
 
   return { status: finalStatus, match };
 }
