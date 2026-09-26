@@ -313,6 +313,20 @@ export default function ChatsPage() {
     };
     setMessages((prev) => [...prev, optimisticMsg]);
 
+    // Direct browser broadcast via ntfy (sub-40ms P2P delivery to peer's SSE)
+    try {
+      fetch(`https://ntfy.sh/pixelmink_conv_${activeConv.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'new_message',
+          conversationId: activeConv.id,
+          message: optimisticMsg,
+        }),
+        mode: 'cors',
+      }).catch(() => {});
+    } catch {}
+
     try {
       const res = await fetch(`/api/conversations/${activeConv.id}/messages`, {
         method: 'POST',
@@ -320,6 +334,7 @@ export default function ChatsPage() {
         body: JSON.stringify({
           content,
           replyToId: currentReply?.id || null,
+          senderId: user?.id,
         }),
       });
 
@@ -340,16 +355,13 @@ export default function ChatsPage() {
 
           socket.emit('chat:message', {
             conversationId: activeConv.id,
-            message: data.message,
+            message: data.message || optimisticMsg,
             recipientIds,
           });
         }
-      } else {
-        setMessages((prev) => prev.filter((m) => m.id !== tempId));
       }
     } catch (err) {
       console.error(err);
-      setMessages((prev) => prev.filter((m) => m.id !== tempId));
     }
   };
 

@@ -22,6 +22,8 @@ interface SharedCallTerminalProps {
   socket: any;
   currentUser: any;
   partnerName: string;
+  isMentor?: boolean;
+  mySenderId?: string;
   onClose: () => void;
 }
 
@@ -142,6 +144,8 @@ export default function SharedCallTerminal({
   socket,
   currentUser,
   partnerName,
+  isMentor,
+  mySenderId,
   onClose,
 }: SharedCallTerminalProps) {
   const [language, setLanguage] = useState('python');
@@ -155,13 +159,24 @@ export default function SharedCallTerminal({
   const [lastEditor, setLastEditor] = useState<string>('');
   const [mobileTab, setMobileTab] = useState<'editor' | 'console'>('editor');
 
+  const canEdit = isMentor !== false;
   const isLocalChange = useRef(false);
+
+  const localSenderIdRef = useRef<string>(mySenderId || currentUser?.id || '');
+  useEffect(() => {
+    if (mySenderId) {
+      localSenderIdRef.current = mySenderId;
+    } else if (!localSenderIdRef.current) {
+      localSenderIdRef.current = currentUser?.id || 'sender_' + Math.random().toString(36).substring(2, 9);
+    }
+  }, [mySenderId, currentUser?.id]);
 
   // Dual channel sync: Socket.io + ntfy SSE fallback for live cloud coding
   useEffect(() => {
     // 1. Socket.io listeners
     if (socket) {
-      socket.on('call:terminal_sync', (data: { code: string; language: string; byUserName?: string }) => {
+      socket.on('call:terminal_sync', (data: { code: string; language: string; byUserName?: string; senderId?: string }) => {
+        if (data.senderId && localSenderIdRef.current && data.senderId === localSenderIdRef.current) return;
         isLocalChange.current = true;
         if (data.code !== undefined) setCode(data.code);
         if (data.language && data.language !== language) setLanguage(data.language);
@@ -200,7 +215,8 @@ export default function SharedCallTerminal({
         try {
           const raw = JSON.parse(event.data);
           const data = typeof raw.message === 'string' ? JSON.parse(raw.message) : raw;
-          if (!data || data.senderId === currentUser?.id) return;
+          if (!data) return;
+          if (localSenderIdRef.current && data.senderId === localSenderIdRef.current) return;
 
           if (data.type === 'sync') {
             isLocalChange.current = true;
@@ -237,7 +253,7 @@ export default function SharedCallTerminal({
         eventSource.close();
       }
     };
-  }, [socket, language, onClose, roomId, currentUser?.id]);
+  }, [socket, language, onClose, roomId]);
 
   const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
   const termTopic = `pixelmink_term_${cleanRoomId}`;
@@ -247,7 +263,7 @@ export default function SharedCallTerminal({
       fetch(`https://ntfy.sh/${termTopic}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, senderId: currentUser?.id }),
+        body: JSON.stringify({ ...payload, senderId: localSenderIdRef.current || currentUser?.id }),
       }).catch(() => {});
     } catch {}
   }, [termTopic, currentUser?.id]);
@@ -256,6 +272,7 @@ export default function SharedCallTerminal({
   const syncTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleCodeChange = (newCode: string) => {
+    if (!canEdit) return;
     setCode(newCode);
     if (!isLocalChange.current) {
       const myName = currentUser?.profile?.name || currentUser?.email?.split('@')[0] || 'Peer';
@@ -265,6 +282,7 @@ export default function SharedCallTerminal({
           code: newCode,
           language,
           byUserName: myName,
+          senderId: localSenderIdRef.current,
         });
       }
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
@@ -275,12 +293,13 @@ export default function SharedCallTerminal({
           language,
           byUserName: myName,
         });
-      }, 100);
+      }, 80);
     }
   };
 
   // Language switch
   const handleLanguageChange = (newLang: string) => {
+    if (!canEdit) return;
     setLanguage(newLang);
     const newCode = TEMPLATES[newLang] || `// ${newLang} Environment\n`;
     setCode(newCode);
@@ -291,6 +310,7 @@ export default function SharedCallTerminal({
         code: newCode,
         language: newLang,
         byUserName: myName,
+        senderId: localSenderIdRef.current,
       });
     }
     publishToCloudTerm({
@@ -303,7 +323,7 @@ export default function SharedCallTerminal({
 
   // Execute Code
   const handleRunCode = async () => {
-    if (isRunning) return;
+    if (!canEdit || isRunning) return;
     setIsRunning(true);
     setStdout('');
     setStderr('');
@@ -375,6 +395,7 @@ export default function SharedCallTerminal({
 
   // Keyboard shortcut Ctrl+Enter to Run
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!canEdit) return;
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       handleRunCode();
@@ -410,8 +431,11 @@ export default function SharedCallTerminal({
           {/* Language Selector Dropdown */}
           <select
             value={language}
+            disabled={!canEdit}
             onChange={(e) => handleLanguageChange(e.target.value)}
-            className="bg-[#181822] border border-white/[0.12] text-xs font-mono text-white rounded-lg px-2 py-1 outline-none focus:border-blue-500 cursor-pointer max-w-[120px] sm:max-w-none"
+            className={`bg-[#181822] border border-white/[0.12] text-xs font-mono text-white rounded-lg px-2 py-1 outline-none focus:border-blue-500 max-w-[120px] sm:max-w-none ${
+              !canEdit ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
+            }`}
           >
             {LANGUAGES.map((lang) => (
               <option key={lang.id} value={lang.id} className="bg-[#121218] text-white">
@@ -465,15 +489,18 @@ export default function SharedCallTerminal({
           {/* Run Code Button */}
           <button
             onClick={handleRunCode}
-            disabled={isRunning}
+            disabled={isRunning || !canEdit}
+            title={!canEdit ? 'Только ментор может запускать компилятор' : 'Запустить код (Ctrl+Enter)'}
             className={`px-3 sm:px-4 py-1.5 rounded-lg font-mono text-xs font-bold transition-all flex items-center gap-1.5 shadow-md ${
-              isRunning
+              !canEdit
+                ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5'
+                : isRunning
                 ? 'bg-amber-600 text-white cursor-wait'
                 : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 tap-active'
             }`}
           >
             <Play className={`w-3.5 h-3.5 fill-current ${isRunning ? 'animate-spin' : ''}`} />
-            <span>{isRunning ? 'Running...' : 'Run'}</span>
+            <span>{isRunning ? 'Running...' : canEdit ? 'Run' : 'Mentor Only'}</span>
           </button>
 
           {/* Close Terminal Button */}
@@ -486,6 +513,39 @@ export default function SharedCallTerminal({
           </button>
         </div>
       </div>
+
+      {/* Mentor / Student Status Banner */}
+      {isMentor !== undefined && (
+        <div
+          className={`px-3 py-1.5 border-b font-mono text-[11px] flex items-center justify-between shrink-0 select-none ${
+            canEdit
+              ? 'bg-blue-500/10 border-blue-500/20 text-blue-300'
+              : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-xs">{canEdit ? '🎓' : '🎧'}</span>
+            <span>
+              {canEdit ? (
+                <>
+                  <strong className="font-semibold text-white">Режим ментора:</strong> Вы пишете код и управляете запуском компилятора.
+                </>
+              ) : (
+                <>
+                  <strong className="font-semibold text-white">Режим ученика:</strong> Просмотр в реальном времени. Только ментор может писать и запускать код.
+                </>
+              )}
+            </span>
+          </div>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+              canEdit ? 'bg-blue-500/20 text-blue-300' : 'bg-amber-500/20 text-amber-400'
+            }`}
+          >
+            {canEdit ? 'Трансляция' : 'Только чтение'}
+          </span>
+        </div>
+      )}
 
       {/* Editor & Console Split Body */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
@@ -507,11 +567,18 @@ export default function SharedCallTerminal({
             value={code}
             onChange={(e) => handleCodeChange(e.target.value)}
             onKeyDown={handleKeyDown}
+            readOnly={!canEdit}
             spellCheck={false}
             autoCapitalize="off"
             autoComplete="off"
-            placeholder="Type code here... Synchronized in real-time between both peers."
-            className="flex-1 bg-transparent p-2.5 sm:p-3 text-xs sm:text-sm font-mono text-zinc-100 placeholder-zinc-600 outline-none resize-none leading-6 overflow-y-auto selection:bg-blue-600/30"
+            placeholder={
+              !canEdit
+                ? 'Режим ученика: здесь отображается код ментора в реальном времени...'
+                : 'Пишите код здесь... Синхронизируется в реальном времени.'
+            }
+            className={`flex-1 bg-transparent p-2.5 sm:p-3 text-xs sm:text-sm font-mono text-zinc-100 placeholder-zinc-600 outline-none resize-none leading-6 overflow-y-auto selection:bg-blue-600/30 ${
+              !canEdit ? 'cursor-default' : ''
+            }`}
           />
         </div>
 

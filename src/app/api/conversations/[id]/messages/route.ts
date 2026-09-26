@@ -30,8 +30,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const conversationId = params.id;
+    const body = await req.json();
+    const { content, messageType = 'TEXT', replyToId, senderId: bodySenderId } = body;
+
     const user = await getSessionUser(req);
-    let senderId = user?.id;
+    let senderId = user?.id || bodySenderId;
     if (!senderId) {
       const demo = await prisma.user.findFirst({ where: { email: 'alex@xchange.dev' } });
       senderId = demo?.id;
@@ -41,20 +44,39 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: 'User required' }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { content, messageType = 'TEXT', replyToId } = body;
-
     if (!content || !content.trim()) {
       return NextResponse.json({ error: 'Message content cannot be empty' }, { status: 400 });
     }
 
-    // Verify conversation members are not blocked
-    const conv = await prisma.conversation.findUnique({
+    // Auto-heal: Ensure conversation exists in DB before inserting message
+    let conv = await prisma.conversation.findUnique({
       where: { id: conversationId },
       include: { members: true },
     });
+
+    if (!conv) {
+      try {
+        conv = await prisma.conversation.create({
+          data: {
+            id: conversationId,
+            isGroup: false,
+            members: {
+              create: [{ userId: senderId }],
+            },
+          },
+          include: { members: true },
+        });
+      } catch {
+        conv = await prisma.conversation.findUnique({
+          where: { id: conversationId },
+          include: { members: true },
+        });
+      }
+    }
+
+    // Verify conversation members are not blocked
     if (conv && !conv.isGroup) {
-      const otherMember = conv.members.find((m) => m.userId !== senderId);
+      const otherMember = conv.members?.find((m) => m.userId !== senderId);
       if (otherMember) {
         if (await isUserBlocked(senderId, otherMember.userId)) {
           return NextResponse.json({ error: 'Пользователь заблокирован' }, { status: 403 });

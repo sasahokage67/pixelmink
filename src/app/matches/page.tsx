@@ -99,14 +99,35 @@ export default function MatchesPage() {
 
   const [connectedUsers, setConnectedUsers] = useState<any[]>([]);
 
+  const getPersistedMatches = (): string[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem('pixelmink_connected_matches');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const persistMatches = (ids: string[]) => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('pixelmink_connected_matches', JSON.stringify(ids));
+    } catch {}
+  };
+
   const loadMatches = async () => {
     try {
       setLoading(true);
       const res = await fetch('/api/matches');
+      const localMatches = getPersistedMatches();
       if (res.ok) {
         const data = await res.json();
         setMatches(data.matches || []);
-        if (data.connectedUserIds) setConnectedUserIds(data.connectedUserIds);
+        const mergedConnected = Array.from(new Set([...(data.connectedUserIds || []), ...localMatches]));
+        setConnectedUserIds(mergedConnected);
+        persistMatches(mergedConnected);
+
         if (data.connectedUsers) setConnectedUsers(data.connectedUsers);
         if (data.pendingSentIds) setPendingSentIds(data.pendingSentIds);
         if (data.pendingReceived) setPendingReceived(data.pendingReceived);
@@ -119,9 +140,15 @@ export default function MatchesPage() {
             setIsModalOpen(true);
           }
         }
+      } else {
+        if (localMatches.length > 0) {
+          setConnectedUserIds(localMatches);
+        }
       }
     } catch (err) {
       console.error(err);
+      const localMatches = getPersistedMatches();
+      if (localMatches.length > 0) setConnectedUserIds(localMatches);
     } finally {
       setLoading(false);
     }
@@ -221,7 +248,9 @@ export default function MatchesPage() {
           if (acceptedObj) {
             setConnectedUsers((prev) => [...prev, acceptedObj]);
           }
-          setConnectedUserIds((prev) => Array.from(new Set([...prev, targetUserId])));
+          const next = Array.from(new Set([...connectedUserIds, targetUserId]));
+          setConnectedUserIds(next);
+          persistMatches(next);
           setPendingSentIds((prev) => prev.filter((id) => id !== targetUserId));
           setPendingReceived((prev) => prev.filter((p) => (p.user?.id || p.id) !== targetUserId));
           setMatchAlert('✓ Взаимный мэтч подтвержден! Инженер добавлен в «Мои мэтчи» и в список чатов.');
@@ -275,7 +304,9 @@ export default function MatchesPage() {
       return;
     }
     // Optimistically unlock
-    setConnectedUserIds((prev) => Array.from(new Set([...prev, targetUserId])));
+    const next = Array.from(new Set([...connectedUserIds, targetUserId]));
+    setConnectedUserIds(next);
+    persistMatches(next);
 
     try {
       const res = await fetch('/api/conversations', {

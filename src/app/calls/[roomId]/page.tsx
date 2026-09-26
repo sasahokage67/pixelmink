@@ -169,6 +169,7 @@ export default function CallRoomPage() {
   const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
   const screenTrackRef = useRef<MediaStreamTrack | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
   const pendingCandidatesRef = useRef<{ [peerId: string]: RTCIceCandidateInit[] }>({});
 
   // Flush queued candidates once remote description is set
@@ -296,7 +297,7 @@ export default function CallRoomPage() {
       }
 
       const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: newDeviceId } },
+        video: { deviceId: { ideal: newDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
       const newVideoTrack = newStream.getVideoTracks()[0];
@@ -361,12 +362,28 @@ export default function CallRoomPage() {
             setSelectedCameraId(preferredId);
           }
 
-          const videoConstraints: any = preferredId ? { deviceId: { exact: preferredId } } : true;
+          const videoConstraints: MediaTrackConstraints = preferredId
+            ? { deviceId: { ideal: preferredId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+            : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
 
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: videoConstraints,
-            audio: true,
-          });
+          let stream: MediaStream;
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: videoConstraints,
+              audio: true,
+            });
+          } catch (camErr) {
+            console.warn('Preferred camera constraint failed, retrying with basic video: true', camErr);
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true,
+              });
+            } catch (anyCamErr) {
+              console.warn('All video attempts failed, falling back to audio only', anyCamErr);
+              throw anyCamErr;
+            }
+          }
           activeStream = stream;
           mediaStreamRef.current = stream;
           setMediaStream(stream);
@@ -519,6 +536,17 @@ export default function CallRoomPage() {
       });
     }
 
+    // Ensure transceivers exist so SDP offer/answer always negotiates video & audio
+    try {
+      const currentSenders = pc.getSenders();
+      if (!currentSenders.some((s) => s.track?.kind === 'video')) {
+        pc.addTransceiver('video', { direction: 'sendrecv' });
+      }
+      if (!currentSenders.some((s) => s.track?.kind === 'audio')) {
+        pc.addTransceiver('audio', { direction: 'sendrecv' });
+      }
+    } catch {}
+
     // ICE Candidate handler with robust JSON serialization
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -540,11 +568,21 @@ export default function CallRoomPage() {
 
     // Remote Track handler
     pc.ontrack = (event) => {
-      const incomingStream = event.streams && event.streams[0] ? event.streams[0] : new MediaStream([event.track]);
-      setRemoteStream(incomingStream);
+      let incomingStream = event.streams && event.streams[0] ? event.streams[0] : null;
+      if (!incomingStream) {
+        if (!remoteStreamRef.current) {
+          remoteStreamRef.current = new MediaStream();
+        }
+        if (!remoteStreamRef.current.getTracks().some((t) => t.id === event.track.id)) {
+          remoteStreamRef.current.addTrack(event.track);
+        }
+        incomingStream = remoteStreamRef.current;
+      }
+      const freshStream = new MediaStream(incomingStream.getTracks());
+      setRemoteStream(freshStream);
       setIsPeerConnected(true);
       if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = incomingStream;
+        remoteVideoRef.current.srcObject = freshStream;
         remoteVideoRef.current.play().catch(() => {});
       }
     };
@@ -989,17 +1027,46 @@ export default function CallRoomPage() {
   };
 
   // Toggle Camera
-  const toggleCam = () => {
+  const toggleCam = async () => {
     if (mediaStream) {
       const vTrack = mediaStream.getVideoTracks()[0];
       if (vTrack) {
         vTrack.enabled = !vTrack.enabled;
         setIsCamOff(!vTrack.enabled);
-      } else {
-        setIsCamOff(!isCamOff);
+        return;
       }
-    } else {
-      setIsCamOff(!isCamOff);
+    }
+    // If no video track exists, attempt to request physical camera
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: selectedCameraId ? { deviceId: { ideal: selectedCameraId } } : true,
+        audio: false,
+      });
+      const newVTrack = newStream.getVideoTracks()[0];
+      if (newVTrack) {
+        cameraTrackRef.current = newVTrack;
+        if (mediaStream) {
+          mediaStream.addTrack(newVTrack);
+        } else {
+          setMediaStream(newStream);
+          mediaStreamRef.current = newStream;
+        }
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = mediaStream || newStream;
+        }
+        if (peerConnectionRef.current) {
+          const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === 'video');
+          if (sender) {
+            await sender.replaceTrack(newVTrack);
+          } else {
+            peerConnectionRef.current.addTrack(newVTrack, mediaStream || newStream);
+          }
+        }
+        setIsCamOff(false);
+      }
+    } catch (e) {
+      console.warn('Failed to start camera on toggle:', e);
+      setIsCamOff(true);
     }
   };
 
@@ -1423,6 +1490,8 @@ export default function CallRoomPage() {
               socket={socket}
               currentUser={user}
               partnerName={remotePeerName || 'Собеседник'}
+              isMentor={isLocalMentor}
+              mySenderId={myPeerIdRef.current || user?.id}
               onClose={() => {
                 if (socket) socket.emit('call:terminal_close', { roomId });
                 sendRoomSignalHttp({ type: 'terminal_closed' });
