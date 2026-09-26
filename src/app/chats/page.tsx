@@ -182,15 +182,15 @@ export default function ChatsPage() {
           const data = await res.json();
           if (data.messages) {
             setMessages((prev) => {
-              if (
-                data.messages.length !== prev.length ||
-                (data.messages.length > 0 &&
-                  prev.length > 0 &&
-                  data.messages[data.messages.length - 1].id !== prev[prev.length - 1].id)
-              ) {
-                return data.messages;
-              }
-              return prev;
+              const tempMsgs = prev.filter((m) => m.id && typeof m.id === 'string' && m.id.startsWith('temp_'));
+              if (tempMsgs.length === 0) return data.messages;
+              const merged = [...data.messages];
+              tempMsgs.forEach((t) => {
+                if (!merged.some((m) => m.content === t.content && Math.abs(new Date(m.createdAt).getTime() - new Date(t.createdAt).getTime()) < 5000)) {
+                  merged.push(t);
+                }
+              });
+              return merged;
             });
           }
         }
@@ -506,11 +506,25 @@ export default function ChatsPage() {
   const otherMember = activeConv?.members?.find((m: any) => m.userId !== user?.id)?.user;
   const isPeerOnline = otherMember ? onlineUsers.has(otherMember.id) : false;
 
-  const filteredConversations = conversations.filter((c) => {
-    const peer = c.members?.find((m: any) => m.userId !== user?.id)?.user;
-    const name = peer?.profile?.name || c.title || '';
-    return name.toLowerCase().includes(search.toLowerCase());
-  });
+  const filteredConversations = conversations
+    .reduce((acc: any[], c: any) => {
+      const peerId = c.members?.find((m: any) => m.userId !== user?.id)?.userId;
+      const exists = acc.some((existing: any) => {
+        if (existing.id === c.id) return true;
+        if (!c.isGroup && !existing.isGroup && peerId) {
+          const existingPeerId = existing.members?.find((m: any) => m.userId !== user?.id)?.userId;
+          return existingPeerId === peerId;
+        }
+        return false;
+      });
+      if (!exists) acc.push(c);
+      return acc;
+    }, [])
+    .filter((c) => {
+      const peer = c.members?.find((m: any) => m.userId !== user?.id)?.user;
+      const name = peer?.profile?.name || c.title || '';
+      return name.toLowerCase().includes(search.toLowerCase());
+    });
 
   return (
     <div className="h-[calc(100dvh-8rem)] md:h-[calc(100vh-8.5rem)] flex rounded-2xl border border-white/[0.08] bg-[#0c0c10] overflow-hidden">

@@ -617,7 +617,8 @@ export default function CallRoomPage() {
 
     peerConnectionRef.current = pc;
     return pc;
-  }, [mediaStream, socket, sendRoomSignalHttp, sendRoomSignal, effectiveUserName]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Ensure remote video auto-plays when remoteStream arrives
   useEffect(() => {
@@ -766,12 +767,13 @@ export default function CallRoomPage() {
       socket.off('call:terminal_declined');
       socket.off('call:terminal_closed');
 
-      if (peerConnectionRef.current) {
+      if (isCallFinished && peerConnectionRef.current) {
         peerConnectionRef.current.close();
         peerConnectionRef.current = null;
       }
     };
-  }, [socket, roomId, hasEnteredName, effectiveUserName, getOrCreatePeerConnection, remotePeerName, sendRoomSignal]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, roomId, hasEnteredName, isCallFinished]);
 
   // 3. WebRTC Signaling over HTTP Cloud Relay + ntfy SSE (Vercel cross-device instant sync)
   useEffect(() => {

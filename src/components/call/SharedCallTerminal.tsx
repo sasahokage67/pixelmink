@@ -216,7 +216,7 @@ export default function SharedCallTerminal({
           const raw = JSON.parse(event.data);
           const data = typeof raw.message === 'string' ? JSON.parse(raw.message) : raw;
           if (!data) return;
-          if (localSenderIdRef.current && data.senderId === localSenderIdRef.current) return;
+          if (data.senderId && localSenderIdRef.current && data.senderId === localSenderIdRef.current) return;
 
           if (data.type === 'sync') {
             isLocalChange.current = true;
