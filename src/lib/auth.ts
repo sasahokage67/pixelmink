@@ -9,6 +9,12 @@ export interface TokenPayload {
   userId: string;
   email: string;
   role: string;
+  name?: string;
+  bio?: string;
+  location?: string;
+  languages?: string;
+  teachSkills?: string[];
+  learnSkills?: string[];
 }
 
 export function signToken(payload: TokenPayload): string {
@@ -46,7 +52,7 @@ export async function getSessionUser(req: NextRequest) {
   const payload = verifyToken(token);
   if (!payload || !payload.userId) return null;
 
-  const user = await prisma.user.findUnique({
+  let user = await prisma.user.findUnique({
     where: { id: payload.userId },
     include: {
       profile: true,
@@ -55,6 +61,96 @@ export async function getSessionUser(req: NextRequest) {
       },
     },
   });
+
+  // Self-healing rehydration for Vercel ephemeral serverless containers
+  if (!user && payload.userId && payload.email) {
+    try {
+      const cleanName = payload.name || payload.email.split('@')[0];
+      user = await prisma.user.create({
+        data: {
+          id: payload.userId,
+          email: payload.email,
+          password: 'persisted_user_hash',
+          role: payload.role || 'USER',
+          profile: {
+            create: {
+              name: cleanName,
+              bio: payload.bio || 'Computer Science engineer & peer knowledge contributor',
+              location: payload.location || 'Remote',
+              languages: payload.languages || 'English, Russian',
+              xCredits: 5,
+            },
+          },
+        },
+        include: {
+          profile: true,
+          userSkills: {
+            include: { skill: true },
+          },
+        },
+      });
+
+      if (payload.teachSkills && payload.teachSkills.length > 0) {
+        for (const skillName of payload.teachSkills) {
+          let s = await prisma.skill.findFirst({ where: { name: skillName } });
+          if (!s) {
+            s = await prisma.skill.create({
+              data: {
+                name: skillName,
+                category: 'COMPUTER_SCIENCE',
+                description: `Skill: ${skillName}`,
+              },
+            });
+          }
+          await prisma.userSkill.create({
+            data: {
+              userId: user.id,
+              skillId: s.id,
+              type: 'TEACH',
+              level: 'INTERMEDIATE',
+              description: `Ready to teach ${skillName}`,
+            },
+          }).catch(() => {});
+        }
+      }
+
+      if (payload.learnSkills && payload.learnSkills.length > 0) {
+        for (const skillName of payload.learnSkills) {
+          let s = await prisma.skill.findFirst({ where: { name: skillName } });
+          if (!s) {
+            s = await prisma.skill.create({
+              data: {
+                name: skillName,
+                category: 'COMPUTER_SCIENCE',
+                description: `Skill: ${skillName}`,
+              },
+            });
+          }
+          await prisma.userSkill.create({
+            data: {
+              userId: user.id,
+              skillId: s.id,
+              type: 'LEARN',
+              level: 'BEGINNER',
+              learningGoal: `Learning ${skillName}`,
+            },
+          }).catch(() => {});
+        }
+      }
+
+      user = await prisma.user.findUnique({
+        where: { id: payload.userId },
+        include: {
+          profile: true,
+          userSkills: {
+            include: { skill: true },
+          },
+        },
+      });
+    } catch (rehydrateErr) {
+      console.warn('Rehydration skipped or handled:', rehydrateErr);
+    }
+  }
 
   return user;
 }

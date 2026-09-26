@@ -39,13 +39,40 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Intercept browser fetch to attach Authorization header if token exists in localStorage
+if (typeof window !== 'undefined' && !(window as any).__pixelmink_fetch_intercepted) {
+  (window as any).__pixelmink_fetch_intercepted = true;
+  const originalFetch = window.fetch;
+  window.fetch = async (...args) => {
+    let [resource, config] = args;
+    try {
+      const token = localStorage.getItem('pixelmink_token');
+      if (token) {
+        config = config || {};
+        const headers = new Headers(config.headers || {});
+        if (!headers.has('Authorization')) {
+          headers.set('Authorization', `Bearer ${token}`);
+        }
+        config.headers = headers;
+      }
+    } catch {}
+    return originalFetch(resource, config);
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchCurrentUser = async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const headers: Record<string, string> = {};
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('pixelmink_token');
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch('/api/auth/me', { headers });
       if (res.ok) {
         const data = await res.json();
         if (data.authenticated && data.user) {
@@ -75,6 +102,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const data = await res.json();
       if (res.ok && data.user) {
+        if (data.token && typeof window !== 'undefined') {
+          localStorage.setItem('pixelmink_token', data.token);
+        }
         setUser(data.user);
         return true;
       }
@@ -93,6 +123,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const data = await res.json();
       if (res.ok && data.user) {
+        if (data.token && typeof window !== 'undefined') {
+          localStorage.setItem('pixelmink_token', data.token);
+        }
         setUser(data.user);
         return { success: true };
       }
@@ -103,7 +136,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {}
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('pixelmink_token');
+      localStorage.removeItem('pixelmink_guest_name');
+    }
     setUser(null);
   };
 
@@ -115,11 +154,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshUser = async () => {
-    const res = await fetch('/api/auth/me');
-    if (res.ok) {
-      const data = await res.json();
-      if (data.authenticated) setUser(data.user);
-    }
+    try {
+      const headers: Record<string, string> = {};
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('pixelmink_token');
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch('/api/auth/me', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.authenticated) setUser(data.user);
+      }
+    } catch {}
   };
 
   return (

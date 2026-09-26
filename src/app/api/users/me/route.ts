@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getSessionUser } from '@/lib/auth';
+import { getSessionUser, signToken } from '@/lib/auth';
+
+export async function GET(req: NextRequest) {
+  try {
+    const user = await getSessionUser(req);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    return NextResponse.json({ success: true, user });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -23,7 +35,29 @@ export async function PATCH(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, profile: updatedProfile });
+    const teachSkills = user.userSkills?.filter((s) => s.type === 'TEACH').map((s) => s.skill.name) || [];
+    const learnSkills = user.userSkills?.filter((s) => s.type === 'LEARN').map((s) => s.skill.name) || [];
+
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      name: updatedProfile.name || user.profile?.name || '',
+      bio: updatedProfile.bio || '',
+      location: updatedProfile.location || 'Remote',
+      languages: updatedProfile.languages || 'English, Russian',
+      teachSkills,
+      learnSkills,
+    });
+
+    const response = NextResponse.json({ success: true, profile: updatedProfile, token });
+    response.cookies.set('token', token, {
+      httpOnly: false,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
+    return response;
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

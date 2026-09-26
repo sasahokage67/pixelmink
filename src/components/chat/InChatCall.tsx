@@ -77,8 +77,25 @@ export default function InChatCall({
     async function initMedia() {
       try {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          let preferredId = typeof window !== 'undefined' ? localStorage.getItem('pixelmink_preferred_cam_id') : null;
+          if (!preferredId && navigator.mediaDevices.enumerateDevices) {
+            try {
+              const devices = await navigator.mediaDevices.enumerateDevices();
+              const cams = devices.filter((d) => d.kind === 'videoinput');
+              const physicalCam = cams.find((c) => {
+                const lbl = (c.label || '').toLowerCase();
+                return !lbl.includes('vcam') && !lbl.includes('virtual') && !lbl.includes('obs');
+              });
+              if (physicalCam) preferredId = physicalCam.deviceId;
+            } catch {}
+          }
+
+          const videoConstraint: any = initialType === 'VIDEO'
+            ? (preferredId ? { deviceId: { exact: preferredId } } : true)
+            : false;
+
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: initialType === 'VIDEO',
+            video: videoConstraint,
             audio: true,
           });
           streamInstance = stream;

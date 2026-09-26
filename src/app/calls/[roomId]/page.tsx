@@ -24,6 +24,8 @@ import {
   User,
   AlertCircle,
   Terminal as TerminalIcon,
+  ChevronUp,
+  Camera,
 } from 'lucide-react';
 import Identicon from '@/components/ui/Identicon';
 import SharedCallTerminal from '@/components/call/SharedCallTerminal';
@@ -40,7 +42,7 @@ export default function CallRoomPage() {
   const params = useParams();
   const roomId = params.roomId as string;
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { socket } = useSocket();
   const { t, lang } = useLanguage();
 
@@ -53,6 +55,11 @@ export default function CallRoomPage() {
   const [isCamOff, setIsCamOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
+
+  // Camera devices
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
+  const [showCameraMenu, setShowCameraMenu] = useState(false);
 
   // Remote peer state
   const [remotePeerSocketId, setRemotePeerSocketId] = useState<string | null>(null);
@@ -84,8 +91,10 @@ export default function CallRoomPage() {
   // Effective username
   const effectiveUserName = user?.profile?.name || guestName || 'Peer';
 
-  // Check if we need guest prompt
+  // Check if we need guest prompt: authenticated users bypass immediately
   useEffect(() => {
+    if (authLoading) return;
+
     if (user?.profile?.name) {
       setHasEnteredName(true);
     } else {
@@ -95,7 +104,7 @@ export default function CallRoomPage() {
         setHasEnteredName(true);
       }
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   // Copy full invite link
   const handleCopyLink = () => {
@@ -104,6 +113,49 @@ export default function CallRoomPage() {
       navigator.clipboard.writeText(url);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 3000);
+    }
+  };
+
+  // Switch camera device dynamically
+  const handleSwitchCamera = async (newDeviceId: string) => {
+    try {
+      setShowCameraMenu(false);
+      setSelectedCameraId(newDeviceId);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pixelmink_preferred_cam_id', newDeviceId);
+      }
+
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: newDeviceId } },
+        audio: false,
+      });
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      if (!newVideoTrack) return;
+
+      if (cameraTrackRef.current) {
+        cameraTrackRef.current.stop();
+      }
+      cameraTrackRef.current = newVideoTrack;
+
+      if (mediaStream) {
+        const oldTrack = mediaStream.getVideoTracks()[0];
+        if (oldTrack) mediaStream.removeTrack(oldTrack);
+        mediaStream.addTrack(newVideoTrack);
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = mediaStream;
+        }
+      }
+
+      if (peerConnectionRef.current) {
+        const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === 'video');
+        if (sender) {
+          await sender.replaceTrack(newVideoTrack);
+        }
+      }
+
+      setIsCamOff(false);
+    } catch (err) {
+      console.error('Failed to switch camera:', err);
     }
   };
 
@@ -116,12 +168,44 @@ export default function CallRoomPage() {
     async function setupCamera() {
       try {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          // Discover video devices
+          let cams: MediaDeviceInfo[] = [];
+          try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            cams = devices.filter((d) => d.kind === 'videoinput');
+            setVideoDevices(cams);
+          } catch {}
+
+          let preferredId = typeof window !== 'undefined' ? localStorage.getItem('pixelmink_preferred_cam_id') : null;
+
+          // If no stored preference or stored device is missing, avoid virtual cam (VCam, OBS) if physical exists
+          if (!preferredId || !cams.some((c) => c.deviceId === preferredId)) {
+            const physicalCam = cams.find((c) => {
+              const lbl = (c.label || '').toLowerCase();
+              return !lbl.includes('vcam') && !lbl.includes('virtual') && !lbl.includes('obs');
+            });
+            preferredId = physicalCam?.deviceId || cams[0]?.deviceId || '';
+          }
+
+          if (preferredId) {
+            setSelectedCameraId(preferredId);
+          }
+
+          const videoConstraints: any = preferredId ? { deviceId: { exact: preferredId } } : true;
+
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
+            video: videoConstraints,
             audio: true,
           });
           activeStream = stream;
           setMediaStream(stream);
+
+          // Re-enumerate to get labeled devices if first enumerate was unlabeled
+          try {
+            const updatedDevices = await navigator.mediaDevices.enumerateDevices();
+            const updatedCams = updatedDevices.filter((d) => d.kind === 'videoinput');
+            setVideoDevices(updatedCams);
+          } catch {}
 
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
@@ -512,6 +596,18 @@ export default function CallRoomPage() {
     return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  // If auth is still checking, show clean connecting screen
+  if (authLoading) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col items-center justify-center space-y-4">
+        <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <span className="font-mono text-xs text-zinc-400">
+          Подключение к сессии WebRTC...
+        </span>
+      </div>
+    );
+  }
+
   // If friend opened the link without logging in, show quick name prompt
   if (!hasEnteredName) {
     return (
@@ -523,14 +619,10 @@ export default function CallRoomPage() {
 
           <div className="space-y-1.5">
             <h2 className="text-base font-bold text-white font-mono">
-              {lang === 'ru' ? 'Вход в видеокомнату' : lang === 'kz' ? 'Бейнебөлмеге кіру' : 'Join Call Room'}
+              Вход в видеокомнату
             </h2>
             <p className="text-xs font-mono text-zinc-400">
-              {lang === 'ru'
-                ? 'Введите ваше имя, чтобы ваш собеседник видел, кто подключился'
-                : lang === 'kz'
-                ? 'Сұхбаттасыңыз кім қосылғанын көруі үшін есіміңізді енгізіңіз'
-                : 'Enter your name to connect directly via WebRTC'}
+              Введите ваше имя, чтобы ваш собеседник видел, кто подключился
             </p>
           </div>
 
@@ -873,18 +965,74 @@ export default function CallRoomPage() {
             {isMicMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
           </button>
 
-          {/* Toggle Video */}
-          <button
-            onClick={toggleCam}
-            className={`p-3 rounded-full transition-all ${
-              isCamOff
-                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                : 'bg-white/10 hover:bg-white/20 text-white'
-            }`}
-            title={isCamOff ? 'Включить камеру' : 'Выключить камеру'}
-          >
-            {isCamOff ? <VideoOff className="w-4 h-4" /> : <VideoIcon className="w-4 h-4" />}
-          </button>
+          {/* Toggle Video & Device Selector */}
+          <div className="relative">
+            <div className="flex items-center">
+              <button
+                onClick={toggleCam}
+                className={`p-3 ${
+                  videoDevices.length > 0 ? 'rounded-l-full' : 'rounded-full'
+                } transition-all ${
+                  isCamOff
+                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                    : 'bg-white/10 hover:bg-white/20 text-white'
+                }`}
+                title={isCamOff ? 'Включить камеру' : 'Выключить камеру'}
+              >
+                {isCamOff ? <VideoOff className="w-4 h-4" /> : <VideoIcon className="w-4 h-4" />}
+              </button>
+
+              {videoDevices.length > 0 && (
+                <button
+                  onClick={() => setShowCameraMenu(!showCameraMenu)}
+                  className={`p-3 pr-2.5 pl-1.5 rounded-r-full border-l border-white/10 transition-all ${
+                    isCamOff
+                      ? 'bg-red-500/20 text-red-400 border-r border-t border-b border-red-500/30'
+                      : 'bg-white/10 hover:bg-white/20 text-zinc-300'
+                  }`}
+                  title="Выбрать физическую камеру / устройство"
+                >
+                  <ChevronUp className={`w-3.5 h-3.5 transition-transform ${showCameraMenu ? 'rotate-180' : ''}`} />
+                </button>
+              )}
+            </div>
+
+            {/* Camera Selection Popover */}
+            {showCameraMenu && videoDevices.length > 0 && (
+              <div className="absolute bottom-14 left-1/2 -translate-x-1/2 w-72 bg-[#121218] border border-white/15 rounded-xl shadow-2xl p-2 z-50 space-y-1 font-mono text-xs">
+                <div className="px-2 py-1 text-[10px] text-zinc-400 uppercase font-bold border-b border-white/10 flex items-center justify-between">
+                  <span>Выбор камеры</span>
+                  <span className="text-zinc-500">{videoDevices.length} найдено</span>
+                </div>
+                <div className="max-h-52 overflow-y-auto space-y-1 pt-1">
+                  {videoDevices.map((dev, idx) => {
+                    const isSelected = dev.deviceId === selectedCameraId;
+                    const label = dev.label || `Камера ${idx + 1}`;
+                    const isVirtual = label.toLowerCase().includes('vcam') || label.toLowerCase().includes('obs') || label.toLowerCase().includes('virtual');
+                    return (
+                      <button
+                        key={dev.deviceId || idx}
+                        onClick={() => handleSwitchCamera(dev.deviceId)}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between gap-2 transition-colors ${
+                          isSelected
+                            ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                            : 'hover:bg-white/5 text-zinc-300'
+                        }`}
+                      >
+                        <div className="truncate flex-1">
+                          <span className="block truncate">{label}</span>
+                          {isVirtual && (
+                            <span className="text-[9px] text-amber-400 font-mono">Виртуальная камера</span>
+                          )}
+                        </div>
+                        {isSelected && <Check className="w-3.5 h-3.5 shrink-0 text-blue-400" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Screen Share */}
           <button

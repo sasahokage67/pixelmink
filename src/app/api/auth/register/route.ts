@@ -183,7 +183,17 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const token = signToken({ userId: user.id, email: user.email, role: user.role });
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.profile?.name || cleanName,
+      bio: userBio,
+      location: user.profile?.location || 'Remote',
+      languages: user.profile?.languages || 'English',
+      teachSkills: teachList,
+      learnSkills: learnList,
+    });
 
     const response = NextResponse.json({
       success: true,

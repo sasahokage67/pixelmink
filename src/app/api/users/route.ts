@@ -16,6 +16,9 @@ export async function GET(req: NextRequest) {
 
     const currentUser = await getSessionUser(req);
 
+    const rawSearch = searchParams.get('search') || searchParams.get('nickname') || '';
+    const cleanSearch = rawSearch.trim().replace(/^@/, '');
+
     // Build filter conditions
     const where: any = {};
 
@@ -23,11 +26,14 @@ export async function GET(req: NextRequest) {
       where.id = { not: currentUser.id };
     }
 
-    if (search) {
+    if (cleanSearch) {
       where.OR = [
-        { profile: { name: { contains: search } } },
-        { profile: { bio: { contains: search } } },
-        { userSkills: { some: { skill: { name: { contains: search } } } } },
+        { profile: { name: { contains: cleanSearch } } },
+        { profile: { name: { contains: cleanSearch.toLowerCase() } } },
+        { profile: { name: { contains: cleanSearch.toUpperCase() } } },
+        { email: { contains: cleanSearch.toLowerCase() } },
+        { profile: { bio: { contains: cleanSearch } } },
+        { userSkills: { some: { skill: { name: { contains: cleanSearch } } } } },
       ];
     }
 
@@ -66,7 +72,7 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    const users = await prisma.user.findMany({
+    let users = await prisma.user.findMany({
       where,
       include: {
         profile: true,
@@ -79,6 +85,29 @@ export async function GET(req: NextRequest) {
       },
       take: 50,
     });
+
+    // Case-insensitive fallback if nothing found with Prisma contains
+    if (users.length === 0 && cleanSearch) {
+      const allCandidates = await prisma.user.findMany({
+        where: currentUser ? { id: { not: currentUser.id } } : {},
+        include: {
+          profile: true,
+          userSkills: {
+            include: { skill: true },
+          },
+        },
+        take: 100,
+      });
+
+      const q = cleanSearch.toLowerCase();
+      users = allCandidates.filter((u) => {
+        const uName = (u.profile?.name || '').toLowerCase();
+        const uEmail = (u.email || '').toLowerCase();
+        const uBio = (u.profile?.bio || '').toLowerCase();
+        const hasSkill = u.userSkills?.some((s) => (s.skill?.name || '').toLowerCase().includes(q));
+        return uName.includes(q) || uEmail.includes(q) || uBio.includes(q) || hasSkill;
+      });
+    }
 
     return NextResponse.json({ success: true, users });
   } catch (err: any) {

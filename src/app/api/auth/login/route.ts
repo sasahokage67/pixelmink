@@ -51,7 +51,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
-    const token = signToken({ userId: user.id, email: user.email, role: user.role });
+    const teachSkills = user.userSkills?.filter((s) => s.type === 'TEACH').map((s) => s.skill.name) || [];
+    const learnSkills = user.userSkills?.filter((s) => s.type === 'LEARN').map((s) => s.skill.name) || [];
+
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.profile?.name || user.email.split('@')[0],
+      bio: user.profile?.bio || '',
+      location: user.profile?.location || 'Remote',
+      languages: user.profile?.languages || 'English',
+      teachSkills,
+      learnSkills,
+    });
 
     const response = NextResponse.json({
       success: true,

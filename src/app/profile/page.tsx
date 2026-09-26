@@ -32,7 +32,7 @@ import Identicon from '@/components/ui/Identicon';
 function ProfileContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user: currentUser, refreshUser } = useAuth();
+  const { user: currentUser, loading: authLoading, refreshUser } = useAuth();
   const { socket } = useSocket();
   const { lang } = useLanguage();
 
@@ -62,6 +62,7 @@ function ProfileContent() {
   const [languages, setLanguages] = useState('');
   const [availability, setAvailability] = useState('');
   const [saveLoading, setSaveLoading] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Peer review / comment form state
   const [commentRating, setCommentRating] = useState(5);
@@ -74,23 +75,31 @@ function ProfileContent() {
   const [reviewError, setReviewError] = useState('');
 
   const fetchUserData = async () => {
-    if (!targetUserId) return;
     try {
       setLoading(true);
-      const res = await fetch(`/api/users/${targetUserId}`);
+      const url = isOwnProfile ? '/api/users/me' : `/api/users/${targetUserId}`;
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        setProfileData(data.user);
+        const userData = data.user || data;
+        setProfileData(userData);
         if (data.stats) {
           setStats(data.stats);
         }
         if (isOwnProfile) {
-          setName(data.user?.profile?.name || '');
-          setBio(data.user?.profile?.bio || '');
-          setLocation(data.user?.profile?.location || '');
-          setLanguages(data.user?.profile?.languages || '');
-          setAvailability(data.user?.profile?.availability || '');
+          setName(userData?.profile?.name || currentUser?.profile?.name || '');
+          setBio(userData?.profile?.bio || currentUser?.profile?.bio || '');
+          setLocation(userData?.profile?.location || currentUser?.profile?.location || '');
+          setLanguages(userData?.profile?.languages || currentUser?.profile?.languages || '');
+          setAvailability(userData?.profile?.availability || currentUser?.profile?.availability || '');
         }
+      } else if (isOwnProfile && currentUser) {
+        setProfileData(currentUser);
+        setName(currentUser?.profile?.name || '');
+        setBio(currentUser?.profile?.bio || '');
+        setLocation(currentUser?.profile?.location || '');
+        setLanguages(currentUser?.profile?.languages || '');
+        setAvailability(currentUser?.profile?.availability || '');
       }
 
       if (isOwnProfile) {
@@ -102,18 +111,27 @@ function ProfileContent() {
       }
     } catch (err) {
       console.error('Error fetching profile:', err);
+      if (isOwnProfile && currentUser) {
+        setProfileData(currentUser);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!currentUser && !queryUserId) {
+      router.push('/auth/login');
+      return;
+    }
     fetchUserData();
-  }, [targetUserId, isOwnProfile]);
+  }, [targetUserId, isOwnProfile, authLoading, currentUser]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveLoading(true);
+    setSaveSuccess(false);
     try {
       const res = await fetch('/api/users/me', {
         method: 'PATCH',
@@ -121,7 +139,13 @@ function ProfileContent() {
         body: JSON.stringify({ name, bio, location, languages, availability }),
       });
       if (res.ok) {
+        const data = await res.json();
+        if (data.token && typeof window !== 'undefined') {
+          localStorage.setItem('pixelmink_token', data.token);
+        }
         setIsEditing(false);
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3500);
         await refreshUser();
         await fetchUserData();
       }
@@ -202,18 +226,21 @@ function ProfileContent() {
     router.push(`/calls/${roomId}`);
   };
 
-  const p = profileData?.profile;
-  const teaches = profileData?.userSkills?.filter((s: any) => s.type === 'TEACH') || [];
-  const learns = profileData?.userSkills?.filter((s: any) => s.type === 'LEARN') || [];
+  const p = profileData?.profile || (isOwnProfile ? currentUser?.profile : null);
+  const allSkills = (profileData?.userSkills && profileData.userSkills.length > 0)
+    ? profileData.userSkills
+    : ((isOwnProfile ? currentUser?.userSkills : []) || []);
+  const teaches = allSkills.filter((s: any) => s.type === 'TEACH');
+  const learns = allSkills.filter((s: any) => s.type === 'LEARN');
   const reviews = profileData?.reviewsReceived || [];
   const achievements = profileData?.achievements || [];
 
-  if (loading && !profileData) {
+  if (loading && !profileData && !currentUser) {
     return (
       <div className="max-w-4xl mx-auto py-16 flex flex-col items-center justify-center space-y-4">
         <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
         <span className="font-mono text-xs text-zinc-400">
-          {lang === 'ru' ? 'Загрузка личного кабинета...' : lang === 'kz' ? 'Жеке кабинет жүктелуде...' : 'Loading profile...'}
+          Загрузка личного кабинета...
         </span>
       </div>
     );
@@ -221,6 +248,13 @@ function ProfileContent() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in py-2">
+      {saveSuccess && (
+        <div className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-xs flex items-center justify-between animate-in fade-in">
+          <span>✓ Профиль и параметры обмена успешно сохранены</span>
+          <span className="text-[10px] text-zinc-500">Автосинхронизация активна</span>
+        </div>
+      )}
+
       {/* Profile Header Hero Card */}
       <div className="drinkit-card p-6 md:p-8 space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
@@ -482,19 +516,23 @@ function ProfileContent() {
           </div>
           <div className="flex flex-wrap gap-2">
             {teaches.length > 0 ? (
-              teaches.map((ts: any) => (
-                <span
-                  key={ts.id}
-                  className="font-mono text-xs px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
-                >
-                  {ts.skill?.name || 'Skill'} ({ts.level})
-                </span>
-              ))
+              teaches.map((ts: any, idx: number) => {
+                const sName = ts.skill?.name || ts.name || (typeof ts === 'string' ? ts : 'Skill');
+                const level = ts.level ? ` (${ts.level})` : '';
+                return (
+                  <span
+                    key={ts.id || idx}
+                    className="font-mono text-xs px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
+                  >
+                    {sName}{level}
+                  </span>
+                );
+              })
             ) : (
               <span className="text-xs font-mono text-zinc-500">
                 {isOwnProfile
-                  ? (lang === 'ru' ? 'Добавьте свои навыки в разделе «My Skills»' : 'Add skills in My Skills tab')
-                  : (lang === 'ru' ? 'Навыки пока не указаны' : 'No skills declared yet')}
+                  ? 'Добавьте свои навыки в разделе «My Skills»'
+                  : 'Навыки пока не указаны'}
               </span>
             )}
           </div>
@@ -504,25 +542,28 @@ function ProfileContent() {
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-              {lang === 'ru' ? 'Навыки, которые изучаю' : lang === 'kz' ? 'Үйренгім келетін дағдылар' : 'Skills I Want To Learn'}
+              Навыки, которые изучаю
             </h2>
             <span className="font-mono text-xs text-zinc-500">{learns.length}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {learns.length > 0 ? (
-              learns.map((ls: any) => (
-                <span
-                  key={ls.id}
-                  className="font-mono text-xs px-3 py-1 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20"
-                >
-                  {ls.skill?.name || 'Skill'}
-                </span>
-              ))
+              learns.map((ls: any, idx: number) => {
+                const sName = ls.skill?.name || ls.name || (typeof ls === 'string' ? ls : 'Skill');
+                return (
+                  <span
+                    key={ls.id || idx}
+                    className="font-mono text-xs px-3 py-1 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20"
+                  >
+                    {sName}
+                  </span>
+                );
+              })
             ) : (
               <span className="text-xs font-mono text-zinc-500">
                 {isOwnProfile
-                  ? (lang === 'ru' ? 'Укажите желаемые навыки для подбора пар' : 'Add target skills for barter matches')
-                  : (lang === 'ru' ? 'Цели пока не указаны' : 'No learning targets declared')}
+                  ? 'Укажите желаемые навыки для подбора пар'
+                  : 'Цели пока не указаны'}
               </span>
             )}
           </div>
