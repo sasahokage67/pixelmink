@@ -29,7 +29,7 @@ const CACHE_TTL_MS = 3000;
  */
 export async function pushPeerToCloud(peer: CloudPeer): Promise<void> {
   try {
-    const res = await fetch(SYNC_API_URL, { cache: 'no-store' });
+    const res = await fetch(SYNC_API_URL, { cache: 'no-store', signal: AbortSignal.timeout(400) });
     if (!res.ok) return;
 
     const json = await res.json();
@@ -51,6 +51,7 @@ export async function pushPeerToCloud(peer: CloudPeer): Promise<void> {
     await fetch(SYNC_API_URL, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(400),
       body: JSON.stringify({
         name: 'pixelmink_global_peers_v1',
         data: {
@@ -61,7 +62,7 @@ export async function pushPeerToCloud(peer: CloudPeer): Promise<void> {
       }),
     });
   } catch (err) {
-    console.warn('Cloud sync push failed (non-critical):', err);
+    // Non-critical, ignore timeout or 429
   }
 }
 
@@ -76,7 +77,7 @@ export async function syncPeersFromCloud(force = false): Promise<CloudPeer[]> {
     }
     lastSyncTimestamp = now;
 
-    const res = await fetch(SYNC_API_URL, { cache: 'no-store' });
+    const res = await fetch(SYNC_API_URL, { cache: 'no-store', signal: AbortSignal.timeout(400) });
     if (!res.ok) return cachedCloudPeers;
 
     const json = await res.json();

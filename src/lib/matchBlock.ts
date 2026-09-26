@@ -1,8 +1,5 @@
 import prisma from './prisma';
 
-const CLOUD_SIGNALING_ID = 'ff808181a09d98f701a0ddbb49c91d6c';
-const CLOUD_SIGNALING_URL = `https://api.restful-api.dev/objects/${CLOUD_SIGNALING_ID}`;
-
 export interface CloudRelationshipData {
   activeCalls?: any[];
   roomSignals?: Record<string, any[]>;
@@ -10,34 +7,21 @@ export interface CloudRelationshipData {
   blocks?: Array<{ blockerId: string; blockedId: string; createdAt: number }>;
 }
 
+// In-memory relationship cache for instant responsiveness
+let inMemoryCloudData: CloudRelationshipData = {
+  matches: [],
+  blocks: [],
+};
+
 export async function getCloudRegistry(): Promise<CloudRelationshipData> {
-  try {
-    const res = await fetch(CLOUD_SIGNALING_URL, { cache: 'no-store' });
-    if (!res.ok) return {};
-    const json = await res.json();
-    return json.data || {};
-  } catch {
-    return {};
-  }
+  return inMemoryCloudData;
 }
 
 export async function saveCloudRegistry(data: Partial<CloudRelationshipData>): Promise<void> {
-  try {
-    const existing = await getCloudRegistry();
-    await fetch(CLOUD_SIGNALING_URL, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'pixelmink_calls_signaling_v1',
-        data: {
-          ...existing,
-          ...data,
-        },
-      }),
-    });
-  } catch (err) {
-    console.warn('saveCloudRegistry error:', err);
-  }
+  inMemoryCloudData = {
+    ...inMemoryCloudData,
+    ...data,
+  };
 }
 
 /**
@@ -272,6 +256,16 @@ export async function handleMatchRequest(
   targetUserId: string,
   action?: 'request' | 'accept' | 'decline'
 ): Promise<{ status: string; match: any }> {
+  // Defensive check: if targetUserId passed was actually a match record ID
+  if (targetUserId) {
+    try {
+      const matchRecord = await prisma.match.findUnique({ where: { id: targetUserId } });
+      if (matchRecord) {
+        targetUserId = matchRecord.userAId === senderId ? matchRecord.userBId : matchRecord.userAId;
+      }
+    } catch {}
+  }
+
   // If blocked, cannot match
   if (await isUserBlocked(senderId, targetUserId)) {
     throw new Error('Невозможно установить мэтч с заблокированным пользователем');

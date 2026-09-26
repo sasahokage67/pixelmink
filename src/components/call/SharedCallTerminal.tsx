@@ -153,6 +153,7 @@ export default function SharedCallTerminal({
   const [runtimeLabel, setRuntimeLabel] = useState<string>('');
   const [isCopied, setIsCopied] = useState(false);
   const [lastEditor, setLastEditor] = useState<string>('');
+  const [mobileTab, setMobileTab] = useState<'editor' | 'console'>('editor');
 
   const isLocalChange = useRef(false);
 
@@ -306,6 +307,7 @@ export default function SharedCallTerminal({
     setIsRunning(true);
     setStdout('');
     setStderr('');
+    setMobileTab('console');
 
     if (socket) {
       socket.emit('call:terminal_executing', { roomId });
@@ -422,6 +424,32 @@ export default function SharedCallTerminal({
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>Синхронизировано с {partnerName || 'собеседником'}</span>
           </span>
+
+          {/* Mobile Tab Switcher */}
+          <div className="md:hidden flex bg-[#161622] rounded-lg p-0.5 border border-white/10 shrink-0">
+            <button
+              type="button"
+              onClick={() => setMobileTab('editor')}
+              className={`px-2 py-1 rounded text-[10px] font-mono font-bold transition-all ${
+                mobileTab === 'editor'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              Код
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileTab('console')}
+              className={`px-2 py-1 rounded text-[10px] font-mono font-bold transition-all ${
+                mobileTab === 'console'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              Консоль
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -462,7 +490,11 @@ export default function SharedCallTerminal({
       {/* Editor & Console Split Body */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
         {/* Code Editor Pane (60%) */}
-        <div className="flex-1 flex bg-[#0c0c12] overflow-hidden border-b md:border-b-0 md:border-r border-white/[0.08] min-h-[140px]">
+        <div
+          className={`flex-1 bg-[#0c0c12] overflow-hidden border-b md:border-b-0 md:border-r border-white/[0.08] min-h-0 ${
+            mobileTab === 'editor' ? 'flex' : 'hidden md:flex'
+          }`}
+        >
           {/* Line Numbers Gutter */}
           <div className="w-10 sm:w-12 py-3 bg-[#0a0a0e] text-zinc-600 font-mono text-xs text-right pr-2 sm:pr-3 select-none overflow-hidden shrink-0 leading-6 border-r border-white/[0.04]">
             {linesArray.map((n) => (
@@ -483,8 +515,12 @@ export default function SharedCallTerminal({
           />
         </div>
 
-        {/* Terminal Output Console Pane (Mobile: bottom fixed height, Desktop: side column) */}
-        <div className="w-full md:w-96 flex flex-col bg-[#07070a] overflow-hidden shrink-0 select-text h-44 sm:h-52 md:h-full">
+        {/* Terminal Output Console Pane (Mobile: full when tab active, Desktop: side column) */}
+        <div
+          className={`w-full md:w-96 bg-[#07070a] overflow-hidden shrink-0 select-text h-full ${
+            mobileTab === 'console' ? 'flex flex-col flex-1' : 'hidden md:flex md:flex-col'
+          }`}
+        >
           {/* Terminal Console Header */}
           <div className="px-3.5 py-2 bg-[#0e0e14] border-b border-white/[0.06] flex items-center justify-between text-xs font-mono text-zinc-400 shrink-0">
             <div className="flex items-center gap-2">

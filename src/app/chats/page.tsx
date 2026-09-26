@@ -33,6 +33,7 @@ export default function ChatsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const paramConvId = searchParams.get('convId');
+  const paramUserId = searchParams.get('userId');
   const { user } = useAuth();
   const { socket, onlineUsers } = useSocket();
 
@@ -101,7 +102,40 @@ export default function ChatsPage() {
 
         if (paramConvId) {
           const match = convList.find((c: any) => c.id === paramConvId);
-          if (match) setActiveConv(match);
+          if (match) {
+            setActiveConv(match);
+          } else {
+            try {
+              const directRes = await fetch(`/api/conversations/${paramConvId}`);
+              if (directRes.ok) {
+                const directData = await directRes.json();
+                if (directData.conversation) {
+                  setConversations((prev) => [directData.conversation, ...prev.filter((c) => c.id !== paramConvId)]);
+                  setActiveConv(directData.conversation);
+                }
+              }
+            } catch {}
+          }
+        } else if (paramUserId) {
+          const matchUser = convList.find((c: any) => c.members?.some((m: any) => m.userId === paramUserId));
+          if (matchUser) {
+            setActiveConv(matchUser);
+          } else {
+            try {
+              const createRes = await fetch('/api/conversations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetUserId: paramUserId }),
+              });
+              if (createRes.ok) {
+                const createData = await createRes.json();
+                if (createData.conversation) {
+                  setConversations((prev) => [createData.conversation, ...prev.filter((c) => c.id !== createData.conversation.id)]);
+                  setActiveConv(createData.conversation);
+                }
+              }
+            } catch {}
+          }
         } else if (convList.length > 0 && !activeConv && typeof window !== 'undefined' && window.innerWidth >= 768) {
           setActiveConv(convList[0]);
         }
@@ -113,7 +147,7 @@ export default function ChatsPage() {
 
   useEffect(() => {
     loadConversations();
-  }, [paramConvId, user]);
+  }, [paramConvId, paramUserId, user]);
 
   // Load messages when activeConv changes, subscribe to SSE & polling
   useEffect(() => {

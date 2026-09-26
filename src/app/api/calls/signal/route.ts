@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
 
       // Real-time broadcast to receiver via ntfy (instant ring on all devices)
       if (receiverId) {
-        fetch(`https://ntfy.sh/pixelmink_user_${receiverId}`, {
+        await fetch(`https://ntfy.sh/pixelmink_user_${receiverId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
       } catch {}
 
       const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
-      fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
+      await fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
       }).catch(() => {});
 
       if (callerId) {
-        fetch(`https://ntfy.sh/pixelmink_user_${callerId}`, {
+        await fetch(`https://ntfy.sh/pixelmink_user_${callerId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
       } catch {}
 
       const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
-      fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
+      await fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -221,7 +221,7 @@ export async function POST(req: NextRequest) {
       }).catch(() => {});
 
       if (callerId) {
-        fetch(`https://ntfy.sh/pixelmink_user_${callerId}`, {
+        await fetch(`https://ntfy.sh/pixelmink_user_${callerId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -257,7 +257,7 @@ export async function POST(req: NextRequest) {
 
       // Also publish to ntfy room channel for real-time delivery
       const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
-      fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
+      await fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

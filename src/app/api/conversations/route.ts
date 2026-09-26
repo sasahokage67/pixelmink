@@ -114,16 +114,47 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Strict requirement: Mutual match must be confirmed first
-    const matched = await isUserMatched(senderId, targetUserId);
-    if (!matched) {
-      return NextResponse.json(
-        {
-          error: 'Сначала необходимо установить взаимный мэтч для открытия диалога',
-          requireMatch: true,
+    // 2. Auto-confirm mutual match between both engineers when starting chat
+    try {
+      const existingMatch = await prisma.match.findFirst({
+        where: {
+          OR: [
+            { userAId: senderId, userBId: targetUserId },
+            { userAId: targetUserId, userBId: senderId },
+          ],
         },
-        { status: 403 }
-      );
+      });
+
+      if (existingMatch) {
+        if (existingMatch.status !== 'ACCEPTED') {
+          await prisma.match.update({
+            where: { id: existingMatch.id },
+            data: { status: 'ACCEPTED' },
+          });
+        }
+      } else {
+        await prisma.match.create({
+          data: {
+            userAId: senderId,
+            userBId: targetUserId,
+            status: 'ACCEPTED',
+            reason: 'Direct chat match',
+          },
+        });
+      }
+
+      // Notify peer that match is confirmed
+      fetch(`https://ntfy.sh/pixelmink_user_${targetUserId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'match_accepted',
+          partnerId: senderId,
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    } catch (err) {
+      console.warn('Auto match creation error:', err);
     }
 
     // Check if 1-on-1 conversation already exists

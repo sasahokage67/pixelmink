@@ -274,10 +274,9 @@ export default function MatchesPage() {
       setMatchAlert('Этот пользователь заблокирован.');
       return;
     }
-    if (!connectedUserIds.includes(targetUserId)) {
-      setMatchAlert('🔒 Для открытия чата необходим взаимный мэтч! Нажмите «Запросить мэтч».');
-      return;
-    }
+    // Optimistically unlock
+    setConnectedUserIds((prev) => Array.from(new Set([...prev, targetUserId])));
+
     try {
       const res = await fetch('/api/conversations', {
         method: 'POST',
@@ -285,17 +284,13 @@ export default function MatchesPage() {
         body: JSON.stringify({ targetUserId }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setMatchAlert(data.error || 'Для открытия чата необходим взаимный мэтч!');
-        return;
-      }
       if (data.conversation?.id) {
         router.push(`/chats?convId=${data.conversation.id}`);
       } else {
-        router.push('/chats');
+        router.push(`/chats?userId=${targetUserId}`);
       }
     } catch {
-      router.push('/chats');
+      router.push(`/chats?userId=${targetUserId}`);
     }
   };
 
@@ -499,10 +494,10 @@ export default function MatchesPage() {
             {pendingReceived.map((req) => {
               const u = req.user || req;
               const name = u?.profile?.name || u?.email?.split('@')[0] || 'Инженер';
-              const reqId = u?.id || req.id;
+              const targetUserId = req.user?.id || (req.userAId === user?.id ? req.userBId : req.userAId) || req.fromUserId || u?.id || req.id;
               return (
                 <div
-                  key={req.id || reqId}
+                  key={req.id || targetUserId}
                   className="p-3 rounded-xl bg-[#14141b] border border-amber-500/20 flex items-center justify-between gap-3"
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -514,13 +509,13 @@ export default function MatchesPage() {
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
-                      onClick={() => handleRequestMatch(reqId, 'accept')}
+                      onClick={() => handleRequestMatch(targetUserId, 'accept')}
                       className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-[11px] font-bold"
                     >
                       Принять
                     </button>
                     <button
-                      onClick={() => handleRequestMatch(reqId, 'decline')}
+                      onClick={() => handleRequestMatch(targetUserId, 'decline')}
                       className="px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-[11px]"
                     >
                       Отклонить
@@ -855,6 +850,14 @@ export default function MatchesPage() {
                                       <Check className="w-3 h-3 text-emerald-400" />
                                       <span>Мэтч</span>
                                     </span>
+                                  ) : pendingReceived.some((p) => (p.user?.id || p.id) === peer.id) ? (
+                                    <button
+                                      onClick={() => handleRequestMatch(peer.id, 'accept')}
+                                      className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-[11px] font-bold flex items-center gap-1 shadow-md shadow-emerald-600/20"
+                                    >
+                                      <Check className="w-3 h-3" />
+                                      <span>Принять</span>
+                                    </button>
                                   ) : isPendingSent ? (
                                     <span className="px-2 py-1 rounded-lg bg-zinc-800 text-zinc-400 font-mono text-[11px] border border-white/5">
                                       ⏳ Ждем
@@ -871,27 +874,19 @@ export default function MatchesPage() {
 
                                   <button
                                     onClick={() => handleStartDirectChat(peer.id)}
-                                    className={`px-2.5 py-1.5 rounded-lg font-mono text-[11px] flex items-center gap-1 transition-all ${
-                                      isMatched
-                                        ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200'
-                                        : 'bg-zinc-900/60 text-zinc-500 hover:text-zinc-400'
-                                    }`}
-                                    title={isMatched ? 'Чат' : 'Требуется взаимный мэтч'}
+                                    className="px-2.5 py-1.5 rounded-lg font-mono text-[11px] flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-all border border-white/[0.06]"
+                                    title="Открыть общий чат"
                                   >
-                                    {isMatched ? <MessageSquare className="w-3 h-3 text-zinc-400" /> : <Lock className="w-3 h-3 text-zinc-500" />}
+                                    <MessageSquare className="w-3 h-3 text-blue-400" />
                                     <span>Чат</span>
                                   </button>
 
                                   <button
                                     onClick={() => handleStartDirectCall(peer.id)}
-                                    className={`px-2.5 py-1.5 rounded-lg font-mono text-[11px] flex items-center gap-1 transition-all ${
-                                      isMatched
-                                        ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200'
-                                        : 'bg-zinc-900/60 text-zinc-500 hover:text-zinc-400'
-                                    }`}
-                                    title={isMatched ? 'Созвон' : 'Требуется взаимный мэтч'}
+                                    className="px-2.5 py-1.5 rounded-lg font-mono text-[11px] flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-all border border-white/[0.06]"
+                                    title="Начать видеосозвон"
                                   >
-                                    {isMatched ? <Video className="w-3 h-3 text-zinc-400" /> : <Lock className="w-3 h-3 text-zinc-500" />}
+                                    <Video className="w-3 h-3 text-emerald-400" />
                                     <span>Созвон</span>
                                   </button>
 

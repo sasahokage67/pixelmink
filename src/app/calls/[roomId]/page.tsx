@@ -189,40 +189,63 @@ export default function CallRoomPage() {
   // Effective username
   const effectiveUserName = user?.profile?.name || guestName || 'Peer';
 
-  // Initialize unique peer ID on mount
+  // Initialize unique peer ID on mount (session-isolated so 2 tabs/devices never clash)
   useEffect(() => {
     if (!myPeerIdRef.current) {
-      const stored = typeof window !== 'undefined' ? localStorage.getItem('pixelmink_client_peer_id') : null;
+      const stored = typeof window !== 'undefined' ? sessionStorage.getItem('pixelmink_session_peer_id') : null;
       if (stored) {
         myPeerIdRef.current = stored;
       } else {
-        const generated = (user?.id ? `${user.id}_` : 'peer_') + Math.random().toString(36).substring(2, 9);
+        const generated = (user?.id ? `${user.id}_` : 'peer_') + Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36).slice(-4);
         myPeerIdRef.current = generated;
         if (typeof window !== 'undefined') {
-          localStorage.setItem('pixelmink_client_peer_id', generated);
+          sessionStorage.setItem('pixelmink_session_peer_id', generated);
         }
       }
     }
   }, [user]);
 
-  // Dual signaling helper (Socket.IO + Cloud REST relay for cross-laptop Vercel communication)
+  const cleanRoomId = (roomId || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+  // Dual signaling helper: Direct client ntfy broadcast (sub-40ms P2P) + Cloud REST relay for Vercel
   const sendRoomSignalHttp = useCallback(
     async (signal: any, toPeerId?: string | null) => {
+      const now = Date.now();
+      const payload = {
+        action: 'room_send',
+        roomId,
+        fromPeerId: myPeerIdRef.current,
+        toPeerId: toPeerId || undefined,
+        signal,
+        createdAt: now,
+      };
+
+      // 1. Direct browser publish to ntfy (sub-40ms latency, bypasses serverless lambdas)
+      try {
+        fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'room_signal',
+            fromPeerId: myPeerIdRef.current,
+            toPeerId: toPeerId || undefined,
+            signal,
+            createdAt: now,
+          }),
+          mode: 'cors',
+        }).catch(() => {});
+      } catch {}
+
+      // 2. Server API route for fallback & persistence
       try {
         await fetch('/api/calls/signal', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'room_send',
-            roomId,
-            fromPeerId: myPeerIdRef.current,
-            toPeerId: toPeerId || undefined,
-            signal,
-          }),
+          body: JSON.stringify(payload),
         });
       } catch {}
     },
-    [roomId]
+    [roomId, cleanRoomId]
   );
 
   const sendRoomSignal = useCallback(
@@ -496,16 +519,22 @@ export default function CallRoomPage() {
       });
     }
 
-    // ICE Candidate handler
+    // ICE Candidate handler with robust JSON serialization
     pc.onicecandidate = (event) => {
       if (event.candidate) {
+        const candInit = event.candidate.toJSON ? event.candidate.toJSON() : {
+          candidate: event.candidate.candidate,
+          sdpMid: event.candidate.sdpMid,
+          sdpMLineIndex: event.candidate.sdpMLineIndex,
+          usernameFragment: event.candidate.usernameFragment,
+        };
         if (socket) {
           socket.emit('webrtc:signal', {
             to: targetSocketId,
-            signal: { type: 'candidate', candidate: event.candidate },
+            signal: { type: 'candidate', candidate: candInit },
           });
         }
-        sendRoomSignalHttp({ type: 'candidate', candidate: event.candidate }, targetSocketId);
+        sendRoomSignalHttp({ type: 'candidate', candidate: candInit }, targetSocketId);
       }
     };
 
@@ -517,6 +546,22 @@ export default function CallRoomPage() {
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = incomingStream;
         remoteVideoRef.current.play().catch(() => {});
+      }
+    };
+
+    // Auto renegotiate when tracks are dynamically attached/changed
+    pc.onnegotiationneeded = async () => {
+      try {
+        if (pc.signalingState === 'stable' && targetSocketId) {
+          const isLeader = myPeerIdRef.current.localeCompare(targetSocketId) > 0;
+          if (isLeader) {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, targetSocketId);
+          }
+        }
+      } catch (err) {
+        console.warn('Renegotiation warning:', err);
       }
     };
 
@@ -534,7 +579,7 @@ export default function CallRoomPage() {
 
     peerConnectionRef.current = pc;
     return pc;
-  }, [mediaStream, socket, sendRoomSignalHttp]);
+  }, [mediaStream, socket, sendRoomSignalHttp, sendRoomSignal, effectiveUserName]);
 
   // Ensure remote video auto-plays when remoteStream arrives
   useEffect(() => {
@@ -690,18 +735,29 @@ export default function CallRoomPage() {
     };
   }, [socket, roomId, hasEnteredName, effectiveUserName, getOrCreatePeerConnection, remotePeerName, sendRoomSignal]);
 
-  // 3. WebRTC Signaling over HTTP Cloud Relay (Vercel cross-device fallback)
+  // 3. WebRTC Signaling over HTTP Cloud Relay + ntfy SSE (Vercel cross-device instant sync)
   useEffect(() => {
     if (!roomId || !hasEnteredName || isCallFinished) return;
 
     let isMounted = true;
 
-    // Announce presence in room
+    // Announce immediate entry into room
     sendRoomSignalHttp({
       type: 'peer_joined',
       userName: effectiveUserName,
       peerId: myPeerIdRef.current,
     });
+
+    // Presence heartbeat: broadcasts every 2.5s until WebRTC peer connection is established
+    const heartbeatTimer = setInterval(() => {
+      if (!isPeerConnected) {
+        sendRoomSignalHttp({
+          type: 'presence',
+          userName: effectiveUserName,
+          peerId: myPeerIdRef.current,
+        });
+      }
+    }, 2500);
 
     const pollSignals = async () => {
       try {
@@ -728,19 +784,20 @@ export default function CallRoomPage() {
               setRemotePeerSocketId(fromPeerId);
             }
 
-            if (signal.type === 'peer_joined') {
+            if (signal.type === 'peer_joined' || signal.type === 'presence') {
               setRemotePeerSocketId(fromPeerId);
               if (signal.userName) setRemotePeerName(signal.userName);
 
               const pc = getOrCreatePeerConnection(fromPeerId);
-              try {
-                if (pc.signalingState === 'stable') {
+              const isLeader = myPeerIdRef.current.localeCompare(fromPeerId) > 0;
+              if (isLeader && pc.signalingState === 'stable' && !remoteStream) {
+                try {
                   const offer = await pc.createOffer();
                   await pc.setLocalDescription(offer);
                   sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, fromPeerId);
+                } catch (e) {
+                  console.warn('Poll offer error:', e);
                 }
-              } catch (e) {
-                console.error(e);
               }
             } else if (signal.type === 'offer' && signal.sdp) {
               const pc = getOrCreatePeerConnection(fromPeerId);
@@ -802,37 +859,52 @@ export default function CallRoomPage() {
       } catch {}
     };
 
-    // Instant WebRTC signals over ntfy SSE
+    // Instant WebRTC signals over ntfy SSE with 10m historical replay
     let sseSource: EventSource | null = null;
-    const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
     try {
-      sseSource = new EventSource(`https://ntfy.sh/pixelmink_call_${cleanRoomId}/sse`);
+      sseSource = new EventSource(`https://ntfy.sh/pixelmink_call_${cleanRoomId}/sse?since=10m`);
       sseSource.onmessage = async (event) => {
         try {
           const raw = JSON.parse(event.data);
-          const item = typeof raw.message === 'string' ? JSON.parse(raw.message) : raw;
-          if (!item || !item.signal) return;
-          if (item.fromPeerId === myPeerIdRef.current) return;
+          let item = raw;
+          if (typeof raw.message === 'string') {
+            try {
+              item = JSON.parse(raw.message);
+            } catch {
+              item = raw.message;
+            }
+          } else if (raw.message && typeof raw.message === 'object') {
+            item = raw.message;
+          }
+
+          if (!item) return;
+          const fromPeerId = item.fromPeerId || item.peerId;
+          if (!fromPeerId || fromPeerId === myPeerIdRef.current) return;
           if (item.toPeerId && item.toPeerId !== myPeerIdRef.current) return;
 
-          const signal = item.signal;
-          if (signal.userName && !remotePeerName) setRemotePeerName(signal.userName);
-          if (item.fromPeerId && !remotePeerSocketId) setRemotePeerSocketId(item.fromPeerId);
+          const signal = item.signal || (item.type !== 'room_signal' ? item : null);
+          if (!signal) return;
 
-          if (signal.type === 'peer_joined') {
-            setRemotePeerSocketId(item.fromPeerId);
+          if (signal.userName && !remotePeerName) setRemotePeerName(signal.userName);
+          if (fromPeerId && !remotePeerSocketId) setRemotePeerSocketId(fromPeerId);
+
+          if (signal.type === 'peer_joined' || signal.type === 'presence') {
+            setRemotePeerSocketId(fromPeerId);
             if (signal.userName) setRemotePeerName(signal.userName);
-            const pc = getOrCreatePeerConnection(item.fromPeerId);
-            try {
-              if (pc.signalingState === 'stable') {
+            const pc = getOrCreatePeerConnection(fromPeerId);
+            const isLeader = myPeerIdRef.current.localeCompare(fromPeerId) > 0;
+            if (isLeader && pc.signalingState === 'stable' && !remoteStream) {
+              try {
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
-                sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, item.fromPeerId);
+                sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, fromPeerId);
+              } catch (e) {
+                console.warn('SSE offer error:', e);
               }
-            } catch (e) {}
+            }
           } else if (signal.type === 'offer' && signal.sdp) {
-            const pc = getOrCreatePeerConnection(item.fromPeerId);
-            const isPolite = myPeerIdRef.current.localeCompare(item.fromPeerId) > 0;
+            const pc = getOrCreatePeerConnection(fromPeerId);
+            const isPolite = myPeerIdRef.current.localeCompare(fromPeerId) > 0;
             if (pc.signalingState !== 'stable') {
               if (!isPolite) return;
               try {
@@ -841,21 +913,31 @@ export default function CallRoomPage() {
             }
             try {
               await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-              await flushCandidates(item.fromPeerId, pc);
+              await flushCandidates(fromPeerId, pc);
               const answer = await pc.createAnswer();
               await pc.setLocalDescription(answer);
-              sendRoomSignal({ type: 'answer', sdp: answer, senderName: effectiveUserName }, item.fromPeerId);
+              sendRoomSignal({ type: 'answer', sdp: answer, senderName: effectiveUserName }, fromPeerId);
             } catch (e) {}
           } else if (signal.type === 'answer' && signal.sdp) {
-            const pc = getOrCreatePeerConnection(item.fromPeerId);
+            const pc = getOrCreatePeerConnection(fromPeerId);
             try {
               if (pc.signalingState === 'have-local-offer') {
                 await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-                await flushCandidates(item.fromPeerId, pc);
+                await flushCandidates(fromPeerId, pc);
               }
             } catch (e) {}
           } else if ((signal.type === 'candidate' || signal.type === 'ice-candidate') && signal.candidate) {
-            await handleIncomingCandidate(item.fromPeerId, signal.candidate);
+            await handleIncomingCandidate(fromPeerId, signal.candidate);
+          } else if (signal.type === 'chat_message' && signal.message) {
+            setCallMessages((prev) => {
+              if (prev.some((m) => m.id === signal.message.id)) return prev;
+              return [...prev, signal.message];
+            });
+          } else if (signal.type === 'role_switch' && signal.mentorRole) {
+            setMentorRole(signal.mentorRole);
+            playAlertChime('switch');
+            setShowRoleSwitchBanner(true);
+            setTimeout(() => setShowRoleSwitchBanner(false), 8000);
           } else if (signal.type === 'terminal_opened') {
             setIsTerminalOpen(true);
             setTerminalProposal(null);
@@ -871,9 +953,10 @@ export default function CallRoomPage() {
     return () => {
       isMounted = false;
       clearInterval(interval);
+      clearInterval(heartbeatTimer);
       if (sseSource) sseSource.close();
     };
-  }, [roomId, hasEnteredName, isCallFinished, effectiveUserName, sendRoomSignal, sendRoomSignalHttp, getOrCreatePeerConnection, remotePeerName, remotePeerSocketId]);
+  }, [roomId, hasEnteredName, isCallFinished, effectiveUserName, sendRoomSignal, sendRoomSignalHttp, getOrCreatePeerConnection, remotePeerName, remotePeerSocketId, isPeerConnected, cleanRoomId, remoteStream]);
 
   // Manual role swap handler
   const handleManualRoleSwitch = () => {
@@ -1162,7 +1245,7 @@ export default function CallRoomPage() {
 
           {/* Reciprocal Phase Badge & Timer */}
           <div
-            className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-mono border transition-all ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-mono border transition-all ${
               isPhase1
                 ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
                 : 'bg-purple-500/10 border-purple-500/30 text-purple-300'
@@ -1170,7 +1253,7 @@ export default function CallRoomPage() {
           >
             <span className={`w-1.5 h-1.5 rounded-full ${isPhase1 ? 'bg-blue-400' : 'bg-purple-400'} animate-pulse`} />
             <span className="font-bold whitespace-nowrap">
-              {isPhase1 ? 'Фаза 1/2 (30 мин)' : 'Фаза 2/2 (30 мин)'}:
+              {isPhase1 ? '1/2' : '2/2'}:
             </span>
             <span className="text-white hidden sm:inline">
               Ментор: <b className="text-blue-300">@{currentMentorName}</b>
@@ -1179,9 +1262,9 @@ export default function CallRoomPage() {
             <span className="text-zinc-400 hidden lg:inline">
               Ученик: @{currentStudentName}
             </span>
-            <span className="text-zinc-500">•</span>
+            <span className="text-zinc-500 hidden sm:inline">•</span>
             <span className="text-zinc-200 font-bold whitespace-nowrap">
-              {isPhase1 ? 'До смены:' : 'До конца:'} {formatCountdown(phaseRemaining)}
+              {formatCountdown(phaseRemaining)}
             </span>
           </div>
 
@@ -1191,10 +1274,10 @@ export default function CallRoomPage() {
         </div>
 
         {/* Right Actions: Manual Role Swap & Copy Invite */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={handleManualRoleSwitch}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#181820] hover:bg-[#20202a] text-zinc-200 border border-white/10 text-xs font-mono font-medium transition-all tap-active"
+            className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg bg-[#181820] hover:bg-[#20202a] text-zinc-200 border border-white/10 text-xs font-mono font-medium transition-all tap-active"
             title="Поменяться ролями (ментор / ученик)"
           >
             <Repeat className="w-3.5 h-3.5 text-blue-400" />
@@ -1203,7 +1286,7 @@ export default function CallRoomPage() {
 
           <button
             onClick={handleToggleTerminal}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all shadow-md ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all shadow-md ${
               isTerminalOpen
                 ? 'bg-emerald-600 text-white border border-emerald-400 shadow-emerald-600/20'
                 : 'bg-blue-600 hover:bg-blue-500 text-white border border-blue-400 shadow-blue-600/20'
@@ -1211,7 +1294,8 @@ export default function CallRoomPage() {
             title="Открыть совместный редактор и компилятор кода (Python, C++, JS, Rust, Go)"
           >
             <Code2 className="w-3.5 h-3.5" />
-            <span>{isTerminalOpen ? 'Закрыть компилятор' : 'Компилятор кода'}</span>
+            <span className="hidden sm:inline">{isTerminalOpen ? 'Закрыть компилятор' : 'Компилятор кода'}</span>
+            <span className="sm:hidden">{isTerminalOpen ? 'Закрыть' : 'Код'}</span>
           </button>
         </div>
       </header>
@@ -1350,7 +1434,7 @@ export default function CallRoomPage() {
 
         {/* Mobile-only Floating PiP Video when Terminal is Open */}
         {isTerminalOpen && (
-          <div className="md:hidden fixed top-16 right-3 z-30 w-32 sm:w-36 aspect-video rounded-xl overflow-hidden border border-white/20 shadow-2xl bg-[#121217] backdrop-blur-md">
+          <div className="md:hidden fixed bottom-20 right-3 z-30 w-32 sm:w-36 aspect-video rounded-xl overflow-hidden border border-white/20 shadow-2xl bg-[#121217] backdrop-blur-md">
             {isPeerConnected && remoteStream ? (
               <video
                 ref={(el) => {
@@ -1383,13 +1467,25 @@ export default function CallRoomPage() {
           className={`h-full max-h-[calc(100vh-140px)] ${
             isTerminalOpen
               ? 'hidden md:flex md:w-60 lg:w-72 md:flex-col md:gap-3 md:shrink-0'
-              : 'flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4'
+              : 'flex-1 relative md:grid md:grid-cols-2 gap-3 md:gap-4'
           }`}
         >
-          {/* Peer 1: Local Stream */}
-          <div className={`relative rounded-2xl overflow-hidden bg-[#121217] border border-white/[0.08] flex items-center justify-center ${isTerminalOpen ? 'flex-1 min-h-0' : ''}`}>
+          {/* Peer 1: Local Stream (Floating selfie PiP on mobile, left column on desktop) */}
+          <div
+            className={`overflow-hidden bg-[#121217] flex items-center justify-center transition-all ${
+              isTerminalOpen
+                ? 'flex-1 min-h-0 relative rounded-2xl border border-white/[0.08]'
+                : 'absolute bottom-4 right-4 w-28 h-36 sm:w-32 sm:h-44 md:relative md:w-auto md:h-full md:bottom-auto md:right-auto rounded-2xl border-2 border-white/20 md:border md:border-white/[0.08] shadow-2xl md:shadow-none z-20'
+            }`}
+          >
             <video
-              ref={localVideoRef}
+              ref={(el) => {
+                localVideoRef.current = el;
+                if (el && mediaStream && el.srcObject !== mediaStream) {
+                  el.srcObject = mediaStream;
+                  el.play().catch(() => {});
+                }
+              }}
               autoPlay
               playsInline
               muted
@@ -1397,22 +1493,23 @@ export default function CallRoomPage() {
             />
 
             {isCamOff && (
-              <div className="flex flex-col items-center justify-center gap-2 text-zinc-500">
-                <Identicon name={effectiveUserName} size={isTerminalOpen ? 48 : 80} />
-                <div className="text-xs font-mono text-zinc-400">{effectiveUserName}</div>
-                <div className="text-[10px] font-mono text-zinc-600">Camera Off</div>
+              <div className="flex flex-col items-center justify-center gap-1 sm:gap-2 text-zinc-500 p-2 text-center">
+                <Identicon name={effectiveUserName} size={isTerminalOpen ? 48 : 56} />
+                <div className="text-[11px] font-mono text-zinc-400 truncate max-w-[90px]">{effectiveUserName}</div>
+                <div className="text-[9px] font-mono text-zinc-600">Camera Off</div>
               </div>
             )}
 
             {/* Local Stream Overlay */}
-            <div className="absolute bottom-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/75 backdrop-blur-md border border-white/10 text-xs font-mono text-white">
-              <span>{effectiveUserName} (Вы)</span>
+            <div className="absolute bottom-2 left-2 md:bottom-3 md:left-3 flex items-center gap-1.5 px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-black/75 backdrop-blur-md border border-white/10 text-[10px] md:text-xs font-mono text-white">
+              <span className="hidden sm:inline">{effectiveUserName} (Вы)</span>
+              <span className="sm:hidden">Вы</span>
               {isLocalMentor ? (
-                <span className="flex items-center gap-1 text-[10px] font-bold bg-blue-500/25 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-full">
+                <span className="flex items-center gap-0.5 text-[9px] md:text-[10px] font-bold bg-blue-500/25 text-blue-300 border border-blue-500/40 px-1.5 py-0.5 rounded-full">
                   🎓 Ментор
                 </span>
               ) : (
-                <span className="flex items-center gap-1 text-[10px] font-bold bg-zinc-800 text-zinc-300 border border-white/10 px-2 py-0.5 rounded-full">
+                <span className="flex items-center gap-0.5 text-[9px] md:text-[10px] font-bold bg-zinc-800 text-zinc-300 border border-white/10 px-1.5 py-0.5 rounded-full">
                   🎧 Ученик
                 </span>
               )}
@@ -1421,12 +1518,22 @@ export default function CallRoomPage() {
             </div>
           </div>
 
-          {/* Peer 2: Remote Friend Stream OR Authentic Waiting State */}
-          <div className={`relative rounded-2xl overflow-hidden bg-[#121217] border border-white/[0.08] flex items-center justify-center ${isTerminalOpen ? 'flex-1 min-h-0' : ''}`}>
+          {/* Peer 2: Remote Friend Stream OR Authentic Waiting State (Full width on mobile, right column on desktop) */}
+          <div
+            className={`relative rounded-2xl overflow-hidden bg-[#121217] border border-white/[0.08] flex items-center justify-center ${
+              isTerminalOpen ? 'flex-1 min-h-0' : 'w-full h-full'
+            }`}
+          >
             {isPeerConnected && remoteStream ? (
               <>
                 <video
-                  ref={remoteVideoRef}
+                  ref={(el) => {
+                    remoteVideoRef.current = el;
+                    if (el && remoteStream && el.srcObject !== remoteStream) {
+                      el.srcObject = remoteStream;
+                      el.play().catch(() => {});
+                    }
+                  }}
                   autoPlay
                   playsInline
                   className="w-full h-full object-cover"
