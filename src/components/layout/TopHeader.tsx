@@ -77,14 +77,6 @@ export default function TopHeader() {
           </Link>
         )}
 
-        {/* Start Instant Call Button */}
-        <Link
-          href="/calls"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-medium tap-active transition-all shadow-sm shadow-blue-500/20"
-        >
-          <Video className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Созвон</span>
-        </Link>
 
         {/* Notification Bell */}
         <div className="relative">

@@ -16,11 +16,13 @@ import {
   Filter,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useSocket } from '@/context/SocketContext';
 import Identicon from '@/components/ui/Identicon';
 
 export default function DiscoverPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { socket } = useSocket();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -92,6 +94,39 @@ export default function DiscoverPage() {
     } catch {
       router.push('/chats');
     }
+  };
+
+  const handleStartCall = async (targetUserId: string) => {
+    const roomId = `room-${targetUserId.slice(0, 8)}-${Date.now().toString(36)}`;
+    try {
+      await fetch('/api/calls/signal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'initiate',
+          roomId,
+          callerId: user?.id,
+          callerName: user?.profile?.name || user?.email?.split('@')[0] || 'Инженер',
+          callerAvatar: user?.profile?.avatar,
+          receiverId: targetUserId,
+          type: 'VIDEO',
+        }),
+      });
+
+      if (socket) {
+        socket.emit('call:initiate', {
+          callerId: user?.id,
+          callerName: user?.profile?.name || user?.email?.split('@')[0] || 'Инженер',
+          callerAvatar: user?.profile?.avatar,
+          receiverId: targetUserId,
+          roomId,
+          type: 'VIDEO',
+        });
+      }
+    } catch (e) {
+      console.error('Call initiate error:', e);
+    }
+    router.push(`/calls/${roomId}`);
   };
 
   return (
@@ -316,10 +351,7 @@ export default function DiscoverPage() {
                   </button>
 
                   <button
-                    onClick={() => {
-                      const roomId = `room-${peer.id.slice(0, 8)}-${Date.now().toString(36)}`;
-                      router.push(`/calls/${roomId}`);
-                    }}
+                    onClick={() => handleStartCall(peer.id)}
                     className="py-1.5 px-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-mono tap-active transition-all flex items-center justify-center gap-1"
                   >
                     <Video className="w-3.5 h-3.5 text-zinc-400" />

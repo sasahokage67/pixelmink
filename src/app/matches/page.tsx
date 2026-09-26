@@ -22,6 +22,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useSocket } from '@/context/SocketContext';
 import Identicon from '@/components/ui/Identicon';
 
 const CATEGORIES = [
@@ -48,6 +49,7 @@ export default function MatchesPage() {
   const searchParams = useSearchParams();
   const requestTeacherId = searchParams.get('requestTeacherId');
   const { user } = useAuth();
+  const { socket } = useSocket();
 
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -180,8 +182,36 @@ export default function MatchesPage() {
     }
   };
 
-  const handleStartDirectCall = (targetUserId: string) => {
+  const handleStartDirectCall = async (targetUserId: string) => {
     const roomId = `room-${targetUserId.slice(0, 8)}-${Date.now().toString(36)}`;
+    try {
+      await fetch('/api/calls/signal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'initiate',
+          roomId,
+          callerId: user?.id,
+          callerName: user?.profile?.name || user?.email?.split('@')[0] || 'Инженер',
+          callerAvatar: user?.profile?.avatar,
+          receiverId: targetUserId,
+          type: 'VIDEO',
+        }),
+      });
+
+      if (socket) {
+        socket.emit('call:initiate', {
+          callerId: user?.id,
+          callerName: user?.profile?.name || user?.email?.split('@')[0] || 'Инженер',
+          callerAvatar: user?.profile?.avatar,
+          receiverId: targetUserId,
+          roomId,
+          type: 'VIDEO',
+        });
+      }
+    } catch (e) {
+      console.error('Call initiate error:', e);
+    }
     router.push(`/calls/${roomId}`);
   };
 

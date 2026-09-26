@@ -196,6 +196,21 @@ function ProfileContent() {
           }),
         });
 
+        // Cross-device cloud signaling for Vercel
+        await fetch('/api/calls/signal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'initiate',
+            roomId,
+            callerId: currentUser?.id,
+            callerName: currentUser?.profile?.name || currentUser?.email?.split('@')[0] || 'Инженер',
+            callerAvatar: currentUser?.profile?.avatar,
+            receiverId: targetUserId,
+            type: 'VIDEO',
+          }),
+        });
+
         if (socket) {
           socket.emit('call:initiate', {
             callerId: currentUser?.id,

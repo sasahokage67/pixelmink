@@ -26,6 +26,10 @@ import {
   Terminal as TerminalIcon,
   ChevronUp,
   Camera,
+  Repeat,
+  CheckCircle2,
+  Clock,
+  Sparkles,
 } from 'lucide-react';
 import Identicon from '@/components/ui/Identicon';
 import SharedCallTerminal from '@/components/call/SharedCallTerminal';
@@ -37,6 +41,53 @@ const RTC_CONFIG: RTCConfiguration = {
     { urls: 'stun:stun2.l.google.com:19302' },
   ],
 };
+
+const MAX_CALL_SECONDS = 3600; // 1 hour hard cap
+const PHASE_1_SECONDS = 1800; // 30 minutes for Phase 1
+const WARNING_SECONDS = 3480; // 58 minutes (2 min warning)
+
+function playAlertChime(type: 'switch' | 'warning' | 'finish') {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    if (type === 'switch') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+      osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.15);
+      osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.3);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.6);
+    } else if (type === 'warning') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      osc.frequency.setValueAtTime(440, ctx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
+    } else if (type === 'finish') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(783.99, ctx.currentTime);
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime + 0.25);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.8);
+    }
+  } catch {}
+}
 
 export default function CallRoomPage() {
   const params = useParams();
@@ -67,8 +118,18 @@ export default function CallRoomPage() {
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isPeerConnected, setIsPeerConnected] = useState(false);
 
-  // UI & Call state
+  // UI & 1-Hour Call Reciprocal Mentoring state (30 min + 30 min)
   const [callDuration, setCallDuration] = useState(0);
+  const [mentorRole, setMentorRole] = useState<'local' | 'remote'>('local');
+  const [showRoleSwitchBanner, setShowRoleSwitchBanner] = useState(false);
+  const [showWarningBanner, setShowWarningBanner] = useState(false);
+  const [isCallFinished, setIsCallFinished] = useState(false);
+
+  // Cloud signaling refs (cross-laptop P2P relay on Vercel)
+  const myPeerIdRef = useRef<string>('');
+  const lastSignalPollTimeRef = useRef<number>(0);
+  const handledSignalIdsRef = useRef<Set<string>>(new Set());
+
   const [showChat, setShowChat] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -90,6 +151,55 @@ export default function CallRoomPage() {
 
   // Effective username
   const effectiveUserName = user?.profile?.name || guestName || 'Peer';
+
+  // Initialize unique peer ID on mount
+  useEffect(() => {
+    if (!myPeerIdRef.current) {
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('pixelmink_client_peer_id') : null;
+      if (stored) {
+        myPeerIdRef.current = stored;
+      } else {
+        const generated = (user?.id ? `${user.id}_` : 'peer_') + Math.random().toString(36).substring(2, 9);
+        myPeerIdRef.current = generated;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('pixelmink_client_peer_id', generated);
+        }
+      }
+    }
+  }, [user]);
+
+  // Dual signaling helper (Socket.IO + Cloud REST relay for cross-laptop Vercel communication)
+  const sendRoomSignalHttp = useCallback(
+    async (signal: any, toPeerId?: string | null) => {
+      try {
+        await fetch('/api/calls/signal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'room_send',
+            roomId,
+            fromPeerId: myPeerIdRef.current,
+            toPeerId: toPeerId || undefined,
+            signal,
+          }),
+        });
+      } catch {}
+    },
+    [roomId]
+  );
+
+  const sendRoomSignal = useCallback(
+    async (signal: any, toPeerId?: string | null) => {
+      if (socket) {
+        socket.emit('webrtc:signal', {
+          to: toPeerId || remotePeerSocketId,
+          signal,
+        });
+      }
+      await sendRoomSignalHttp(signal, toPeerId || remotePeerSocketId);
+    },
+    [socket, remotePeerSocketId, sendRoomSignalHttp]
+  );
 
   // Check if we need guest prompt: authenticated users bypass immediately
   useEffect(() => {
@@ -229,18 +339,56 @@ export default function CallRoomPage() {
 
     setupCamera();
 
-    // Duration counter
-    const timer = setInterval(() => {
-      setCallDuration((prev) => prev + 1);
-    }, 1000);
-
     return () => {
-      clearInterval(timer);
       if (activeStream) {
         activeStream.getTracks().forEach((track) => track.stop());
       }
     };
   }, [hasEnteredName]);
+
+  // 1-Hour Call Reciprocal Timer (30m Mentor 1 + 30m Mentor 2)
+  useEffect(() => {
+    if (!hasEnteredName || isCallFinished) return;
+
+    const timer = setInterval(() => {
+      setCallDuration((prev) => {
+        const next = prev + 1;
+
+        // Auto role switch at 30 minutes (1800s)
+        if (next === PHASE_1_SECONDS) {
+          playAlertChime('switch');
+          setMentorRole((r) => (r === 'local' ? 'remote' : 'local'));
+          setShowRoleSwitchBanner(true);
+          setTimeout(() => setShowRoleSwitchBanner(false), 9000);
+        }
+
+        // 2-minute warning at 58 minutes (3480s)
+        if (next === WARNING_SECONDS) {
+          playAlertChime('warning');
+          setShowWarningBanner(true);
+        }
+
+        // 1-hour hard cap at 60 minutes (3600s)
+        if (next >= MAX_CALL_SECONDS) {
+          playAlertChime('finish');
+          setIsCallFinished(true);
+          if (mediaStream) {
+            mediaStream.getTracks().forEach((track) => track.stop());
+          }
+          if (peerConnectionRef.current) {
+            peerConnectionRef.current.close();
+            peerConnectionRef.current = null;
+          }
+          clearInterval(timer);
+          return MAX_CALL_SECONDS;
+        }
+
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [hasEnteredName, isCallFinished, mediaStream]);
 
   // Create or retrieve PeerConnection
   const getOrCreatePeerConnection = useCallback((targetSocketId: string) => {
@@ -259,11 +407,14 @@ export default function CallRoomPage() {
 
     // ICE Candidate handler
     pc.onicecandidate = (event) => {
-      if (event.candidate && socket) {
-        socket.emit('webrtc:signal', {
-          to: targetSocketId,
-          signal: { type: 'candidate', candidate: event.candidate },
-        });
+      if (event.candidate) {
+        if (socket) {
+          socket.emit('webrtc:signal', {
+            to: targetSocketId,
+            signal: { type: 'candidate', candidate: event.candidate },
+          });
+        }
+        sendRoomSignalHttp({ type: 'candidate', candidate: event.candidate }, targetSocketId);
       }
     };
 
@@ -328,10 +479,7 @@ export default function CallRoomPage() {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        socket.emit('webrtc:signal', {
-          to: socketId,
-          signal: { type: 'offer', sdp: offer, senderName: effectiveUserName },
-        });
+        sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, socketId);
       } catch (err) {
         console.error('Error creating WebRTC offer:', err);
       }
@@ -354,10 +502,7 @@ export default function CallRoomPage() {
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
 
-          socket.emit('webrtc:signal', {
-            to: from,
-            signal: { type: 'answer', sdp: answer, senderName: effectiveUserName },
-          });
+          sendRoomSignal({ type: 'answer', sdp: answer, senderName: effectiveUserName }, from);
         } else if (signal.type === 'answer') {
           await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
         } else if (signal.type === 'candidate' && signal.candidate) {
@@ -375,6 +520,16 @@ export default function CallRoomPage() {
     // D: In-call Chat Messages
     socket.on('call:new_chat_message', (msg: any) => {
       setCallMessages((prev) => [...prev, msg]);
+    });
+
+    // Role switch event over socket
+    socket.on('call:role_switch', ({ mentorRole: newRole }: any) => {
+      if (newRole) {
+        setMentorRole(newRole);
+        playAlertChime('switch');
+        setShowRoleSwitchBanner(true);
+        setTimeout(() => setShowRoleSwitchBanner(false), 8000);
+      }
     });
 
     // E: Peer Disconnected
@@ -417,6 +572,7 @@ export default function CallRoomPage() {
       socket.off('call:peer_joined');
       socket.off('webrtc:signal');
       socket.off('call:new_chat_message');
+      socket.off('call:role_switch');
       socket.off('call:peer_left');
       socket.off('call:terminal_request');
       socket.off('call:terminal_opened');
@@ -428,7 +584,133 @@ export default function CallRoomPage() {
         peerConnectionRef.current = null;
       }
     };
-  }, [socket, roomId, hasEnteredName, effectiveUserName, getOrCreatePeerConnection, remotePeerName]);
+  }, [socket, roomId, hasEnteredName, effectiveUserName, getOrCreatePeerConnection, remotePeerName, sendRoomSignal]);
+
+  // 3. WebRTC Signaling over HTTP Cloud Relay (Vercel cross-device fallback)
+  useEffect(() => {
+    if (!roomId || !hasEnteredName || isCallFinished) return;
+
+    let isMounted = true;
+
+    // Announce presence in room
+    sendRoomSignalHttp({
+      type: 'peer_joined',
+      userName: effectiveUserName,
+      peerId: myPeerIdRef.current,
+    });
+
+    const pollSignals = async () => {
+      try {
+        const res = await fetch(
+          `/api/calls/signal?action=room_poll&roomId=${encodeURIComponent(roomId)}&peerId=${encodeURIComponent(myPeerIdRef.current)}&since=${lastSignalPollTimeRef.current}`,
+          { cache: 'no-store' }
+        );
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          if (data.timestamp) lastSignalPollTimeRef.current = data.timestamp;
+          const signals = data.signals || [];
+
+          for (const item of signals) {
+            if (handledSignalIdsRef.current.has(item.id)) continue;
+            handledSignalIdsRef.current.add(item.id);
+
+            const { fromPeerId, signal } = item;
+            if (!signal) continue;
+
+            if (signal.userName && !remotePeerName) {
+              setRemotePeerName(signal.userName);
+            }
+            if (fromPeerId && !remotePeerSocketId) {
+              setRemotePeerSocketId(fromPeerId);
+            }
+
+            if (signal.type === 'peer_joined') {
+              setRemotePeerSocketId(fromPeerId);
+              if (signal.userName) setRemotePeerName(signal.userName);
+
+              const pc = getOrCreatePeerConnection(fromPeerId);
+              try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, fromPeerId);
+              } catch (e) {
+                console.error(e);
+              }
+            } else if (signal.type === 'offer') {
+              const pc = getOrCreatePeerConnection(fromPeerId);
+              try {
+                await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                sendRoomSignal({ type: 'answer', sdp: answer, senderName: effectiveUserName }, fromPeerId);
+              } catch (e) {
+                console.error(e);
+              }
+            } else if (signal.type === 'answer') {
+              const pc = getOrCreatePeerConnection(fromPeerId);
+              try {
+                await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+              } catch (e) {
+                console.error(e);
+              }
+            } else if (signal.type === 'candidate' && signal.candidate) {
+              const pc = getOrCreatePeerConnection(fromPeerId);
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+              } catch (e) {
+                console.warn(e);
+              }
+            } else if (signal.type === 'chat_message') {
+              setCallMessages((prev) => {
+                if (prev.some((m) => m.id === signal.message.id)) return prev;
+                return [...prev, signal.message];
+              });
+            } else if (signal.type === 'role_switch') {
+              if (signal.mentorRole) {
+                setMentorRole(signal.mentorRole);
+                playAlertChime('switch');
+                setShowRoleSwitchBanner(true);
+                setTimeout(() => setShowRoleSwitchBanner(false), 8000);
+              }
+            } else if (signal.type === 'terminal_request') {
+              setTerminalProposal({ fromUserId: fromPeerId, fromUserName: signal.fromUserName || 'Собеседник' });
+            } else if (signal.type === 'terminal_opened') {
+              setIsTerminalOpen(true);
+              setTerminalProposal(null);
+              setTerminalRequestSent(false);
+            } else if (signal.type === 'terminal_declined') {
+              setTerminalRequestSent(false);
+              setTerminalDeclinedNotice(`${signal.byUserName || 'Собеседник'} отклонил(а) предложение открыть терминал`);
+              setTimeout(() => setTerminalDeclinedNotice(null), 4000);
+            } else if (signal.type === 'terminal_closed') {
+              setIsTerminalOpen(false);
+            }
+          }
+        }
+      } catch {}
+    };
+
+    const interval = setInterval(pollSignals, 1800);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [roomId, hasEnteredName, isCallFinished, effectiveUserName, sendRoomSignal, sendRoomSignalHttp, getOrCreatePeerConnection, remotePeerName, remotePeerSocketId]);
+
+  // Manual role swap handler
+  const handleManualRoleSwitch = () => {
+    const nextRole = mentorRole === 'local' ? 'remote' : 'local';
+    setMentorRole(nextRole);
+    playAlertChime('switch');
+    setShowRoleSwitchBanner(true);
+    setTimeout(() => setShowRoleSwitchBanner(false), 8000);
+
+    sendRoomSignal({
+      type: 'role_switch',
+      mentorRole: nextRole === 'local' ? 'remote' : 'local',
+      byUserName: effectiveUserName,
+    });
+  };
 
   // Toggle Microphone
   const toggleMic = () => {
@@ -523,7 +805,7 @@ export default function CallRoomPage() {
   // Send In-call Chat Message
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatInput.trim() || !socket) return;
+    if (!chatInput.trim()) return;
 
     const newMsg = {
       id: Math.random().toString(36).substring(2, 9),
@@ -532,7 +814,11 @@ export default function CallRoomPage() {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    socket.emit('call:chat_message', { roomId, message: newMsg });
+    if (socket) {
+      socket.emit('call:chat_message', { roomId, message: newMsg });
+    }
+    sendRoomSignalHttp({ type: 'chat_message', message: newMsg });
+
     setCallMessages((prev) => [...prev, newMsg]);
     setChatInput('');
   };
@@ -543,11 +829,18 @@ export default function CallRoomPage() {
       if (socket) {
         socket.emit('call:terminal_close', { roomId });
       }
+      sendRoomSignalHttp({ type: 'terminal_closed' });
       setIsTerminalOpen(false);
     } else {
-      if (!socket) return;
-      socket.emit('call:terminal_request', {
-        roomId,
+      if (socket) {
+        socket.emit('call:terminal_request', {
+          roomId,
+          fromUserId: user?.id || `guest_${Date.now()}`,
+          fromUserName: effectiveUserName,
+        });
+      }
+      sendRoomSignalHttp({
+        type: 'terminal_request',
         fromUserId: user?.id || `guest_${Date.now()}`,
         fromUserName: effectiveUserName,
       });
@@ -563,6 +856,11 @@ export default function CallRoomPage() {
         fromUserName: effectiveUserName,
       });
     }
+    sendRoomSignalHttp({
+      type: 'terminal_opened',
+      accepted: true,
+      fromUserName: effectiveUserName,
+    });
     setTerminalProposal(null);
     setIsTerminalOpen(true);
   };
@@ -575,6 +873,10 @@ export default function CallRoomPage() {
         fromUserName: effectiveUserName,
       });
     }
+    sendRoomSignalHttp({
+      type: 'terminal_declined',
+      byUserName: effectiveUserName,
+    });
     setTerminalProposal(null);
   };
 
@@ -587,13 +889,20 @@ export default function CallRoomPage() {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
-    router.push('/calls');
+    router.push('/matches');
   };
 
   const formatDuration = (secs: number) => {
     const mins = Math.floor(secs / 60);
     const s = secs % 60;
     return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const formatCountdown = (secs: number) => {
+    const s = Math.max(0, secs);
+    const mins = Math.floor(s / 60);
+    const rem = s % 60;
+    return `${mins.toString().padStart(2, '0')}:${rem.toString().padStart(2, '0')}`;
   };
 
   // If auth is still checking, show clean connecting screen
@@ -657,30 +966,67 @@ export default function CallRoomPage() {
     );
   }
 
+  const isPhase1 = callDuration < PHASE_1_SECONDS;
+  const isLocalMentor = isPhase1 ? mentorRole === 'local' : mentorRole !== 'local';
+  const currentMentorName = isLocalMentor ? effectiveUserName : (remotePeerName || 'Собеседник');
+  const currentStudentName = isLocalMentor ? (remotePeerName || 'Собеседник') : effectiveUserName;
+  const phaseRemaining = isPhase1 ? PHASE_1_SECONDS - callDuration : MAX_CALL_SECONDS - callDuration;
+
   return (
     <div className="fixed inset-0 z-50 bg-[#09090b] flex flex-col justify-between overflow-hidden select-none">
-      {/* Top Bar */}
-      <header className="h-14 border-b border-white/[0.08] px-4 md:px-6 flex items-center justify-between bg-[#0e0e13]/90 backdrop-blur-md shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
+      {/* Top Bar with 1-Hour Reciprocal Mentoring Status */}
+      <header className="h-14 border-b border-white/[0.08] px-3 sm:px-6 flex items-center justify-between bg-[#0e0e13]/90 backdrop-blur-md shrink-0 gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="flex items-center gap-2 shrink-0">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-mono text-xs font-bold text-white tracking-wider uppercase">
+            <span className="font-mono text-xs font-bold text-white tracking-wider uppercase hidden md:inline">
               {roomId}
             </span>
           </div>
 
-          <span className="text-zinc-600">•</span>
-          <span className="font-mono text-xs text-zinc-400 bg-white/5 px-2 py-0.5 rounded border border-white/10">
-            {formatDuration(callDuration)}
-          </span>
+          <span className="text-zinc-600 hidden md:inline">•</span>
 
-          <span className="hidden sm:inline-flex items-center gap-1 font-mono text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-            P2P Direct WebRTC
+          {/* Reciprocal Phase Badge & Timer */}
+          <div
+            className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-mono border transition-all ${
+              isPhase1
+                ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
+                : 'bg-purple-500/10 border-purple-500/30 text-purple-300'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${isPhase1 ? 'bg-blue-400' : 'bg-purple-400'} animate-pulse`} />
+            <span className="font-bold whitespace-nowrap">
+              {isPhase1 ? 'Фаза 1/2 (30 мин)' : 'Фаза 2/2 (30 мин)'}:
+            </span>
+            <span className="text-white hidden sm:inline">
+              Ментор: <b className="text-blue-300">@{currentMentorName}</b>
+            </span>
+            <span className="text-zinc-500 hidden lg:inline">→</span>
+            <span className="text-zinc-400 hidden lg:inline">
+              Ученик: @{currentStudentName}
+            </span>
+            <span className="text-zinc-500">•</span>
+            <span className="text-zinc-200 font-bold whitespace-nowrap">
+              {isPhase1 ? 'До смены:' : 'До конца:'} {formatCountdown(phaseRemaining)}
+            </span>
+          </div>
+
+          <span className="font-mono text-xs text-zinc-400 bg-white/5 px-2 py-0.5 rounded border border-white/10 hidden xl:inline">
+            Всего: {formatDuration(callDuration)} / 60:00
           </span>
         </div>
 
-        {/* Copy Invite Link for Friend Button */}
-        <div className="flex items-center gap-2">
+        {/* Right Actions: Manual Role Swap & Copy Invite */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleManualRoleSwitch}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#181820] hover:bg-[#20202a] text-zinc-200 border border-white/10 text-xs font-mono font-medium transition-all tap-active"
+            title="Поменяться ролями (ментор / ученик)"
+          >
+            <Repeat className="w-3.5 h-3.5 text-blue-400" />
+            <span className="hidden sm:inline">Сменить роли</span>
+          </button>
+
           <button
             onClick={handleCopyLink}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
@@ -690,22 +1036,50 @@ export default function CallRoomPage() {
             }`}
           >
             {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>
-              {copiedLink
-                ? lang === 'ru'
-                  ? 'Ссылка скопирована!'
-                  : lang === 'kz'
-                  ? 'Сілтеме көшірілді!'
-                  : 'Link Copied!'
-                : lang === 'ru'
-                ? 'Скопировать ссылку для кента'
-                : lang === 'kz'
-                ? 'Досыңа сілтемені көшіру'
-                : 'Copy Invite Link'}
-            </span>
+            <span>{copiedLink ? 'Скопировано!' : 'Ссылка для кента'}</span>
           </button>
         </div>
       </header>
+
+      {/* Reciprocal Role Switch Banner Alert */}
+      {showRoleSwitchBanner && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 bg-gradient-to-r from-blue-950 via-indigo-950 to-purple-950 border border-blue-500/50 px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-mono text-white animate-in fade-in slide-in-from-top-4 max-w-lg w-full">
+          <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+            <Repeat className="w-4 h-4" />
+          </div>
+          <div className="flex-1">
+            <div className="font-bold text-blue-300">
+              {isPhase1 ? 'Смена ролей активирована!' : 'Смена ролей! Вторые 30 минут начались'}
+            </div>
+            <div className="text-[11px] text-zinc-300">
+              Теперь <span className="text-white font-bold">@{currentMentorName}</span> обучает{' '}
+              <span className="text-white font-bold">@{currentStudentName}</span>.
+            </div>
+          </div>
+          <button
+            onClick={() => setShowRoleSwitchBanner(false)}
+            className="text-zinc-400 hover:text-white ml-2 p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 2-Minute Call Limit Warning Toast */}
+      {showWarningBanner && !isCallFinished && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 bg-amber-950/90 border border-amber-500/60 px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 text-xs font-mono text-amber-200 animate-in fade-in slide-in-from-top-4 max-w-lg w-full">
+          <Clock className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+          <span className="flex-1">
+            <b>Внимание:</b> До завершения 1-часовой сессии осталось 2 минуты! Завершайте разбор темы и подводите итоги.
+          </span>
+          <button
+            onClick={() => setShowWarningBanner(false)}
+            className="text-amber-400 hover:text-white ml-2 p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Mutual Consent Proposal Modal for Shared Terminal */}
       {terminalProposal && (
@@ -825,8 +1199,17 @@ export default function CallRoomPage() {
             )}
 
             {/* Local Stream Overlay */}
-            <div className="absolute bottom-3 left-3 flex items-center gap-2 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/10 text-xs font-mono text-white">
-              <span>{effectiveUserName} (You)</span>
+            <div className="absolute bottom-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/75 backdrop-blur-md border border-white/10 text-xs font-mono text-white">
+              <span>{effectiveUserName} (Вы)</span>
+              {isLocalMentor ? (
+                <span className="flex items-center gap-1 text-[10px] font-bold bg-blue-500/25 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-full">
+                  🎓 Ментор
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-[10px] font-bold bg-zinc-800 text-zinc-300 border border-white/10 px-2 py-0.5 rounded-full">
+                  🎧 Ученик
+                </span>
+              )}
               {isMicMuted && <MicOff className="w-3 h-3 text-red-400" />}
               {isScreenSharing && <Monitor className="w-3 h-3 text-blue-400" />}
             </div>
@@ -842,9 +1225,18 @@ export default function CallRoomPage() {
                   playsInline
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute bottom-3 left-3 flex items-center gap-2 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/10 text-xs font-mono text-white">
+                <div className="absolute bottom-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/75 backdrop-blur-md border border-white/10 text-xs font-mono text-white">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span>{remotePeerName || 'Собеседник'}</span>
+                  {!isLocalMentor ? (
+                    <span className="flex items-center gap-1 text-[10px] font-bold bg-blue-500/25 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-full">
+                      🎓 Ментор
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-[10px] font-bold bg-zinc-800 text-zinc-300 border border-white/10 px-2 py-0.5 rounded-full">
+                      🎧 Ученик
+                    </span>
+                  )}
                 </div>
               </>
             ) : (
@@ -1091,6 +1483,60 @@ export default function CallRoomPage() {
 
         <div className="hidden sm:block" />
       </footer>
+
+      {/* 1-Hour Session Auto-End Completion Modal */}
+      {isCallFinished && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in select-none">
+          <div className="bg-[#111116] border border-blue-500/40 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center space-y-5 shadow-2xl animate-in zoom-in-95">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/10 border-2 border-emerald-500/40 text-emerald-400 mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-mono uppercase tracking-wider text-emerald-400 font-bold flex items-center justify-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>1-часовая сессия завершена</span>
+              </div>
+              <h2 className="text-xl font-bold text-white font-mono tracking-tight">
+                Время сессии истекло (60 минут)
+              </h2>
+              <p className="text-xs font-mono text-zinc-400 leading-relaxed">
+                Вы успешно провели взаимный обмен знаниями: 30 минут обучения от первого ментора и 30 минут обратного менторства.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs font-mono text-zinc-300 space-y-2 text-left">
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500">Длительность:</span>
+                <span className="text-white font-bold">60 мин (3600с)</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500">Формат:</span>
+                <span className="text-blue-400 font-medium">30 мин + 30 мин взаимно</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-500">Участники:</span>
+                <span className="text-zinc-200 truncate max-w-[200px]">{effectiveUserName} & {remotePeerName || 'Собеседник'}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => router.push('/matches')}
+                className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all shadow-lg shadow-blue-600/30 tap-active"
+              >
+                Все пользователи
+              </button>
+              <button
+                onClick={() => router.push('/profile')}
+                className="flex-1 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-xs font-bold transition-all tap-active"
+              >
+                В кабинет
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

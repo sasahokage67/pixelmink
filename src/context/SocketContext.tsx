@@ -124,17 +124,85 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     };
   }, [incomingCall]);
 
-  const acceptCall = () => {
+  // Cross-device cloud signaling poll for incoming calls (essential for Vercel serverless)
+  const dismissedCallsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let isMounted = true;
+    const pollIncomingCalls = async () => {
+      // Don't interrupt if already in call or modal is open
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/calls/')) {
+        return;
+      }
+      if (incomingCall) return;
+
+      try {
+        const res = await fetch(`/api/calls/signal?action=check_incoming&userId=${encodeURIComponent(user.id)}`, {
+          cache: 'no-store',
+        });
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          if (data.incomingCall && data.incomingCall.roomId) {
+            if (!dismissedCallsRef.current.has(data.incomingCall.roomId)) {
+              setIncomingCall(data.incomingCall);
+            }
+          }
+        }
+      } catch (err) {
+        // silent catch for background polling
+      }
+    };
+
+    pollIncomingCalls();
+    const interval = setInterval(pollIncomingCalls, 2500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [user?.id, incomingCall]);
+
+  const acceptCall = async () => {
     if (!incomingCall) return;
     const { roomId, callerId } = incomingCall;
+
+    try {
+      await fetch('/api/calls/signal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'accept',
+          roomId,
+          receiverId: user?.id,
+        }),
+      });
+    } catch {}
+
     socket?.emit('call:accept', { roomId, callerId });
     setIncomingCall(null);
     router.push(`/calls/${roomId}`);
   };
 
-  const declineCall = () => {
+  const declineCall = async () => {
     if (!incomingCall) return;
-    socket?.emit('call:reject', { roomId: incomingCall.roomId, callerId: incomingCall.callerId });
+    const { roomId, callerId } = incomingCall;
+    dismissedCallsRef.current.add(roomId);
+
+    try {
+      await fetch('/api/calls/signal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reject',
+          roomId,
+          receiverId: user?.id,
+        }),
+      });
+    } catch {}
+
+    socket?.emit('call:reject', { roomId, callerId });
     setIncomingCall(null);
   };
 

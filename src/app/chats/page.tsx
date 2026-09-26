@@ -261,10 +261,25 @@ export default function ChatsPage() {
         }),
       });
 
+      // Cross-device cloud signaling for Vercel
+      await fetch('/api/calls/signal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'initiate',
+          roomId,
+          callerId: user?.id,
+          callerName: user?.profile?.name || user?.email?.split('@')[0] || 'Инженер',
+          callerAvatar: user?.profile?.avatar,
+          receiverId: recipient?.userId,
+          type,
+        }),
+      });
+
       if (socket) {
         socket.emit('call:initiate', {
           callerId: user?.id,
-          callerName: user?.profile?.name || 'Peer Developer',
+          callerName: user?.profile?.name || user?.email?.split('@')[0] || 'Инженер',
           callerAvatar: user?.profile?.avatar,
           receiverId: recipient?.userId,
           roomId,
