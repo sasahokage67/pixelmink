@@ -157,7 +157,7 @@ export default function AdminPage() {
                 <Clock className="w-4 h-4 text-blue-400" />
               </div>
               <div className="text-2xl font-mono font-bold text-white">{analytics.hoursTaught}h</div>
-              <div className="text-[10px] font-mono text-blue-400">+412 XCredits minted</div>
+              <div className="text-[10px] font-mono text-blue-400">Reciprocal barter</div>
             </div>
           </div>
         </div>

@@ -99,7 +99,7 @@ export default function DashboardPage() {
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Платформа взаимного обмена инженерными знаниями • 1 час = 1 XC
+            Платформа прямого бартера инженерных знаний • 30/30 мин взаимно
           </p>
         </div>
 
@@ -124,11 +124,11 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="drinkit-card px-3 py-2 flex items-center gap-2">
-            <Zap className="w-3.5 h-3.5 text-blue-400" />
+            <Users className="w-3.5 h-3.5 text-blue-400" />
             <div className="font-mono text-xs">
-              <span className="text-zinc-500">Баланс:</span>{' '}
+              <span className="text-zinc-500">Формат:</span>{' '}
               <span className="text-blue-400 font-bold">
-                {user?.profile?.xCredits ?? 5} XC
+                Бартер 1-на-1
               </span>
             </div>
           </div>

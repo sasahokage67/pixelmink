@@ -231,7 +231,7 @@ export default function SeminarsPage() {
                       onClick={() => handleRegister(sem.id)}
                       className="flex-1 py-2.5 px-4 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-semibold tap-active transition-all shadow-md shadow-blue-600/20"
                     >
-                      Register for Free (0 XC)
+                      Register for Free
                     </button>
                   )}
                 </div>

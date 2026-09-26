@@ -266,14 +266,14 @@ export const DICTIONARY: Translations = {
     kz: 'Кодты тексеру, бірге жөндеу және теорияны талдау үшін экран көрсетілімі бар бейнеқоңырау.',
   },
   rule_4_title: {
-    en: 'Proof & Credits',
-    ru: 'Подтверждение и кредиты',
-    kz: 'Дәлелдеу және кредиттер',
+    en: 'Reciprocal Split (30/30)',
+    ru: 'Равноправный сплит (30/30)',
+    kz: 'Тең бөлісу (30/30)',
   },
   rule_4_desc: {
-    en: 'Complete sessions to earn XCredits (1 hr taught = 1 hr learned) and pass verified mastery quizzes.',
-    ru: '1 час обучения дает 1 XCredit для бронирования урока у любого эксперта + проверочные тесты.',
-    kz: '1 сағат үйрету кез келген сарапшыдан сабақ алу үшін 1 XCredit береді + растау тесттері.',
+    en: 'Equal 1-on-1 reciprocal sessions: 30 minutes teaching, 30 minutes learning with built-in code editor and timer.',
+    ru: 'Прямой бартер 1-на-1: 30 минут менторит один, следующие 30 минут — второй, со встроенным таймером и редактором кода.',
+    kz: 'Тікелей 1-ге-1 бартер: 30 минут бірі үйретеді, келесі 30 минут екіншісі, таймер мен код редакторы бар.',
   },
 
   // Live Barters Ticker
@@ -305,9 +305,9 @@ export const DICTIONARY: Translations = {
     kz: 'pixelmink қауымдастығына қосылыңыз. Төменгі деңгейлі жүйелер, ML және инфрақұрылым салаларында әлем бойынша әріптестер табыңыз.',
   },
   manifesto_btn: {
-    en: 'Create Your Account & Claim 5 XC',
-    ru: 'Создать аккаунт и получить 5 XC',
-    kz: 'Тіркелгі жасап, 5 XC алу',
+    en: 'Create Account & Start Barter',
+    ru: 'Создать аккаунт и начать бартер',
+    kz: 'Тіркелгі жасап, бартерді бастау',
   },
   manifesto_browse: {
     en: 'Browse Peer Graph',
@@ -437,9 +437,9 @@ export const DICTIONARY: Translations = {
     kz: 'Немен жұмыс істеп жатқаныңызды немесе не оқып жатқаныңызды жазыңыз (мысалы, Rust-тағы Raft консенсусы, PyTorch трансформаторларын баптау)...',
   },
   reg_submit_btn: {
-    en: 'Complete Profile & Claim 5 XC',
-    ru: 'Завершить регистрацию и забрать 5 XC',
-    kz: 'Тіркелуді аяқтап, 5 XC алу',
+    en: 'Complete Profile & Start Barter',
+    ru: 'Завершить регистрацию',
+    kz: 'Тіркелуді аяқтау',
   },
   reg_already_have: {
     en: 'Already have an account?',
@@ -467,9 +467,9 @@ export const DICTIONARY: Translations = {
     kz: 'Биодан алынған негізгі кілт сөздер:',
   },
   reg_bonus_badge: {
-    en: 'Includes +5 XCredits to immediately book your first 1-on-1 session.',
-    ru: 'Включает +5 XCredits для мгновенного бронирования вашей первой сессии.',
-    kz: 'Алғашқы жеке сессияны бірден брондау үшін +5 XCredits беріледі.',
+    en: 'Pure 1-on-1 peer exchange with split 30/30 min sessions.',
+    ru: 'Прямой обмен 1-на-1 в формате сплит-сессий 30/30 минут.',
+    kz: '30/30 минуттық бөлінген сессиялар форматындағы 1-ге-1 тікелей алмасу.',
   },
 
   // Back button
@@ -516,9 +516,9 @@ export const DICTIONARY: Translations = {
     kz: 'Тіркелгіңіз жоқ па?',
   },
   login_register_link: {
-    en: 'Register and get 5 XC',
-    ru: 'Зарегистрироваться и получить 5 XC',
-    kz: 'Тіркеліп, 5 XC алу',
+    en: 'Register for free',
+    ru: 'Зарегистрироваться бесплатно',
+    kz: 'Тегін тіркелу',
   },
 
   // FAQ Section
@@ -573,9 +573,9 @@ export const DICTIONARY: Translations = {
     kz: 'Егер екі қатысушының дағдылары тікелей сәйкес келмесе ше?',
   },
   faq_a4: {
-    en: 'pixelmink supports circular 3-way and multi-party routing (Node A teaches Node B, Node B teaches Node C, and Node C teaches Node A). You can always exchange time credits with the wider network even without a direct pair.',
-    ru: 'pixelmink поддерживает кольцевую маршрутизацию (Узел A обучает Узел B, Узел B обучает Узел C, а Узел C обучает Узел A). Вы всегда можете обменять полученные часы со всей инженерной сетью платформы.',
-    kz: 'pixelmink көп түйінді сақиналы бағыттауды қолдайды (A түйіні B-ге үйретеді, B түйіні C-ге үйретеді, ал C түйіні A-ға үйретеді). Тікелей сәйкестік болмаған күннің өзінде жиналған уақытты жалпы желімен оңай алмастыра аласыз.',
+    en: 'pixelmink supports circular 3-way and multi-party routing (Node A teaches Node B, Node B teaches Node C, and Node C teaches Node A). You can always exchange reciprocal knowledge with the wider network.',
+    ru: 'pixelmink поддерживает кольцевую маршрутизацию (Узел A обучает Узел B, Узел B обучает Узел C, а Узел C обучает Узел A). Вы всегда можете найти взаимный бартер в инженерной сети платформы.',
+    kz: 'pixelmink көп түйінді сақиналы бағыттауды қолдайды (A түйіні B-ге үйретеді, B түйіні C-ге үйретеді, ал C түйіні A-ға үйретеді). Сіз желіде әрқашан өзара тиімді бартер таба аласыз.',
   },
   faq_q5: {
     en: 'How is user privacy and data protected?',

@@ -56,8 +56,8 @@ export default function Sidebar() {
           </div>
         </div>
         <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px]">
-          <Zap className="w-3 h-3 text-blue-400" />
-          <span>{user?.profile?.xCredits ?? 5} XC</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>P2P Barter</span>
         </div>
       </div>
 

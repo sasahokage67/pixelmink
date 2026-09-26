@@ -92,7 +92,7 @@ export default function MySkillsPage() {
             Мои навыки и стек
           </h1>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Укажите, чему вы можете обучать для начисления XCredits, и что хотите изучить у проверенных коллег.
+            Укажите, чему вы можете обучать и что хотите изучить в формате равноправного бартера знаний.
           </p>
         </div>
 
@@ -115,7 +115,7 @@ export default function MySkillsPage() {
                 Могу обучать ({teachSkills.length})
               </h2>
             </div>
-            <span className="font-mono text-xs text-emerald-400">+1 XC / час</span>
+            <span className="font-mono text-xs text-emerald-400">Бартер: передача знаний</span>
           </div>
 
           <div className="space-y-3">
@@ -180,7 +180,7 @@ export default function MySkillsPage() {
                 Хочу изучить ({learnSkills.length})
               </h2>
             </div>
-            <span className="font-mono text-xs text-blue-400">-1 XC / час</span>
+            <span className="font-mono text-xs text-blue-400">Бартер: получение знаний</span>
           </div>
 
           <div className="space-y-3">
@@ -265,7 +265,7 @@ export default function MySkillsPage() {
                       : 'text-zinc-400 hover:text-white'
                   }`}
                 >
-                  Могу обучать (+XC)
+                  Могу обучать
                 </button>
                 <button
                   type="button"
@@ -276,7 +276,7 @@ export default function MySkillsPage() {
                       : 'text-zinc-400 hover:text-white'
                   }`}
                 >
-                  Хочу изучить (-XC)
+                  Хочу изучить
                 </button>
               </div>
 

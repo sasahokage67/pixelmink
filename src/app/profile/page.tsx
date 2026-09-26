@@ -26,6 +26,7 @@ import {
   ShieldAlert,
   Check,
   UserCheck,
+  Users,
   X,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -641,16 +642,16 @@ function ProfileContent() {
             <div className="text-[10px] text-zinc-500">уникальных инженеров</div>
           </div>
 
-          {/* 4. XCredits balance */}
+          {/* 4. Barter Model */}
           <div className="p-4 bg-black/40 rounded-xl border border-white/[0.06] space-y-1">
             <div className="flex items-center justify-between text-zinc-500">
-              <span className="text-[10px] uppercase font-bold tracking-wider">Баланс XC</span>
-              <Zap className="w-3.5 h-3.5 text-blue-400" />
+              <span className="text-[10px] uppercase font-bold tracking-wider">Формат обмена</span>
+              <Users className="w-3.5 h-3.5 text-blue-400" />
             </div>
-            <div className="text-2xl font-bold text-blue-400 tracking-tight">
-              {stats.xCredits} <span className="text-xs font-normal text-zinc-500">XC</span>
+            <div className="text-xl font-bold text-white tracking-tight">
+              30 / 30 <span className="text-xs font-normal text-zinc-500">мин</span>
             </div>
-            <div className="text-[10px] text-zinc-500">1ч обучения = 1 XC</div>
+            <div className="text-[10px] text-zinc-500">Прямой бартер 1-на-1</div>
           </div>
         </div>
       </div>

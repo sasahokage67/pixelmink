@@ -858,8 +858,8 @@ export default function MatchesPage() {
                           </div>
                         </Link>
 
-                        <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-white/[0.04] text-zinc-400 border border-white/[0.06] shrink-0">
-                          {peer.profile?.xCredits ?? 5} XC
+                        <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">
+                          Бартер
                         </span>
                       </div>
 
@@ -1328,9 +1328,9 @@ export default function MatchesPage() {
                       onChange={(e) => setDuration(e.target.value)}
                       className="w-full bg-[#18181f] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white outline-none font-mono"
                     >
-                      <option value="30">30 мин (0.5 XC)</option>
-                      <option value="60">60 мин (1.0 XC)</option>
-                      <option value="90">90 мин (1.5 XC)</option>
+                      <option value="30">30 мин</option>
+                      <option value="60">60 мин (30/30)</option>
+                      <option value="90">90 мин</option>
                     </select>
                   </div>
 
