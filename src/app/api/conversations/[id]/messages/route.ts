@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getSessionUser } from '@/lib/auth';
+import { isUserBlocked } from '@/lib/matchBlock';
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -45,6 +46,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     if (!content || !content.trim()) {
       return NextResponse.json({ error: 'Message content cannot be empty' }, { status: 400 });
+    }
+
+    // Verify conversation members are not blocked
+    const conv = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { members: true },
+    });
+    if (conv && !conv.isGroup) {
+      const otherMember = conv.members.find((m) => m.userId !== senderId);
+      if (otherMember) {
+        if (await isUserBlocked(senderId, otherMember.userId)) {
+          return NextResponse.json({ error: 'Пользователь заблокирован' }, { status: 403 });
+        }
+      }
     }
 
     const message = await prisma.message.create({

@@ -21,6 +21,10 @@ import {
   Image as ImageIcon,
   Sparkles,
   ExternalLink,
+  Ban,
+  ShieldAlert,
+  Lock,
+  X,
 } from 'lucide-react';
 import InChatCall from '@/components/chat/InChatCall';
 
@@ -40,8 +44,50 @@ export default function ChatsPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [peerTyping, setPeerTyping] = useState<string | null>(null);
 
+  // Block & Alert state
+  const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
+  const [chatAlert, setChatAlert] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const loadBlockedUsers = async () => {
+    try {
+      const res = await fetch('/api/block');
+      if (res.ok) {
+        const data = await res.json();
+        setBlockedUserIds(data.blockedUserIds || []);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadBlockedUsers();
+  }, [user]);
+
+  const handleToggleBlock = async (targetUserId: string) => {
+    if (!targetUserId) return;
+    const isCurrentlyBlocked = blockedUserIds.includes(targetUserId);
+    const action = isCurrentlyBlocked ? 'unblock' : 'block';
+    try {
+      const res = await fetch('/api/block', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId, action }),
+      });
+      if (res.ok) {
+        if (isCurrentlyBlocked) {
+          setBlockedUserIds((prev) => prev.filter((id) => id !== targetUserId));
+          setChatAlert('Пользователь разблокирован.');
+        } else {
+          setBlockedUserIds((prev) => [...prev, targetUserId]);
+          setChatAlert('Пользователь заблокирован. Звонки и сообщения отключены.');
+        }
+      }
+    } catch {
+      setChatAlert('Ошибка изменения статуса блокировки');
+    }
+  };
 
   // Fetch all conversations
   const loadConversations = async () => {
@@ -212,6 +258,11 @@ export default function ChatsPage() {
   const handleStartInChatCall = async (type: 'AUDIO' | 'VIDEO') => {
     if (!activeConv) return;
     const recipient = activeConv.members?.find((m: any) => m.userId !== user?.id);
+    if (!recipient) return;
+    if (blockedUserIds.includes(recipient.userId)) {
+      setChatAlert('Невозможно позвонить заблокированному пользователю.');
+      return;
+    }
     const roomId = `call_${activeConv.id}_${Date.now()}`;
 
     try {
@@ -248,6 +299,11 @@ export default function ChatsPage() {
   const handleInitiateCall = async (type: 'AUDIO' | 'VIDEO') => {
     if (!activeConv) return;
     const recipient = activeConv.members?.find((m: any) => m.userId !== user?.id);
+    if (!recipient) return;
+    if (blockedUserIds.includes(recipient.userId)) {
+      setChatAlert('Невозможно позвонить заблокированному пользователю.');
+      return;
+    }
     const roomId = `call_${activeConv.id}_${Date.now()}`;
 
     try {
@@ -446,8 +502,49 @@ export default function ChatsPage() {
               >
                 <ExternalLink className="w-4 h-4" />
               </button>
+
+              <button
+                onClick={() => otherMember?.id && handleToggleBlock(otherMember.id)}
+                title={otherMember && blockedUserIds.includes(otherMember.id) ? "Разблокировать собеседника" : "Заблокировать собеседника"}
+                className={`p-2 rounded-xl border transition-all ${
+                  otherMember && blockedUserIds.includes(otherMember.id)
+                    ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                    : 'bg-white/[0.04] hover:bg-red-950/40 text-zinc-400 hover:text-red-400 border-white/[0.08]'
+                }`}
+              >
+                <Ban className="w-4 h-4" />
+              </button>
             </div>
           </div>
+
+          {/* Chat Alert Banner */}
+          {chatAlert && (
+            <div className="p-3 bg-blue-500/10 border-b border-blue-500/20 flex items-center justify-between px-6 text-xs font-mono text-zinc-200">
+              <span className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-blue-400 shrink-0" />
+                <span>{chatAlert}</span>
+              </span>
+              <button onClick={() => setChatAlert(null)} className="text-zinc-500 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Blocked Partner Banner */}
+          {otherMember && blockedUserIds.includes(otherMember.id) && (
+            <div className="p-3 bg-red-950/40 border-b border-red-500/30 flex items-center justify-between px-6 text-xs font-mono text-red-300">
+              <span className="flex items-center gap-2">
+                <Ban className="w-4 h-4 text-red-400 shrink-0" />
+                <span>Пользователь заблокирован. Звонки и отправка сообщений отключены.</span>
+              </span>
+              <button
+                onClick={() => handleToggleBlock(otherMember.id)}
+                className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-white font-mono text-[11px]"
+              >
+                Разблокировать
+              </button>
+            </div>
+          )}
 
           {/* In-Chat WebRTC Call Window (Embedded directly above messages) */}
           {inChatCallRoom && (
@@ -541,41 +638,49 @@ export default function ChatsPage() {
 
           {/* Message Input Box */}
           <div className="p-3 md:p-4 border-t border-white/[0.08] bg-[#111114]">
-            {replyTo && (
-              <div className="flex items-center justify-between pb-2 text-xs font-mono text-zinc-400">
-                <span className="flex items-center gap-1">
-                  <Reply className="w-3 h-3 text-blue-400" />
-                  Replying to: {replyTo.content.substring(0, 30)}...
-                </span>
-                <button onClick={() => setReplyTo(null)} className="text-zinc-500 hover:text-white">
-                  Cancel
-                </button>
+            {otherMember && blockedUserIds.includes(otherMember.id) ? (
+              <div className="py-2.5 text-center text-xs font-mono text-zinc-500">
+                Диалог заблокирован. Разблокируйте пользователя, чтобы возобновить отправку сообщений.
               </div>
+            ) : (
+              <>
+                {replyTo && (
+                  <div className="flex items-center justify-between pb-2 text-xs font-mono text-zinc-400">
+                    <span className="flex items-center gap-1">
+                      <Reply className="w-3 h-3 text-blue-400" />
+                      Replying to: {replyTo.content.substring(0, 30)}...
+                    </span>
+                    <button onClick={() => setReplyTo(null)} className="text-zinc-500 hover:text-white">
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
+                <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                  <div className="flex-1 relative flex items-center">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={handleInputChange}
+                      placeholder={`Message ${otherMember?.profile?.name || 'peer'}...`}
+                      className="w-full bg-[#18181f] border border-white/[0.08] focus:border-blue-500 rounded-full pl-4 pr-10 py-2.5 text-xs text-white placeholder-zinc-500 outline-none font-sans"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={!newMessage.trim()}
+                    className={`p-2.5 rounded-full transition-all tap-active ${
+                      newMessage.trim()
+                        ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30'
+                        : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                    }`}
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </form>
+              </>
             )}
-
-            <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-              <div className="flex-1 relative flex items-center">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={handleInputChange}
-                  placeholder={`Message ${otherMember?.profile?.name || 'peer'}...`}
-                  className="w-full bg-[#18181f] border border-white/[0.08] focus:border-blue-500 rounded-full pl-4 pr-10 py-2.5 text-xs text-white placeholder-zinc-500 outline-none font-sans"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={!newMessage.trim()}
-                className={`p-2.5 rounded-full transition-all tap-active ${
-                  newMessage.trim()
-                    ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30'
-                    : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                }`}
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </form>
           </div>
         </div>
       ) : (

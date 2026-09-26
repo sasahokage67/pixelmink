@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getSessionUser } from '@/lib/auth';
 import { syncPeersFromCloud } from '@/lib/cloudSync';
+import { getCloudRegistry } from '@/lib/matchBlock';
 
 export const dynamic = 'force-dynamic';
 
@@ -144,7 +145,70 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, users });
+    let connectedUserIds: string[] = [];
+    let pendingSentIds: string[] = [];
+    let pendingReceivedIds: string[] = [];
+    let blockedUserIds: string[] = [];
+
+    if (currentUser) {
+      const [matches, blocks, cloud] = await Promise.all([
+        prisma.match.findMany({
+          where: { OR: [{ userAId: currentUser.id }, { userBId: currentUser.id }] },
+        }),
+        prisma.block.findMany({
+          where: { blockerId: currentUser.id },
+          select: { blockedId: true },
+        }),
+        getCloudRegistry(),
+      ]);
+
+      const cloudBlocks = (cloud.blocks || []).filter((b) => b.blockerId === currentUser.id).map((b) => b.blockedId);
+      blockedUserIds = Array.from(new Set([...blocks.map((b) => b.blockedId), ...cloudBlocks]));
+
+      const connSet = new Set<string>();
+      const sentSet = new Set<string>();
+      const recvSet = new Set<string>();
+
+      for (const m of matches) {
+        const other = m.userAId === currentUser.id ? m.userBId : m.userAId;
+        if (m.status === 'ACCEPTED') connSet.add(other);
+        else if (m.status === 'PENDING') {
+          if (m.userAId === currentUser.id) sentSet.add(other);
+          else recvSet.add(other);
+        }
+      }
+
+      for (const cm of cloud.matches || []) {
+        const isA = cm.userAId === currentUser.id;
+        const isB = cm.userBId === currentUser.id;
+        if (!isA && !isB) continue;
+        const other = isA ? cm.userBId : cm.userAId;
+        if (cm.status === 'ACCEPTED') {
+          connSet.add(other);
+          sentSet.delete(other);
+          recvSet.delete(other);
+        } else if (cm.status === 'PENDING') {
+          if (isA) {
+            if (!connSet.has(other)) sentSet.add(other);
+          } else {
+            if (!connSet.has(other)) recvSet.add(other);
+          }
+        }
+      }
+
+      connectedUserIds = Array.from(connSet);
+      pendingSentIds = Array.from(sentSet);
+      pendingReceivedIds = Array.from(recvSet);
+    }
+
+    return NextResponse.json({
+      success: true,
+      users,
+      connectedUserIds,
+      pendingSentIds,
+      pendingReceivedIds,
+      blockedUserIds,
+    });
   } catch (err: any) {
     console.error('Error fetching users:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });

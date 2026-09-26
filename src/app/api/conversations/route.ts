@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getSessionUser } from '@/lib/auth';
+import { isUserMatched, isUserBlocked } from '@/lib/matchBlock';
 
 export async function GET(req: NextRequest) {
   try {
@@ -67,6 +68,26 @@ export async function POST(req: NextRequest) {
 
     if (!targetUserId) {
       return NextResponse.json({ error: 'targetUserId is required' }, { status: 400 });
+    }
+
+    // 1. Check if blocked
+    if (await isUserBlocked(senderId, targetUserId)) {
+      return NextResponse.json(
+        { error: 'Диалог заблокирован' },
+        { status: 403 }
+      );
+    }
+
+    // 2. Strict requirement: Mutual match must be confirmed first
+    const matched = await isUserMatched(senderId, targetUserId);
+    if (!matched) {
+      return NextResponse.json(
+        {
+          error: 'Сначала необходимо установить взаимный мэтч для открытия диалога',
+          requireMatch: true,
+        },
+        { status: 403 }
+      );
     }
 
     // Check if 1-on-1 conversation already exists

@@ -21,6 +21,12 @@ import {
   Send,
   Loader2,
   Sparkles,
+  Lock,
+  Ban,
+  ShieldAlert,
+  Check,
+  UserCheck,
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
@@ -48,6 +54,12 @@ function ProfileContent() {
     reviewsCount: 0,
   });
   const [loading, setLoading] = useState(true);
+
+  // Match Gate & Block state for peer profile
+  const [isMatched, setIsMatched] = useState(false);
+  const [isPendingSent, setIsPendingSent] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [profileAlert, setProfileAlert] = useState<string | null>(null);
 
   // Edit profile state
   const [isEditing, setIsEditing] = useState(false);
@@ -87,6 +99,16 @@ function ProfileContent() {
           setLocation(userData?.profile?.location || currentUser?.profile?.location || '');
           setLanguages(userData?.profile?.languages || currentUser?.profile?.languages || '');
           setAvailability(userData?.profile?.availability || currentUser?.profile?.availability || '');
+        } else if (targetUserId) {
+          try {
+            const matchRes = await fetch('/api/matches');
+            if (matchRes.ok) {
+              const matchData = await matchRes.json();
+              setIsMatched(matchData.connectedUserIds?.includes(targetUserId) || false);
+              setIsPendingSent(matchData.pendingSentIds?.includes(targetUserId) || false);
+              setIsBlocked(matchData.blockedUserIds?.includes(targetUserId) || false);
+            }
+          } catch {}
         }
       } else if (isOwnProfile && currentUser) {
         setProfileData(currentUser);
@@ -183,6 +205,14 @@ function ProfileContent() {
   };
 
   const handleStartCall = async () => {
+    if (isBlocked) {
+      setProfileAlert('Этот пользователь заблокирован.');
+      return;
+    }
+    if (!isMatched) {
+      setProfileAlert('🔒 Для созвона необходим взаимный подтвержденный мэтч! Нажмите «Запросить мэтч».');
+      return;
+    }
     const roomId = `room_${Date.now()}`;
     try {
       if (targetUserId) {
@@ -228,6 +258,87 @@ function ProfileContent() {
     router.push(`/calls/${roomId}`);
   };
 
+  const handleStartChat = async () => {
+    if (isBlocked) {
+      setProfileAlert('Этот пользователь заблокирован.');
+      return;
+    }
+    if (!isMatched) {
+      setProfileAlert('🔒 Для открытия чата необходим взаимный подтвержденный мэтч! Нажмите «Запросить мэтч».');
+      return;
+    }
+    try {
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setProfileAlert(data.error || 'Для открытия чата необходим взаимный мэтч!');
+        return;
+      }
+      if (data.conversation?.id) {
+        router.push(`/chats?convId=${data.conversation.id}`);
+      } else {
+        router.push('/chats');
+      }
+    } catch {
+      router.push('/chats');
+    }
+  };
+
+  const handleRequestMatch = async () => {
+    if (!targetUserId) return;
+    try {
+      const res = await fetch('/api/matches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId, action: 'request' }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.status === 'ACCEPTED') {
+          setIsMatched(true);
+          setIsPendingSent(false);
+          setProfileAlert('✓ Взаимный мэтч подтвержден! Чат и созвон разблокированы.');
+        } else {
+          setIsPendingSent(true);
+          setProfileAlert('Запрос на взаимный мэтч отправлен инженеру.');
+        }
+      } else {
+        setProfileAlert(data.error || 'Не удалось отправить запрос на мэтч');
+      }
+    } catch {
+      setProfileAlert('Сетевая ошибка при отправке запроса');
+    }
+  };
+
+  const handleToggleBlock = async () => {
+    if (!targetUserId) return;
+    const action = isBlocked ? 'unblock' : 'block';
+    try {
+      const res = await fetch('/api/block', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId, action }),
+      });
+      if (res.ok) {
+        if (isBlocked) {
+          setIsBlocked(false);
+          setProfileAlert('Пользователь разблокирован.');
+        } else {
+          setIsBlocked(true);
+          setIsMatched(false);
+          setIsPendingSent(false);
+          setProfileAlert('Пользователь заблокирован. Все контакты аннулированы.');
+        }
+      }
+    } catch {
+      setProfileAlert('Ошибка при изменении статуса блокировки');
+    }
+  };
+
   const p = profileData?.profile || (isOwnProfile ? currentUser?.profile : null);
   const allSkills =
     profileData?.userSkills && profileData.userSkills.length > 0
@@ -250,6 +361,18 @@ function ProfileContent() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in py-2">
+      {profileAlert && (
+        <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-xs font-mono text-zinc-200 flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-blue-400 shrink-0" />
+            <span>{profileAlert}</span>
+          </div>
+          <button onClick={() => setProfileAlert(null)} className="text-zinc-500 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {saveSuccess && (
         <div className="px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-xs flex items-center justify-between animate-in fade-in">
           <span>✓ Профиль и параметры обмена успешно сохранены</span>
@@ -311,23 +434,84 @@ function ProfileContent() {
                 <span>{isEditing ? 'Отмена' : 'Редактировать профиль'}</span>
               </button>
             ) : (
-              <>
-                <button
-                  onClick={handleStartCall}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-blue-600/20 tap-active"
-                >
-                  <Video className="w-3.5 h-3.5" />
-                  <span>Созвониться (P2P)</span>
-                </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {isBlocked ? (
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-2 rounded-xl bg-red-950/20 border border-red-500/30 text-red-400 font-mono text-xs flex items-center gap-1.5">
+                      <Ban className="w-3.5 h-3.5" />
+                      <span>Заблокирован</span>
+                    </span>
+                    <button
+                      onClick={handleToggleBlock}
+                      className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-white/[0.08] font-mono text-xs transition-all tap-active"
+                    >
+                      Разблокировать
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Match status / request */}
+                    {isMatched ? (
+                      <span className="px-3 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-mono text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Взаимный мэтч</span>
+                      </span>
+                    ) : isPendingSent ? (
+                      <button
+                        disabled
+                        className="px-3 py-2 rounded-xl bg-zinc-800/80 border border-white/5 text-zinc-400 font-mono text-xs cursor-default flex items-center gap-1.5"
+                      >
+                        <span>⏳ Запрос отправлен</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleRequestMatch}
+                        className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-blue-600/20 tap-active"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        <span>Запросить мэтч</span>
+                      </button>
+                    )}
 
-                <Link
-                  href="/chats"
-                  className="px-4 py-2 rounded-xl bg-[#18181f] hover:bg-zinc-800 text-zinc-200 border border-white/[0.08] font-mono text-xs flex items-center gap-2 transition-all tap-active"
-                >
-                  <MessageSquare className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Чат</span>
-                </Link>
-              </>
+                    {/* Call button */}
+                    <button
+                      onClick={handleStartCall}
+                      className={`px-4 py-2 rounded-xl font-mono text-xs font-bold flex items-center gap-2 transition-all tap-active ${
+                        isMatched
+                          ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20'
+                          : 'bg-zinc-900/60 hover:bg-zinc-900 text-zinc-500 border border-white/[0.06]'
+                      }`}
+                      title={isMatched ? 'Созвониться' : 'Требуется взаимный мэтч'}
+                    >
+                      {isMatched ? <Video className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5 text-zinc-500" />}
+                      <span>Созвон (P2P)</span>
+                    </button>
+
+                    {/* Chat button */}
+                    <button
+                      onClick={handleStartChat}
+                      className={`px-4 py-2 rounded-xl border border-white/[0.08] font-mono text-xs flex items-center gap-2 transition-all tap-active ${
+                        isMatched
+                          ? 'bg-[#18181f] hover:bg-zinc-800 text-zinc-200'
+                          : 'bg-zinc-900/60 hover:bg-zinc-900 text-zinc-500'
+                      }`}
+                      title={isMatched ? 'Чат' : 'Требуется взаимный мэтч'}
+                    >
+                      {isMatched ? <MessageSquare className="w-3.5 h-3.5 text-zinc-400" /> : <Lock className="w-3.5 h-3.5 text-zinc-500" />}
+                      <span>Чат</span>
+                    </button>
+
+                    {/* Block button */}
+                    <button
+                      onClick={handleToggleBlock}
+                      className="p-2 rounded-xl bg-zinc-900 hover:bg-red-950/40 text-zinc-500 hover:text-red-400 border border-white/[0.08] transition-all tap-active"
+                      title="Заблокировать пользователя"
+                    >
+                      <Ban className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
             )}
           </div>
         </div>

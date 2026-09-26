@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isUserBlocked, isUserMatched } from '@/lib/matchBlock';
 
 export const dynamic = 'force-dynamic';
 
@@ -120,6 +121,27 @@ export async function POST(req: NextRequest) {
     // 1. Initiate incoming call to receiver
     if (action === 'initiate') {
       const { roomId, callerId, callerName, callerAvatar, receiverId, type } = body;
+
+      if (receiverId && callerId) {
+        if (await isUserBlocked(callerId, receiverId)) {
+          return NextResponse.json(
+            { error: 'Звонок отклонен: контакт заблокирован' },
+            { status: 403 }
+          );
+        }
+
+        const matched = await isUserMatched(callerId, receiverId);
+        if (!matched) {
+          return NextResponse.json(
+            {
+              error: 'Звонки доступны только после взаимного подтверждения мэтча',
+              requireMatch: true,
+            },
+            { status: 403 }
+          );
+        }
+      }
+
       const callRecord = {
         id: `call_${roomId}_${now}`,
         roomId,

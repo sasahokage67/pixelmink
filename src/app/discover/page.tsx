@@ -14,6 +14,12 @@ import {
   Video,
   Globe,
   Filter,
+  Lock,
+  Ban,
+  ShieldAlert,
+  Check,
+  X,
+  UserCheck,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
@@ -32,7 +38,12 @@ export default function DiscoverPage() {
   const [level, setLevel] = useState('');
   const [language, setLanguage] = useState('');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [connectedIds, setConnectedIds] = useState<Set<string>>(new Set());
+
+  // Match Gate & Block state
+  const [connectedUserIds, setConnectedUserIds] = useState<string[]>([]);
+  const [pendingSentIds, setPendingSentIds] = useState<string[]>([]);
+  const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
+  const [matchAlert, setMatchAlert] = useState<string | null>(null);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -48,6 +59,9 @@ export default function DiscoverPage() {
       if (res.ok) {
         const data = await res.json();
         setUsers(data.users || []);
+        if (data.connectedUserIds) setConnectedUserIds(data.connectedUserIds);
+        if (data.pendingSentIds) setPendingSentIds(data.pendingSentIds);
+        if (data.blockedUserIds) setBlockedUserIds(data.blockedUserIds);
       }
     } catch (err) {
       console.error(err);
@@ -67,18 +81,65 @@ export default function DiscoverPage() {
 
   const handleConnect = async (targetUserId: string) => {
     try {
-      await fetch('/api/matches', {
+      const res = await fetch('/api/matches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUserId }),
+        body: JSON.stringify({ targetUserId, action: 'request' }),
       });
-      setConnectedIds((prev) => new Set(prev).add(targetUserId));
+      const data = await res.json();
+      if (res.ok) {
+        if (data.status === 'ACCEPTED') {
+          setConnectedUserIds((prev) => Array.from(new Set([...prev, targetUserId])));
+          setPendingSentIds((prev) => prev.filter((id) => id !== targetUserId));
+          setMatchAlert('✓ Взаимный мэтч подтвержден! Чат и созвон разблокированы.');
+        } else {
+          setPendingSentIds((prev) => Array.from(new Set([...prev, targetUserId])));
+          setMatchAlert('Запрос на мэтч отправлен инженеру.');
+        }
+      } else {
+        setMatchAlert(data.error || 'Ошибка при отправке запроса');
+      }
     } catch (err) {
       console.error(err);
+      setMatchAlert('Сетевая ошибка при отправке запроса');
+    }
+  };
+
+  const handleToggleBlock = async (targetUserId: string) => {
+    const isCurrentlyBlocked = blockedUserIds.includes(targetUserId);
+    const action = isCurrentlyBlocked ? 'unblock' : 'block';
+    try {
+      const res = await fetch('/api/block', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId, action }),
+      });
+      if (res.ok) {
+        if (isCurrentlyBlocked) {
+          setBlockedUserIds((prev) => prev.filter((id) => id !== targetUserId));
+          setMatchAlert('Пользователь разблокирован.');
+        } else {
+          setBlockedUserIds((prev) => [...prev, targetUserId]);
+          setConnectedUserIds((prev) => prev.filter((id) => id !== targetUserId));
+          setPendingSentIds((prev) => prev.filter((id) => id !== targetUserId));
+          setMatchAlert('Пользователь заблокирован.');
+        }
+        await fetchUsers();
+      }
+    } catch {
+      setMatchAlert('Ошибка при изменении статуса блокировки');
     }
   };
 
   const handleMessage = async (targetUserId: string) => {
+    if (blockedUserIds.includes(targetUserId)) {
+      setMatchAlert('Этот пользователь заблокирован.');
+      return;
+    }
+    if (!connectedUserIds.includes(targetUserId)) {
+      setMatchAlert('🔒 Для открытия чата необходим взаимный мэтч! Нажмите «Обмен».');
+      return;
+    }
     try {
       const res = await fetch('/api/conversations', {
         method: 'POST',
@@ -86,6 +147,10 @@ export default function DiscoverPage() {
         body: JSON.stringify({ targetUserId }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        setMatchAlert(data.error || 'Требуется взаимный мэтч!');
+        return;
+      }
       if (data.conversation?.id) {
         router.push(`/chats?convId=${data.conversation.id}`);
       } else {
@@ -97,6 +162,14 @@ export default function DiscoverPage() {
   };
 
   const handleStartCall = async (targetUserId: string) => {
+    if (blockedUserIds.includes(targetUserId)) {
+      setMatchAlert('Этот пользователь заблокирован.');
+      return;
+    }
+    if (!connectedUserIds.includes(targetUserId)) {
+      setMatchAlert('🔒 Для созвона необходим взаимный подтвержденный мэтч! Нажмите «Обмен».');
+      return;
+    }
     const roomId = `room-${targetUserId.slice(0, 8)}-${Date.now().toString(36)}`;
     try {
       await fetch('/api/calls/signal', {
@@ -154,6 +227,19 @@ export default function DiscoverPage() {
           />
         </form>
       </div>
+
+      {/* Alert Banner */}
+      {matchAlert && (
+        <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-xs font-mono text-zinc-200 flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-blue-400 shrink-0" />
+            <span>{matchAlert}</span>
+          </div>
+          <button onClick={() => setMatchAlert(null)} className="text-zinc-500 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Filter Chips Bar (Drinkit Style Pill Selectors) */}
       <div className="flex flex-wrap items-center gap-2 pb-2">
@@ -235,7 +321,10 @@ export default function DiscoverPage() {
             const pName = peer.profile?.name || peer.email?.split('@')[0] || 'Инженер';
             const teaches = peer.userSkills?.filter((s: any) => s.type === 'TEACH') || [];
             const wants = peer.userSkills?.filter((s: any) => s.type === 'LEARN') || [];
-            const isConnected = connectedIds.has(peer.id);
+            const isConnected = connectedUserIds.includes(peer.id);
+            const isPendingSent = pendingSentIds.includes(peer.id);
+            const isBlocked = blockedUserIds.includes(peer.id);
+            const isCurrentUser = user && peer.id === user.id;
 
             return (
               <div
@@ -327,36 +416,101 @@ export default function DiscoverPage() {
                   </div>
                 </div>
 
-                {/* Actions: Connect, Message, Call */}
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/[0.06]">
-                  <button
-                    onClick={() => handleConnect(peer.id)}
-                    disabled={isConnected}
-                    className={`py-1.5 px-2 rounded-lg text-xs font-mono tap-active transition-all flex items-center justify-center gap-1 border ${
-                      isConnected
-                        ? 'bg-zinc-800 text-zinc-500 border-transparent cursor-default'
-                        : 'bg-[#18181f] hover:bg-zinc-800 text-zinc-200 border-white/[0.08]'
-                    }`}
-                  >
-                    <UserPlus className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>{isConnected ? 'Запрошен' : 'Обмен'}</span>
-                  </button>
+                {/* Actions: Connect / Match, Message, Call, Block */}
+                <div className="pt-2 border-t border-white/[0.06]">
+                  {isCurrentUser ? (
+                    <div className="py-1.5 text-center font-mono text-[11px] text-zinc-500 bg-white/[0.02] rounded-lg border border-white/[0.04]">
+                      Ваш профиль
+                    </div>
+                  ) : isBlocked ? (
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-red-950/20 border border-red-500/30">
+                      <span className="text-[11px] font-mono text-red-400 flex items-center gap-1">
+                        <Ban className="w-3.5 h-3.5" />
+                        <span>Заблокирован</span>
+                      </span>
+                      <button
+                        onClick={() => handleToggleBlock(peer.id)}
+                        className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-mono text-[11px]"
+                      >
+                        Разблокировать
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {/* Match button */}
+                      {isConnected ? (
+                        <div
+                          className="py-1.5 px-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-[11px] font-bold flex items-center justify-center gap-1"
+                          title="Взаимный мэтч подтвержден"
+                        >
+                          <Check className="w-3 h-3 text-emerald-400" />
+                          <span>Мэтч</span>
+                        </div>
+                      ) : isPendingSent ? (
+                        <button
+                          disabled
+                          className="py-1.5 px-1 rounded-lg bg-zinc-900 border border-white/5 text-zinc-400 font-mono text-[11px] cursor-default flex items-center justify-center gap-1"
+                          title="Запрос на мэтч отправлен"
+                        >
+                          <span>⏳ Ждем</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleConnect(peer.id)}
+                          className="py-1.5 px-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-medium tap-active transition-all flex items-center justify-center gap-1 shadow-md shadow-blue-600/20"
+                          title="Запросить взаимный обмен навыками"
+                        >
+                          <UserPlus className="w-3.5 h-3.5" />
+                          <span>Обмен</span>
+                        </button>
+                      )}
 
-                  <button
-                    onClick={() => handleMessage(peer.id)}
-                    className="py-1.5 px-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-medium tap-active transition-all flex items-center justify-center gap-1 shadow-md shadow-blue-600/20"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" />
-                    <span>Чат</span>
-                  </button>
+                      {/* Chat Button (Locked if not matched) */}
+                      <button
+                        onClick={() => handleMessage(peer.id)}
+                        className={`py-1.5 px-1 rounded-lg text-xs font-mono font-medium tap-active transition-all flex items-center justify-center gap-1 border ${
+                          isConnected
+                            ? 'bg-[#18181f] hover:bg-zinc-800 text-zinc-200 border-white/[0.08]'
+                            : 'bg-zinc-950/60 hover:bg-zinc-900 text-zinc-500 border-white/[0.04]'
+                        }`}
+                        title={isConnected ? 'Написать в чат' : 'Необходим взаимный мэтч'}
+                      >
+                        {isConnected ? (
+                          <MessageSquare className="w-3.5 h-3.5 text-zinc-400" />
+                        ) : (
+                          <Lock className="w-3.5 h-3.5 text-zinc-500" />
+                        )}
+                        <span>Чат</span>
+                      </button>
 
-                  <button
-                    onClick={() => handleStartCall(peer.id)}
-                    className="py-1.5 px-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-mono tap-active transition-all flex items-center justify-center gap-1"
-                  >
-                    <Video className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>Созвон</span>
-                  </button>
+                      {/* Call Button (Locked if not matched) */}
+                      <button
+                        onClick={() => handleStartCall(peer.id)}
+                        className={`py-1.5 px-1 rounded-lg text-xs font-mono tap-active transition-all flex items-center justify-center gap-1 border ${
+                          isConnected
+                            ? 'bg-[#18181f] hover:bg-zinc-800 text-zinc-200 border-white/[0.08]'
+                            : 'bg-zinc-950/60 hover:bg-zinc-900 text-zinc-500 border-white/[0.04]'
+                        }`}
+                        title={isConnected ? 'Быстрый P2P созвон' : 'Необходим взаимный мэтч'}
+                      >
+                        {isConnected ? (
+                          <Video className="w-3.5 h-3.5 text-zinc-400" />
+                        ) : (
+                          <Lock className="w-3.5 h-3.5 text-zinc-500" />
+                        )}
+                        <span>Звонок</span>
+                      </button>
+
+                      {/* Block Button */}
+                      <button
+                        onClick={() => handleToggleBlock(peer.id)}
+                        className="py-1.5 px-1 rounded-lg bg-zinc-950 hover:bg-red-950/40 text-zinc-500 hover:text-red-400 border border-white/[0.04] hover:border-red-500/20 font-mono text-xs flex items-center justify-center transition-all"
+                        title="Заблокировать пользователя"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );

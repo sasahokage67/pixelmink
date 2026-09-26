@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getSessionUser } from '@/lib/auth';
+import { isUserBlocked, isUserMatched } from '@/lib/matchBlock';
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,6 +18,18 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { receiverId, type = 'VIDEO', roomId } = body;
+
+    if (receiverId) {
+      if (await isUserBlocked(callerId, receiverId)) {
+        return NextResponse.json({ error: 'Звонок отклонен: контакт заблокирован' }, { status: 403 });
+      }
+      if (!(await isUserMatched(callerId, receiverId))) {
+        return NextResponse.json(
+          { error: 'Звонки доступны только после взаимного подтверждения мэтча', requireMatch: true },
+          { status: 403 }
+        );
+      }
+    }
 
     const finalRoomId = roomId || `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
