@@ -994,7 +994,7 @@ export default function CallRoomPage() {
       clearInterval(heartbeatTimer);
       if (sseSource) sseSource.close();
     };
-  }, [roomId, hasEnteredName, isCallFinished, effectiveUserName, sendRoomSignal, sendRoomSignalHttp, getOrCreatePeerConnection, remotePeerName, remotePeerSocketId, isPeerConnected, cleanRoomId, remoteStream]);
+  }, [roomId, hasEnteredName, isCallFinished, cleanRoomId]);
 
   // Manual role swap handler
   const handleManualRoleSwitch = () => {

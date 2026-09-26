@@ -105,6 +105,8 @@ export default function ChatsPage() {
           if (match) {
             setActiveConv(match);
           } else {
+            // Try to fetch directly (may fail on ephemeral Vercel SQLite)
+            let found = false;
             try {
               const directRes = await fetch(`/api/conversations/${paramConvId}`);
               if (directRes.ok) {
@@ -112,9 +114,27 @@ export default function ChatsPage() {
                 if (directData.conversation) {
                   setConversations((prev) => [directData.conversation, ...prev.filter((c) => c.id !== paramConvId)]);
                   setActiveConv(directData.conversation);
+                  found = true;
                 }
               }
             } catch {}
+            // Fallback: if paramUserId is also available, create a fresh conversation
+            if (!found && paramUserId) {
+              try {
+                const createRes = await fetch('/api/conversations', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ targetUserId: paramUserId }),
+                });
+                if (createRes.ok) {
+                  const createData = await createRes.json();
+                  if (createData.conversation) {
+                    setConversations((prev) => [createData.conversation, ...prev.filter((c) => c.id !== createData.conversation.id)]);
+                    setActiveConv(createData.conversation);
+                  }
+                }
+              } catch {}
+            }
           }
         } else if (paramUserId) {
           const matchUser = convList.find((c: any) => c.members?.some((m: any) => m.userId === paramUserId));
@@ -190,9 +210,14 @@ export default function ChatsPage() {
           const raw = JSON.parse(event.data);
           const data = typeof raw.message === 'string' ? JSON.parse(raw.message) : raw;
           if (data && data.type === 'new_message' && data.message) {
+            const msg = data.message;
+            // Skip own messages (they are already shown optimistically)
+            if (msg.senderId && user?.id && msg.senderId === user.id) return;
             setMessages((prev) => {
-              if (prev.some((m) => m.id === data.message.id)) return prev;
-              return [...prev, data.message];
+              // Deduplicate by id or by content+timestamp combo
+              if (prev.some((m) => m.id === msg.id)) return prev;
+              if (msg.content && prev.some((m) => m.content === msg.content && m.senderId === msg.senderId && Math.abs(new Date(m.createdAt).getTime() - new Date(msg.createdAt).getTime()) < 3000)) return prev;
+              return [...prev, msg];
             });
             loadConversations();
           }
@@ -224,7 +249,12 @@ export default function ChatsPage() {
 
     const handleNewMessage = (msg: any) => {
       if (activeConv && msg.conversationId === activeConv.id) {
-        setMessages((prev) => [...prev, msg]);
+        // Skip own messages (already shown optimistically)
+        if (msg.senderId && user?.id && msg.senderId === user.id) return;
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
       }
       loadConversations();
     };

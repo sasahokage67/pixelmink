@@ -253,7 +253,8 @@ export default function SharedCallTerminal({
         eventSource.close();
       }
     };
-  }, [socket, language, onClose, roomId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, onClose, roomId]);
 
   const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
   const termTopic = `pixelmink_term_${cleanRoomId}`;

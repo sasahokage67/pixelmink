@@ -316,7 +316,7 @@ export default function MatchesPage() {
       });
       const data = await res.json();
       if (data.conversation?.id) {
-        router.push(`/chats?convId=${data.conversation.id}`);
+        router.push(`/chats?convId=${data.conversation.id}&userId=${targetUserId}`);
       } else {
         router.push(`/chats?userId=${targetUserId}`);
       }
