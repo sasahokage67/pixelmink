@@ -5,24 +5,21 @@ declare global {
   var prisma: PrismaClient | undefined;
 }
 
-function getDatasourceUrl(): string {
+function getDatasourceUrl(): string | undefined {
   const rawUrl = process.env.DATABASE_URL?.trim();
   if (rawUrl && rawUrl.length > 0) {
     return rawUrl;
   }
-  // Safe default for SQLite if DATABASE_URL is unset or empty string in environment
-  return `file:${path.resolve(process.cwd(), 'prisma', 'dev.db')}`;
+  return undefined;
 }
+
+const dbUrl = getDatasourceUrl();
 
 export const prisma =
   global.prisma ||
-  new PrismaClient({
-    datasources: {
-      db: {
-        url: getDatasourceUrl(),
-      },
-    },
-  });
+  (dbUrl
+    ? new PrismaClient({ datasources: { db: { url: dbUrl } } })
+    : new PrismaClient());
 
 if (process.env.NODE_ENV !== 'production') {
   global.prisma = prisma;
