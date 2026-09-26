@@ -23,8 +23,10 @@ import {
   Radio,
   User,
   AlertCircle,
+  Terminal as TerminalIcon,
 } from 'lucide-react';
 import Identicon from '@/components/ui/Identicon';
+import SharedCallTerminal from '@/components/call/SharedCallTerminal';
 
 const RTC_CONFIG: RTCConfiguration = {
   iceServers: [
@@ -65,6 +67,12 @@ export default function CallRoomPage() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [callMessages, setCallMessages] = useState<Array<{ id: string; sender: string; text: string; time: string }>>([]);
   const [chatInput, setChatInput] = useState('');
+
+  // Terminal state (Mutual Consent & Collaborative IDE)
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  const [terminalProposal, setTerminalProposal] = useState<{ fromUserId: string; fromUserName: string } | null>(null);
+  const [terminalRequestSent, setTerminalRequestSent] = useState(false);
+  const [terminalDeclinedNotice, setTerminalDeclinedNotice] = useState<string | null>(null);
 
   // Refs
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -297,6 +305,28 @@ export default function CallRoomPage() {
       setIsPeerConnected(false);
     });
 
+    // F: Shared Coding Terminal Events (Mutual Consent)
+    socket.on('call:terminal_request', (data: { fromUserId: string; fromUserName: string }) => {
+      setTerminalProposal(data);
+    });
+
+    socket.on('call:terminal_opened', () => {
+      setIsTerminalOpen(true);
+      setTerminalProposal(null);
+      setTerminalRequestSent(false);
+    });
+
+    socket.on('call:terminal_declined', ({ byUserName }: { byUserName?: string }) => {
+      setTerminalRequestSent(false);
+      const name = byUserName || 'Собеседник';
+      setTerminalDeclinedNotice(`${name} отклонил(а) предложение открыть терминал`);
+      setTimeout(() => setTerminalDeclinedNotice(null), 4000);
+    });
+
+    socket.on('call:terminal_closed', () => {
+      setIsTerminalOpen(false);
+    });
+
     return () => {
       socket.emit('call:leave', { roomId });
       socket.off('call:existing_peers');
@@ -304,6 +334,10 @@ export default function CallRoomPage() {
       socket.off('webrtc:signal');
       socket.off('call:new_chat_message');
       socket.off('call:peer_left');
+      socket.off('call:terminal_request');
+      socket.off('call:terminal_opened');
+      socket.off('call:terminal_declined');
+      socket.off('call:terminal_closed');
 
       if (peerConnectionRef.current) {
         peerConnectionRef.current.close();
@@ -417,6 +451,47 @@ export default function CallRoomPage() {
     socket.emit('call:chat_message', { roomId, message: newMsg });
     setCallMessages((prev) => [...prev, newMsg]);
     setChatInput('');
+  };
+
+  // Terminal Handlers (Mutual Consent)
+  const handleToggleTerminal = () => {
+    if (isTerminalOpen) {
+      if (socket) {
+        socket.emit('call:terminal_close', { roomId });
+      }
+      setIsTerminalOpen(false);
+    } else {
+      if (!socket) return;
+      socket.emit('call:terminal_request', {
+        roomId,
+        fromUserId: user?.id || `guest_${Date.now()}`,
+        fromUserName: effectiveUserName,
+      });
+      setTerminalRequestSent(true);
+    }
+  };
+
+  const handleAcceptTerminal = () => {
+    if (socket) {
+      socket.emit('call:terminal_response', {
+        roomId,
+        accepted: true,
+        fromUserName: effectiveUserName,
+      });
+    }
+    setTerminalProposal(null);
+    setIsTerminalOpen(true);
+  };
+
+  const handleDeclineTerminal = () => {
+    if (socket) {
+      socket.emit('call:terminal_response', {
+        roomId,
+        accepted: false,
+        fromUserName: effectiveUserName,
+      });
+    }
+    setTerminalProposal(null);
   };
 
   // Leave Call
@@ -540,11 +615,107 @@ export default function CallRoomPage() {
         </div>
       </header>
 
-      {/* Main Video Viewport (2-Side P2P Grid) */}
+      {/* Mutual Consent Proposal Modal for Shared Terminal */}
+      {terminalProposal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-[#0e0e14] border border-blue-500/30 p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                <TerminalIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white font-mono">
+                  {lang === 'ru' ? 'Запрос на совместный терминал' : lang === 'kz' ? 'Бірлескен терминал сұрауы' : 'Shared Coding Request'}
+                </h3>
+                <p className="text-xs text-zinc-400 font-mono">
+                  <span className="text-blue-400 font-bold">{terminalProposal.fromUserName}</span> {lang === 'ru' ? 'предлагает открыть терминал для кодинга' : lang === 'kz' ? 'код жазу терминалын ашуды ұсынады' : 'wants to open coding sandbox'}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-300 font-mono bg-white/[0.03] p-3 rounded-xl border border-white/[0.06] leading-relaxed">
+              {lang === 'ru'
+                ? 'Прямо внутри видеозвонка откроется живой терминал и редактор кода с поддержкой Python, JS/TS, Rust, C++, Go, Bash и SQL. Код и консоль выполнения синхронизируются в реальном времени.'
+                : lang === 'kz'
+                ? 'Бейнеқоңырау ішінде Python, JS/TS, Rust, C++, Go, Bash және SQL қолдайтын тірі терминал ашылады. Код пен нәтижелер екі жаққа да нақты уақытта көрінеді.'
+                : 'A collaborative terminal supporting Python, JS/TS, Rust, C++, Go, Bash will open live.'}
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                onClick={handleDeclineTerminal}
+                className="px-4 py-2 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-zinc-300 text-xs font-mono font-medium transition-all"
+              >
+                {lang === 'ru' ? 'Отклонить' : lang === 'kz' ? 'Бас тарту' : 'Decline'}
+              </button>
+              <button
+                onClick={handleAcceptTerminal}
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold transition-all shadow-lg shadow-emerald-600/30 flex items-center gap-1.5"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>{lang === 'ru' ? 'Согласиться и открыть' : lang === 'kz' ? 'Келісу және ашу' : 'Accept & Open'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notice: Terminal Request Waiting */}
+      {terminalRequestSent && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 bg-[#14141e] border border-blue-500/40 px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 text-xs font-mono text-zinc-200 animate-in fade-in slide-in-from-top-2">
+          <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping" />
+          <span>
+            {lang === 'ru'
+              ? 'Ожидание подтверждения собеседника на открытие терминала...'
+              : lang === 'kz'
+              ? 'Сұхбаттасыңыздың терминалды ашуға келісімі күтілуде...'
+              : 'Waiting for peer approval to open terminal...'}
+          </span>
+          <button
+            onClick={() => setTerminalRequestSent(false)}
+            className="text-zinc-500 hover:text-white ml-1 p-0.5"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Toast Notice: Terminal Declined */}
+      {terminalDeclinedNotice && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 bg-red-950/80 border border-red-500/40 px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-mono text-red-200 animate-in fade-in slide-in-from-top-2">
+          <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+          <span>{terminalDeclinedNotice}</span>
+        </div>
+      )}
+
+      {/* Main Video Viewport (2-Side P2P Grid OR Terminal + Docked Videos) */}
       <div className="flex-1 p-3 md:p-6 flex gap-4 overflow-hidden relative">
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 h-full max-h-[calc(100vh-140px)]">
+        {/* If Terminal is Open: show collaborative IDE on the main side */}
+        {isTerminalOpen && (
+          <div className="flex-1 h-full min-w-0 flex flex-col">
+            <SharedCallTerminal
+              roomId={roomId}
+              socket={socket}
+              currentUser={user}
+              partnerName={remotePeerName || 'Собеседник'}
+              onClose={() => {
+                if (socket) socket.emit('call:terminal_close', { roomId });
+                setIsTerminalOpen(false);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Video Cards: full grid when terminal closed, docked vertical stack when terminal open */}
+        <div
+          className={`h-full max-h-[calc(100vh-140px)] ${
+            isTerminalOpen
+              ? 'w-60 lg:w-72 flex flex-col gap-3 shrink-0'
+              : 'flex-1 grid grid-cols-1 md:grid-cols-2 gap-4'
+          }`}
+        >
           {/* Peer 1: Local Stream */}
-          <div className="relative rounded-2xl overflow-hidden bg-[#121217] border border-white/[0.08] flex items-center justify-center">
+          <div className={`relative rounded-2xl overflow-hidden bg-[#121217] border border-white/[0.08] flex items-center justify-center ${isTerminalOpen ? 'flex-1 min-h-0' : ''}`}>
             <video
               ref={localVideoRef}
               autoPlay
@@ -554,8 +725,8 @@ export default function CallRoomPage() {
             />
 
             {isCamOff && (
-              <div className="flex flex-col items-center justify-center gap-3 text-zinc-500">
-                <Identicon name={effectiveUserName} size={80} />
+              <div className="flex flex-col items-center justify-center gap-2 text-zinc-500">
+                <Identicon name={effectiveUserName} size={isTerminalOpen ? 48 : 80} />
                 <div className="text-xs font-mono text-zinc-400">{effectiveUserName}</div>
                 <div className="text-[10px] font-mono text-zinc-600">Camera Off</div>
               </div>
@@ -570,7 +741,7 @@ export default function CallRoomPage() {
           </div>
 
           {/* Peer 2: Remote Friend Stream OR Authentic Waiting State */}
-          <div className="relative rounded-2xl overflow-hidden bg-[#121217] border border-white/[0.08] flex items-center justify-center">
+          <div className={`relative rounded-2xl overflow-hidden bg-[#121217] border border-white/[0.08] flex items-center justify-center ${isTerminalOpen ? 'flex-1 min-h-0' : ''}`}>
             {isPeerConnected && remoteStream ? (
               <>
                 <video
@@ -586,32 +757,32 @@ export default function CallRoomPage() {
               </>
             ) : (
               /* Authentic Waiting Screen (Zero Fake Users) */
-              <div className="p-6 text-center space-y-4 max-w-sm">
-                <div className="relative w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/20 mx-auto flex items-center justify-center text-blue-400">
-                  <Radio className="w-7 h-7 animate-pulse" />
+              <div className="p-4 md:p-6 text-center space-y-3 max-w-sm">
+                <div className="relative w-12 h-12 md:w-16 md:h-16 rounded-full bg-blue-500/10 border border-blue-500/20 mx-auto flex items-center justify-center text-blue-400">
+                  <Radio className="w-6 h-6 md:w-7 md:h-7 animate-pulse" />
                   <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-ping" />
                 </div>
 
-                <div className="space-y-1.5">
-                  <div className="text-sm font-bold text-white font-mono">
+                <div className="space-y-1">
+                  <div className="text-xs md:text-sm font-bold text-white font-mono">
                     {lang === 'ru'
                       ? 'Ожидание подключения кента...'
                       : lang === 'kz'
                       ? 'Досыңның қосылуын күтуде...'
                       : 'Waiting for Peer to Join...'}
                   </div>
-                  <p className="text-xs font-mono text-zinc-400 leading-relaxed">
+                  <p className="text-[11px] md:text-xs font-mono text-zinc-400 leading-relaxed">
                     {lang === 'ru'
-                      ? 'Скиньте ссылку на эту комнату своему другу. Как только он перейдет по ней — вы сразу увидите и услышите друг друга.'
+                      ? 'Скиньте ссылку на эту комнату другу. Как только он перейдет — начнется созвон.'
                       : lang === 'kz'
-                      ? 'Осы бөлме сілтемесін досыңызға жіберіңіз. Ол кірген кезде бейнебайланыс бірден басталады.'
-                      : 'Share the link with your friend. Connection will establish automatically over WebRTC.'}
+                      ? 'Осы бөлме сілтемесін досыңызға жіберіңіз.'
+                      : 'Share the link with your friend.'}
                   </p>
                 </div>
 
                 <button
                   onClick={handleCopyLink}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 text-white font-mono text-xs font-medium transition-all"
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 text-white font-mono text-xs font-medium transition-all"
                 >
                   <Copy className="w-3.5 h-3.5 text-blue-400" />
                   <span>{copiedLink ? (lang === 'ru' ? 'Скопировано!' : 'Көшірілді!') : (lang === 'ru' ? 'Скопировать ссылку' : 'Сілтемені көшіру')}</span>
@@ -726,6 +897,23 @@ export default function CallRoomPage() {
             title="Демонстрация экрана"
           >
             <Monitor className="w-4 h-4" />
+          </button>
+
+          {/* Shared Coding Terminal Toggle (Mutual Consent) */}
+          <button
+            onClick={handleToggleTerminal}
+            className={`p-3 rounded-full transition-all relative flex items-center justify-center ${
+              isTerminalOpen
+                ? 'bg-emerald-600 text-white border border-emerald-400 shadow-md shadow-emerald-500/20'
+                : 'bg-white/10 hover:bg-white/20 text-white'
+            }`}
+            title={
+              isTerminalOpen
+                ? (lang === 'ru' ? 'Закрыть терминал' : lang === 'kz' ? 'Терминалды жабу' : 'Close Terminal')
+                : (lang === 'ru' ? 'Совместный терминал кодинга (по согласию)' : lang === 'kz' ? 'Бірлескен код терминалы' : 'Shared Coding Terminal')
+            }
+          >
+            <TerminalIcon className="w-4 h-4" />
           </button>
 
           {/* In-Call Chat Drawer Toggle */}

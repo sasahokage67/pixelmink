@@ -154,6 +154,35 @@ app.prepare().then(() => {
       io.to(`call_${roomId}`).emit('call:new_chat_message', message);
     });
 
+    // --- Shared In-Call Terminal & Code IDE (Mutual Consent) ---
+    socket.on('call:terminal_request', ({ roomId, fromUserId, fromUserName }) => {
+      socket.to(`call_${roomId}`).emit('call:terminal_request', { fromUserId, fromUserName });
+    });
+
+    socket.on('call:terminal_response', ({ roomId, accepted, fromUserName }) => {
+      if (accepted) {
+        io.to(`call_${roomId}`).emit('call:terminal_opened', { byUserName: fromUserName });
+      } else {
+        socket.to(`call_${roomId}`).emit('call:terminal_declined', { byUserName: fromUserName });
+      }
+    });
+
+    socket.on('call:terminal_sync', ({ roomId, code, language }) => {
+      socket.to(`call_${roomId}`).emit('call:terminal_sync', { code, language });
+    });
+
+    socket.on('call:terminal_executing', ({ roomId }) => {
+      io.to(`call_${roomId}`).emit('call:terminal_executing');
+    });
+
+    socket.on('call:terminal_output', ({ roomId, output }) => {
+      io.to(`call_${roomId}`).emit('call:terminal_output', output);
+    });
+
+    socket.on('call:terminal_close', ({ roomId }) => {
+      io.to(`call_${roomId}`).emit('call:terminal_closed');
+    });
+
     socket.on('call:leave', ({ roomId }) => {
       socket.leave(`call_${roomId}`);
       if (callRooms.has(roomId)) {

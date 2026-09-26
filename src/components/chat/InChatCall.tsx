@@ -13,8 +13,13 @@ import {
   Minimize2,
   Radio,
   Volume2,
+  Terminal as TerminalIcon,
+  Check,
+  X,
+  AlertCircle,
 } from 'lucide-react';
 import Identicon from '@/components/ui/Identicon';
+import SharedCallTerminal from '@/components/call/SharedCallTerminal';
 
 interface InChatCallProps {
   roomId: string;
@@ -52,6 +57,12 @@ export default function InChatCall({
   const [isCamOff, setIsCamOff] = useState(initialType === 'AUDIO');
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [durationSeconds, setDurationSeconds] = useState(0);
+
+  // Shared Terminal States (Mutual Consent)
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  const [terminalProposal, setTerminalProposal] = useState<{ fromUserId: string; fromUserName: string } | null>(null);
+  const [terminalRequestSent, setTerminalRequestSent] = useState(false);
+  const [terminalDeclinedNotice, setTerminalDeclinedNotice] = useState<string | null>(null);
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -222,12 +233,38 @@ export default function InChatCall({
       }
     });
 
+    // Terminal events
+    socket.on('call:terminal_request', (data: { fromUserId: string; fromUserName: string }) => {
+      setTerminalProposal(data);
+    });
+
+    socket.on('call:terminal_opened', () => {
+      setIsTerminalOpen(true);
+      setTerminalProposal(null);
+      setTerminalRequestSent(false);
+    });
+
+    socket.on('call:terminal_declined', ({ byUserName }: { byUserName?: string }) => {
+      setTerminalRequestSent(false);
+      const name = byUserName || otherMember?.profile?.name || 'Собеседник';
+      setTerminalDeclinedNotice(`${name} отклонил(а) предложение открыть терминал`);
+      setTimeout(() => setTerminalDeclinedNotice(null), 4000);
+    });
+
+    socket.on('call:terminal_closed', () => {
+      setIsTerminalOpen(false);
+    });
+
     return () => {
       socket.off('call:existing_peers');
       socket.off('call:peer_joined');
       socket.off('webrtc:signal');
+      socket.off('call:terminal_request');
+      socket.off('call:terminal_opened');
+      socket.off('call:terminal_declined');
+      socket.off('call:terminal_closed');
     };
-  }, [socket, roomId, currentUser, effectiveUserName, getOrCreatePeerConnection]);
+  }, [socket, roomId, currentUser, effectiveUserName, getOrCreatePeerConnection, otherMember]);
 
   // Controls
   const toggleMic = () => {
@@ -311,6 +348,44 @@ export default function InChatCall({
     router.push(`/calls/${roomId}`);
   };
 
+  const handleToggleTerminal = () => {
+    if (isTerminalOpen) {
+      if (socket) socket.emit('call:terminal_close', { roomId });
+      setIsTerminalOpen(false);
+    } else {
+      if (!socket) return;
+      socket.emit('call:terminal_request', {
+        roomId,
+        fromUserId: currentUser?.id,
+        fromUserName: effectiveUserName,
+      });
+      setTerminalRequestSent(true);
+    }
+  };
+
+  const handleAcceptTerminal = () => {
+    if (socket) {
+      socket.emit('call:terminal_response', {
+        roomId,
+        accepted: true,
+        fromUserName: effectiveUserName,
+      });
+    }
+    setTerminalProposal(null);
+    setIsTerminalOpen(true);
+  };
+
+  const handleDeclineTerminal = () => {
+    if (socket) {
+      socket.emit('call:terminal_response', {
+        roomId,
+        accepted: false,
+        fromUserName: effectiveUserName,
+      });
+    }
+    setTerminalProposal(null);
+  };
+
   const formatTimer = (sec: number) => {
     const m = Math.floor(sec / 60);
     const s = sec % 60;
@@ -319,6 +394,64 @@ export default function InChatCall({
 
   return (
     <div className="border-b border-white/[0.08] bg-[#09090c] p-3 animate-in slide-in-from-top-4 transition-all">
+      {/* Mutual Consent Proposal Modal */}
+      {terminalProposal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-[#0e0e14] border border-blue-500/30 p-5 rounded-2xl max-w-sm w-full shadow-2xl space-y-3.5 animate-in zoom-in-95">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                <TerminalIcon className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-white font-mono">Совместный терминал</h3>
+                <p className="text-[11px] text-zinc-400 font-mono">
+                  {terminalProposal.fromUserName} предлагает открыть терминал
+                </p>
+              </div>
+            </div>
+            <p className="text-[11px] text-zinc-300 font-mono bg-white/[0.03] p-2.5 rounded-lg border border-white/[0.06] leading-relaxed">
+              Откроется общий редактор кода и терминал (Python, JS, TS, Rust, C++, Go, Bash, SQL). Запуск синхронизируется в реальном времени.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                onClick={handleDeclineTerminal}
+                className="px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-zinc-300 text-xs font-mono transition-all"
+              >
+                Отклонить
+              </button>
+              <button
+                onClick={handleAcceptTerminal}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold transition-all shadow-md shadow-emerald-600/30 flex items-center gap-1"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Открыть</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Terminal Waiting Toast */}
+      {terminalRequestSent && (
+        <div className="mb-2 bg-[#14141e] border border-blue-500/40 px-3 py-1.5 rounded-full shadow-lg flex items-center justify-between text-[11px] font-mono text-zinc-300 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping" />
+            <span>Ожидание согласия собеседника на открытие терминала...</span>
+          </div>
+          <button onClick={() => setTerminalRequestSent(false)} className="text-zinc-500 hover:text-white">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Terminal Declined Toast */}
+      {terminalDeclinedNotice && (
+        <div className="mb-2 bg-red-950/80 border border-red-500/40 px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-[11px] font-mono text-red-200 animate-in fade-in">
+          <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+          <span>{terminalDeclinedNotice}</span>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row items-center justify-between gap-3">
         {/* Videos Container: Responsive Side-by-side or PiP */}
         <div className="grid grid-cols-2 gap-3 w-full md:w-auto flex-1 max-w-xl">
@@ -416,6 +549,19 @@ export default function InChatCall({
             <Monitor className="w-4 h-4" />
           </button>
 
+          {/* Shared Coding Terminal Toggle */}
+          <button
+            onClick={handleToggleTerminal}
+            title={isTerminalOpen ? 'Закрыть терминал' : 'Открыть совместный терминал (требуется согласие)'}
+            className={`p-2 rounded-xl transition-all ${
+              isTerminalOpen
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                : 'bg-white/[0.04] text-zinc-300 hover:text-white hover:bg-white/[0.08]'
+            }`}
+          >
+            <TerminalIcon className="w-4 h-4" />
+          </button>
+
           {/* Expand to Full Call Room */}
           <button
             onClick={handleOpenFullscreen}
@@ -435,6 +581,22 @@ export default function InChatCall({
           </button>
         </div>
       </div>
+
+      {/* Embedded In-Chat Collaborative Coding Sandbox */}
+      {isTerminalOpen && (
+        <div className="mt-3 h-[420px] rounded-2xl overflow-hidden border border-white/10 shadow-2xl animate-in zoom-in-95">
+          <SharedCallTerminal
+            roomId={roomId}
+            socket={socket}
+            currentUser={currentUser}
+            partnerName={otherMember?.profile?.name || 'Собеседник'}
+            onClose={() => {
+              if (socket) socket.emit('call:terminal_close', { roomId });
+              setIsTerminalOpen(false);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
