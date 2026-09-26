@@ -37,10 +37,29 @@ import SharedCallTerminal from '@/components/call/SharedCallTerminal';
 
 const RTC_CONFIG: RTCConfiguration = {
   iceServers: [
+    { urls: 'stun:stun.cloudflare.com:3478' },
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.services.mozilla.com' },
+    { urls: 'stun:openrelay.metered.ca:80' },
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelay',
+      credential: 'openrelay',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelay',
+      credential: 'openrelay',
+    },
+    {
+      urls: 'turns:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelay',
+      credential: 'openrelay',
+    },
   ],
+  iceCandidatePoolSize: 10,
 };
 
 const MAX_CALL_SECONDS = 3600; // 1 hour hard cap
@@ -143,12 +162,29 @@ export default function CallRoomPage() {
   const [terminalRequestSent, setTerminalRequestSent] = useState(false);
   const [terminalDeclinedNotice, setTerminalDeclinedNotice] = useState<string | null>(null);
 
-  // Refs
+  // Refs & Media / ICE Buffers
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
   const screenTrackRef = useRef<MediaStreamTrack | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const pendingCandidatesRef = useRef<{ [peerId: string]: RTCIceCandidateInit[] }>({});
+
+  // Flush queued candidates once remote description is set
+  const flushCandidates = useCallback(async (peerId: string, pc: RTCPeerConnection) => {
+    const queue = pendingCandidatesRef.current[peerId] || [];
+    if (queue.length > 0) {
+      for (const cand of queue) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (err) {
+          console.warn('Error flushing queued ICE candidate:', err);
+        }
+      }
+      pendingCandidatesRef.current[peerId] = [];
+    }
+  }, []);
 
   // Effective username
   const effectiveUserName = user?.profile?.name || guestName || 'Peer';
@@ -309,7 +345,24 @@ export default function CallRoomPage() {
             audio: true,
           });
           activeStream = stream;
+          mediaStreamRef.current = stream;
           setMediaStream(stream);
+
+          // If peer connection was already created, attach/replace tracks immediately
+          if (peerConnectionRef.current) {
+            const pc = peerConnectionRef.current;
+            const currentSenders = pc.getSenders();
+            stream.getTracks().forEach((track) => {
+              const existing = currentSenders.find((s) => s.track?.kind === track.kind);
+              if (existing) {
+                existing.replaceTrack(track).catch(() => {});
+              } else {
+                try {
+                  pc.addTrack(track, stream);
+                } catch {}
+              }
+            });
+          }
 
           // Re-enumerate to get labeled devices if first enumerate was unlabeled
           try {
@@ -330,8 +383,24 @@ export default function CallRoomPage() {
         try {
           const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
           activeStream = audioStream;
+          mediaStreamRef.current = audioStream;
           setMediaStream(audioStream);
           setIsCamOff(true);
+
+          if (peerConnectionRef.current) {
+            const pc = peerConnectionRef.current;
+            const currentSenders = pc.getSenders();
+            audioStream.getTracks().forEach((track) => {
+              const existing = currentSenders.find((s) => s.track?.kind === track.kind);
+              if (existing) {
+                existing.replaceTrack(track).catch(() => {});
+              } else {
+                try {
+                  pc.addTrack(track, audioStream);
+                } catch {}
+              }
+            });
+          }
         } catch (audioErr) {
           console.warn('Audio access also failed:', audioErr);
         }
@@ -391,6 +460,24 @@ export default function CallRoomPage() {
     return () => clearInterval(timer);
   }, [hasEnteredName, isCallFinished, mediaStream]);
 
+  // Handle incoming candidate with queuing if remote description is not set yet
+  const handleIncomingCandidate = useCallback(async (fromPeerId: string, candidate: RTCIceCandidateInit) => {
+    if (!candidate) return;
+    const pc = getOrCreatePeerConnection(fromPeerId);
+    if (pc.remoteDescription && pc.remoteDescription.type) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.warn('Error adding ICE candidate directly:', err);
+      }
+    } else {
+      if (!pendingCandidatesRef.current[fromPeerId]) {
+        pendingCandidatesRef.current[fromPeerId] = [];
+      }
+      pendingCandidatesRef.current[fromPeerId].push(candidate);
+    }
+  }, []);
+
   // Create or retrieve PeerConnection
   const getOrCreatePeerConnection = useCallback((targetSocketId: string) => {
     if (peerConnectionRef.current) {
@@ -400,9 +487,12 @@ export default function CallRoomPage() {
     const pc = new RTCPeerConnection(RTC_CONFIG);
 
     // Add local tracks to WebRTC
-    if (mediaStream) {
-      mediaStream.getTracks().forEach((track) => {
-        pc.addTrack(track, mediaStream);
+    const curStream = mediaStreamRef.current || mediaStream;
+    if (curStream) {
+      curStream.getTracks().forEach((track) => {
+        try {
+          pc.addTrack(track, curStream);
+        } catch {}
       });
     }
 
@@ -421,13 +511,12 @@ export default function CallRoomPage() {
 
     // Remote Track handler
     pc.ontrack = (event) => {
-      const incomingStream = event.streams[0];
-      if (incomingStream) {
-        setRemoteStream(incomingStream);
-        setIsPeerConnected(true);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = incomingStream;
-        }
+      const incomingStream = event.streams && event.streams[0] ? event.streams[0] : new MediaStream([event.track]);
+      setRemoteStream(incomingStream);
+      setIsPeerConnected(true);
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = incomingStream;
+        remoteVideoRef.current.play().catch(() => {});
       }
     };
 
@@ -440,15 +529,20 @@ export default function CallRoomPage() {
         pc.connectionState === 'closed'
       ) {
         setIsPeerConnected(false);
-        setRemoteStream(null);
-        setRemotePeerName(null);
-        setRemotePeerSocketId(null);
       }
     };
 
     peerConnectionRef.current = pc;
     return pc;
-  }, [mediaStream, socket]);
+  }, [mediaStream, socket, sendRoomSignalHttp]);
+
+  // Ensure remote video auto-plays when remoteStream arrives
+  useEffect(() => {
+    if (remoteStream && remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.play().catch(() => {});
+    }
+  }, [remoteStream]);
 
   // 2. WebRTC Signaling over Socket.io
   useEffect(() => {
@@ -477,10 +571,12 @@ export default function CallRoomPage() {
       const pc = getOrCreatePeerConnection(socketId);
 
       try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
+        if (pc.signalingState === 'stable') {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
 
-        sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, socketId);
+          sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, socketId);
+        }
       } catch (err) {
         console.error('Error creating WebRTC offer:', err);
       }
@@ -488,7 +584,7 @@ export default function CallRoomPage() {
 
     // C: Receive WebRTC Signal (Offer / Answer / Candidate)
     socket.on('webrtc:signal', async ({ signal, from }: { signal: any; from: string }) => {
-      if (!from) return;
+      if (!from || !signal) return;
 
       if (signal.senderName && !remotePeerName) {
         setRemotePeerName(signal.senderName);
@@ -498,20 +594,27 @@ export default function CallRoomPage() {
       const pc = getOrCreatePeerConnection(from);
 
       try {
-        if (signal.type === 'offer') {
+        if (signal.type === 'offer' && signal.sdp) {
+          const isPolite = myPeerIdRef.current.localeCompare(from) > 0;
+          if (pc.signalingState !== 'stable') {
+            if (!isPolite) return;
+            try {
+              await pc.setLocalDescription({ type: 'rollback' });
+            } catch {}
+          }
           await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          await flushCandidates(from, pc);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
 
           sendRoomSignal({ type: 'answer', sdp: answer, senderName: effectiveUserName }, from);
-        } else if (signal.type === 'answer') {
-          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-        } else if (signal.type === 'candidate' && signal.candidate) {
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-          } catch (iceErr) {
-            console.warn('Error adding ICE candidate:', iceErr);
+        } else if (signal.type === 'answer' && signal.sdp) {
+          if (pc.signalingState === 'have-local-offer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+            await flushCandidates(from, pc);
           }
+        } else if ((signal.type === 'candidate' || signal.type === 'ice-candidate') && signal.candidate) {
+          await handleIncomingCandidate(from, signal.candidate);
         }
       } catch (err) {
         console.error('Error handling WebRTC signal:', err);
@@ -631,36 +734,44 @@ export default function CallRoomPage() {
 
               const pc = getOrCreatePeerConnection(fromPeerId);
               try {
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, fromPeerId);
+                if (pc.signalingState === 'stable') {
+                  const offer = await pc.createOffer();
+                  await pc.setLocalDescription(offer);
+                  sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, fromPeerId);
+                }
               } catch (e) {
                 console.error(e);
               }
-            } else if (signal.type === 'offer') {
+            } else if (signal.type === 'offer' && signal.sdp) {
               const pc = getOrCreatePeerConnection(fromPeerId);
+              const isPolite = myPeerIdRef.current.localeCompare(fromPeerId) > 0;
+              if (pc.signalingState !== 'stable') {
+                if (!isPolite) continue;
+                try {
+                  await pc.setLocalDescription({ type: 'rollback' });
+                } catch {}
+              }
               try {
                 await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                await flushCandidates(fromPeerId, pc);
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
                 sendRoomSignal({ type: 'answer', sdp: answer, senderName: effectiveUserName }, fromPeerId);
               } catch (e) {
                 console.error(e);
               }
-            } else if (signal.type === 'answer') {
+            } else if (signal.type === 'answer' && signal.sdp) {
               const pc = getOrCreatePeerConnection(fromPeerId);
               try {
-                await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                if (pc.signalingState === 'have-local-offer') {
+                  await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                  await flushCandidates(fromPeerId, pc);
+                }
               } catch (e) {
                 console.error(e);
               }
-            } else if (signal.type === 'candidate' && signal.candidate) {
-              const pc = getOrCreatePeerConnection(fromPeerId);
-              try {
-                await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-              } catch (e) {
-                console.warn(e);
-              }
+            } else if ((signal.type === 'candidate' || signal.type === 'ice-candidate') && signal.candidate) {
+              await handleIncomingCandidate(fromPeerId, signal.candidate);
             } else if (signal.type === 'chat_message') {
               setCallMessages((prev) => {
                 if (prev.some((m) => m.id === signal.message.id)) return prev;
@@ -713,32 +824,38 @@ export default function CallRoomPage() {
             if (signal.userName) setRemotePeerName(signal.userName);
             const pc = getOrCreatePeerConnection(item.fromPeerId);
             try {
-              const offer = await pc.createOffer();
-              await pc.setLocalDescription(offer);
-              sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, item.fromPeerId);
+              if (pc.signalingState === 'stable') {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, item.fromPeerId);
+              }
             } catch (e) {}
-          } else if (signal.type === 'offer') {
+          } else if (signal.type === 'offer' && signal.sdp) {
             const pc = getOrCreatePeerConnection(item.fromPeerId);
+            const isPolite = myPeerIdRef.current.localeCompare(item.fromPeerId) > 0;
+            if (pc.signalingState !== 'stable') {
+              if (!isPolite) return;
+              try {
+                await pc.setLocalDescription({ type: 'rollback' });
+              } catch {}
+            }
             try {
               await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+              await flushCandidates(item.fromPeerId, pc);
               const answer = await pc.createAnswer();
               await pc.setLocalDescription(answer);
               sendRoomSignal({ type: 'answer', sdp: answer, senderName: effectiveUserName }, item.fromPeerId);
             } catch (e) {}
-          } else if (signal.type === 'answer') {
+          } else if (signal.type === 'answer' && signal.sdp) {
             const pc = getOrCreatePeerConnection(item.fromPeerId);
             try {
               if (pc.signalingState === 'have-local-offer') {
                 await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+                await flushCandidates(item.fromPeerId, pc);
               }
             } catch (e) {}
-          } else if (signal.type === 'ice-candidate') {
-            const pc = getOrCreatePeerConnection(item.fromPeerId);
-            try {
-              if (signal.candidate) {
-                await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-              }
-            } catch (e) {}
+          } else if ((signal.type === 'candidate' || signal.type === 'ice-candidate') && signal.candidate) {
+            await handleIncomingCandidate(item.fromPeerId, signal.candidate);
           } else if (signal.type === 'terminal_opened') {
             setIsTerminalOpen(true);
             setTerminalProposal(null);
@@ -1212,11 +1329,11 @@ export default function CallRoomPage() {
         </div>
       )}
 
-      {/* Main Video Viewport (2-Side P2P Grid OR Terminal + Docked Videos) */}
-      <div className="flex-1 p-3 md:p-6 flex gap-4 overflow-hidden relative">
-        {/* If Terminal is Open: show collaborative IDE on the main side */}
+      {/* Main Video Viewport (Responsive: Full-width IDE with Floating PiP on Mobile, Docked 2-column on Desktop) */}
+      <div className="flex-1 p-2 sm:p-3 md:p-6 flex flex-col md:flex-row gap-3 md:gap-4 overflow-hidden relative min-h-0">
+        {/* If Terminal is Open: show collaborative IDE taking full space on mobile */}
         {isTerminalOpen && (
-          <div className="flex-1 h-full min-w-0 flex flex-col">
+          <div className="flex-1 w-full h-full min-w-0 min-h-0 flex flex-col">
             <SharedCallTerminal
               roomId={roomId}
               socket={socket}
@@ -1224,18 +1341,49 @@ export default function CallRoomPage() {
               partnerName={remotePeerName || 'Собеседник'}
               onClose={() => {
                 if (socket) socket.emit('call:terminal_close', { roomId });
+                sendRoomSignalHttp({ type: 'terminal_closed' });
                 setIsTerminalOpen(false);
               }}
             />
           </div>
         )}
 
-        {/* Video Cards: full grid when terminal closed, docked vertical stack when terminal open */}
+        {/* Mobile-only Floating PiP Video when Terminal is Open */}
+        {isTerminalOpen && (
+          <div className="md:hidden fixed top-16 right-3 z-30 w-32 sm:w-36 aspect-video rounded-xl overflow-hidden border border-white/20 shadow-2xl bg-[#121217] backdrop-blur-md">
+            {isPeerConnected && remoteStream ? (
+              <video
+                ref={(el) => {
+                  if (el && remoteStream && el.srcObject !== remoteStream) {
+                    el.srcObject = remoteStream;
+                    el.play().catch(() => {});
+                  }
+                }}
+                autoPlay
+                playsInline
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center p-1 bg-zinc-900/90 text-center">
+                <Identicon name={remotePeerName || 'peer'} size={24} />
+                <span className="text-[9px] font-mono text-zinc-400 truncate max-w-[90%] mt-1">
+                  {remotePeerName || 'Ожидание...'}
+                </span>
+              </div>
+            )}
+            <div className="absolute bottom-1 left-1.5 px-1.5 py-0.5 rounded bg-black/80 text-[8px] font-mono text-white flex items-center gap-1">
+              <span className={`w-1.5 h-1.5 rounded-full ${isPeerConnected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+              <span className="truncate max-w-[65px]">{remotePeerName || 'Peer'}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Video Cards: full grid when terminal closed, docked vertical stack when terminal open (Desktop only) */}
         <div
           className={`h-full max-h-[calc(100vh-140px)] ${
             isTerminalOpen
-              ? 'w-60 lg:w-72 flex flex-col gap-3 shrink-0'
-              : 'flex-1 grid grid-cols-1 md:grid-cols-2 gap-4'
+              ? 'hidden md:flex md:w-60 lg:w-72 md:flex-col md:gap-3 md:shrink-0'
+              : 'flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4'
           }`}
         >
           {/* Peer 1: Local Stream */}

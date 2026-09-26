@@ -397,18 +397,19 @@ export default function SharedCallTerminal({
   return (
     <div className="flex-1 flex flex-col h-full bg-[#0a0a0f] border border-white/[0.1] rounded-2xl overflow-hidden shadow-2xl animate-in zoom-in-95">
       {/* Top IDE Toolbar */}
-      <div className="h-12 bg-[#121218] border-b border-white/[0.08] px-4 flex items-center justify-between shrink-0 select-none">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-xs font-bold">
+      <div className="h-12 bg-[#121218] border-b border-white/[0.08] px-2.5 sm:px-4 flex items-center justify-between shrink-0 select-none gap-1.5">
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[11px] sm:text-xs font-bold shrink-0">
             <TerminalIcon className="w-3.5 h-3.5" />
-            <span>P2P Live Terminal</span>
+            <span className="hidden sm:inline">P2P Live Terminal</span>
+            <span className="sm:hidden">P2P</span>
           </div>
 
           {/* Language Selector Dropdown */}
           <select
             value={language}
             onChange={(e) => handleLanguageChange(e.target.value)}
-            className="bg-[#181822] border border-white/[0.12] text-xs font-mono text-white rounded-lg px-2.5 py-1 outline-none focus:border-blue-500 cursor-pointer"
+            className="bg-[#181822] border border-white/[0.12] text-xs font-mono text-white rounded-lg px-2 py-1 outline-none focus:border-blue-500 cursor-pointer max-w-[120px] sm:max-w-none"
           >
             {LANGUAGES.map((lang) => (
               <option key={lang.id} value={lang.id} className="bg-[#121218] text-white">
@@ -417,13 +418,13 @@ export default function SharedCallTerminal({
             ))}
           </select>
 
-          <span className="hidden md:inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+          <span className="hidden lg:inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>Синхронизировано с {partnerName || 'собеседником'}</span>
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Copy Code */}
           <button
             onClick={handleCopyCode}
@@ -437,21 +438,21 @@ export default function SharedCallTerminal({
           <button
             onClick={handleRunCode}
             disabled={isRunning}
-            className={`px-4 py-1.5 rounded-lg font-mono text-xs font-bold transition-all flex items-center gap-1.5 shadow-md ${
+            className={`px-3 sm:px-4 py-1.5 rounded-lg font-mono text-xs font-bold transition-all flex items-center gap-1.5 shadow-md ${
               isRunning
                 ? 'bg-amber-600 text-white cursor-wait'
                 : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 tap-active'
             }`}
           >
             <Play className={`w-3.5 h-3.5 fill-current ${isRunning ? 'animate-spin' : ''}`} />
-            <span>{isRunning ? 'Running...' : 'Run (Ctrl+↵)'}</span>
+            <span>{isRunning ? 'Running...' : 'Run'}</span>
           </button>
 
           {/* Close Terminal Button */}
           <button
             onClick={handleCloseTerminal}
             title="Закрыть терминал для обоих"
-            className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors ml-1"
+            className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors ml-0.5"
           >
             <X className="w-4 h-4" />
           </button>
@@ -461,9 +462,9 @@ export default function SharedCallTerminal({
       {/* Editor & Console Split Body */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
         {/* Code Editor Pane (60%) */}
-        <div className="flex-1 flex bg-[#0c0c12] overflow-hidden border-b md:border-b-0 md:border-r border-white/[0.08]">
+        <div className="flex-1 flex bg-[#0c0c12] overflow-hidden border-b md:border-b-0 md:border-r border-white/[0.08] min-h-[140px]">
           {/* Line Numbers Gutter */}
-          <div className="w-12 py-3 bg-[#0a0a0e] text-zinc-600 font-mono text-xs text-right pr-3 select-none overflow-hidden shrink-0 leading-6 border-r border-white/[0.04]">
+          <div className="w-10 sm:w-12 py-3 bg-[#0a0a0e] text-zinc-600 font-mono text-xs text-right pr-2 sm:pr-3 select-none overflow-hidden shrink-0 leading-6 border-r border-white/[0.04]">
             {linesArray.map((n) => (
               <div key={n}>{n}</div>
             ))}
@@ -478,12 +479,12 @@ export default function SharedCallTerminal({
             autoCapitalize="off"
             autoComplete="off"
             placeholder="Type code here... Synchronized in real-time between both peers."
-            className="flex-1 bg-transparent p-3 text-xs sm:text-sm font-mono text-zinc-100 placeholder-zinc-600 outline-none resize-none leading-6 overflow-y-auto selection:bg-blue-600/30"
+            className="flex-1 bg-transparent p-2.5 sm:p-3 text-xs sm:text-sm font-mono text-zinc-100 placeholder-zinc-600 outline-none resize-none leading-6 overflow-y-auto selection:bg-blue-600/30"
           />
         </div>
 
-        {/* Terminal Output Console Pane (40%) */}
-        <div className="w-full md:w-96 flex flex-col bg-[#07070a] overflow-hidden shrink-0 select-text">
+        {/* Terminal Output Console Pane (Mobile: bottom fixed height, Desktop: side column) */}
+        <div className="w-full md:w-96 flex flex-col bg-[#07070a] overflow-hidden shrink-0 select-text h-44 sm:h-52 md:h-full">
           {/* Terminal Console Header */}
           <div className="px-3.5 py-2 bg-[#0e0e14] border-b border-white/[0.06] flex items-center justify-between text-xs font-mono text-zinc-400 shrink-0">
             <div className="flex items-center gap-2">

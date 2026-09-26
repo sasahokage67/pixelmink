@@ -115,16 +115,30 @@ export default function ChatsPage() {
     loadConversations();
   }, [paramConvId, user]);
 
-  // Load messages when activeConv changes
+  // Load messages when activeConv changes, subscribe to SSE & polling
   useEffect(() => {
     if (!activeConv) return;
+
+    let isMounted = true;
 
     async function loadMessages() {
       try {
         const res = await fetch(`/api/conversations/${activeConv.id}/messages`);
-        if (res.ok) {
+        if (res.ok && isMounted) {
           const data = await res.json();
-          setMessages(data.messages || []);
+          if (data.messages) {
+            setMessages((prev) => {
+              if (
+                data.messages.length !== prev.length ||
+                (data.messages.length > 0 &&
+                  prev.length > 0 &&
+                  data.messages[data.messages.length - 1].id !== prev[prev.length - 1].id)
+              ) {
+                return data.messages;
+              }
+              return prev;
+            });
+          }
         }
       } catch (err) {
         console.error(err);
@@ -133,17 +147,42 @@ export default function ChatsPage() {
 
     loadMessages();
 
+    // Subscribe to ntfy SSE for instant real-time delivery
+    let sseSource: EventSource | null = null;
+    try {
+      sseSource = new EventSource(`https://ntfy.sh/pixelmink_conv_${activeConv.id}/sse`);
+      sseSource.onmessage = (event) => {
+        try {
+          const raw = JSON.parse(event.data);
+          const data = typeof raw.message === 'string' ? JSON.parse(raw.message) : raw;
+          if (data && data.type === 'new_message' && data.message) {
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === data.message.id)) return prev;
+              return [...prev, data.message];
+            });
+            loadConversations();
+          }
+        } catch {}
+      };
+    } catch {}
+
+    // Polling fallback every 2.5 seconds
+    const interval = setInterval(loadMessages, 2500);
+
     // Join Socket room
     if (socket) {
       socket.emit('chat:join', activeConv.id);
     }
 
     return () => {
+      isMounted = false;
+      if (sseSource) sseSource.close();
+      clearInterval(interval);
       if (socket) {
         socket.emit('chat:leave', activeConv.id);
       }
     };
-  }, [activeConv, socket]);
+  }, [activeConv?.id, socket]);
 
   // Real-time socket message and typing listener
   useEffect(() => {
@@ -220,8 +259,25 @@ export default function ChatsPage() {
     if (!newMessage.trim() || !activeConv) return;
 
     const content = newMessage.trim();
+    const currentReply = replyTo;
     setNewMessage('');
     setReplyTo(null);
+
+    // Optimistic message display (0ms perceived latency)
+    const tempId = `temp_${Date.now()}`;
+    const optimisticMsg = {
+      id: tempId,
+      conversationId: activeConv.id,
+      senderId: user?.id,
+      content,
+      messageType: 'TEXT',
+      replyToId: currentReply?.id || null,
+      createdAt: new Date().toISOString(),
+      sender: user,
+      reactions: [],
+      isRead: false,
+    };
+    setMessages((prev) => [...prev, optimisticMsg]);
 
     try {
       const res = await fetch(`/api/conversations/${activeConv.id}/messages`, {
@@ -229,13 +285,20 @@ export default function ChatsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content,
-          replyToId: replyTo?.id || null,
+          replyToId: currentReply?.id || null,
         }),
       });
 
       if (res.ok) {
         const data = await res.json();
-        // Emit through socket for real-time broadcast
+        if (data.message) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === tempId ? data.message : m))
+          );
+        }
+        loadConversations();
+
+        // Emit through socket for real-time broadcast if socket is connected
         if (socket) {
           const recipientIds = activeConv.members
             ?.map((m: any) => m.userId)
@@ -247,9 +310,12 @@ export default function ChatsPage() {
             recipientIds,
           });
         }
+      } else {
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
       }
     } catch (err) {
       console.error(err);
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
     }
   };
 
@@ -491,28 +557,20 @@ export default function ChatsPage() {
             {/* Real WebRTC Call Buttons */}
             <div className="flex items-center gap-1.5 shrink-0">
               <button
-                onClick={() => handleStartInChatCall('AUDIO')}
-                title="Аудиосозвон прямо в чате"
+                onClick={() => handleInitiateCall('AUDIO')}
+                title="Аудиосозвон"
                 className="p-2 rounded-xl bg-[#18181f] hover:bg-zinc-800 text-zinc-300 hover:text-white border border-white/[0.08] tap-active transition-all"
               >
                 <Phone className="w-4 h-4 text-emerald-400" />
               </button>
 
               <button
-                onClick={() => handleStartInChatCall('VIDEO')}
-                title="Видеосозвон прямо в чате"
+                onClick={() => handleInitiateCall('VIDEO')}
+                title="Видеосозвон с компилятором"
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold tap-active transition-all shadow-md shadow-blue-600/20"
               >
                 <Video className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Созвон</span>
-              </button>
-
-              <button
-                onClick={() => handleInitiateCall('VIDEO')}
-                title="Открыть в отдельной комнате на весь экран"
-                className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white border border-white/[0.08] tap-active transition-all hidden sm:flex"
-              >
-                <ExternalLink className="w-4 h-4" />
               </button>
 
               <button

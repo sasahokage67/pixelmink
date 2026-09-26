@@ -85,6 +85,35 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       data: { updatedAt: new Date() },
     });
 
+    // Instant real-time broadcast to conversation topic & member channels
+    try {
+      fetch(`https://ntfy.sh/pixelmink_conv_${conversationId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'new_message',
+          conversationId,
+          message,
+        }),
+      }).catch(() => {});
+
+      if (conv?.members) {
+        for (const member of conv.members) {
+          if (member.userId !== senderId) {
+            fetch(`https://ntfy.sh/pixelmink_user_${member.userId}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'new_chat_message',
+                conversationId,
+                message,
+              }),
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch {}
+
     return NextResponse.json({ success: true, message });
   } catch (err: any) {
     console.error('Error creating message:', err);
