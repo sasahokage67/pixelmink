@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import {
-  Sparkles,
+  Users,
   ArrowRight,
   MessageSquare,
   Video,
@@ -27,18 +27,16 @@ export default function DashboardPage() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [seminars, setSeminars] = useState<any[]>([]);
   const [progressData, setProgressData] = useState<any>(null);
-  const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadDashboard() {
       try {
-        const [mRes, sRes, semRes, pRes, cRes] = await Promise.all([
+        const [mRes, sRes, semRes, pRes] = await Promise.all([
           fetch('/api/matches'),
           fetch('/api/sessions'),
           fetch('/api/seminars'),
           fetch('/api/progress'),
-          fetch('/api/conversations'),
         ]);
 
         if (mRes.ok) {
@@ -57,10 +55,6 @@ export default function DashboardPage() {
           const p = await pRes.json();
           setProgressData(p);
         }
-        if (cRes.ok) {
-          const c = await cRes.json();
-          setConversations(c.conversations?.slice(0, 3) || []);
-        }
       } catch (err) {
         console.error('Failed to load dashboard:', err);
       } finally {
@@ -70,7 +64,7 @@ export default function DashboardPage() {
     loadDashboard();
   }, [user]);
 
-  const startDirectSession = (teacherId: string, skillName: string) => {
+  const startDirectSession = (teacherId: string) => {
     router.push(`/matches?requestTeacherId=${teacherId}`);
   };
 
@@ -92,7 +86,7 @@ export default function DashboardPage() {
     }
   };
 
-  const userName = user?.profile?.name?.split(' ')[0] || 'Alex';
+  const userName = user?.profile?.name || user?.email?.split('@')[0] || 'Инженер';
 
   return (
     <div className="space-y-8 animate-in fade-in">
@@ -101,11 +95,11 @@ export default function DashboardPage() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              Good evening, {userName} 👋
+              Рабочее пространство: {userName}
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Learning Goal: <span className="text-white font-medium">English for IT</span> & <span className="text-white font-medium">Prompt Engineering</span> — Intermediate → Advanced
+            Платформа взаимного обмена инженерными знаниями • 1 час = 1 XC
           </p>
         </div>
 
@@ -114,19 +108,28 @@ export default function DashboardPage() {
           <div className="drinkit-card px-3 py-2 flex items-center gap-2">
             <Clock className="w-3.5 h-3.5 text-blue-400" />
             <div className="font-mono text-xs">
-              <span className="text-zinc-500">Learned:</span> <span className="text-white font-semibold">{progressData?.stats?.learningHours ?? 12.5}h</span>
+              <span className="text-zinc-500">Изучено:</span>{' '}
+              <span className="text-white font-semibold">
+                {user?.profile?.learningHours ?? progressData?.stats?.learningHours ?? 0}ч
+              </span>
             </div>
           </div>
           <div className="drinkit-card px-3 py-2 flex items-center gap-2">
             <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
             <div className="font-mono text-xs">
-              <span className="text-zinc-500">Taught:</span> <span className="text-white font-semibold">{progressData?.stats?.teachingHours ?? 32.5}h</span>
+              <span className="text-zinc-500">Обучено:</span>{' '}
+              <span className="text-white font-semibold">
+                {user?.profile?.teachingHours ?? progressData?.stats?.teachingHours ?? 0}ч
+              </span>
             </div>
           </div>
           <div className="drinkit-card px-3 py-2 flex items-center gap-2">
             <Zap className="w-3.5 h-3.5 text-blue-400" />
             <div className="font-mono text-xs">
-              <span className="text-zinc-500">Credits:</span> <span className="text-blue-400 font-bold">{user?.profile?.xCredits ?? 12} XC</span>
+              <span className="text-zinc-500">Баланс:</span>{' '}
+              <span className="text-blue-400 font-bold">
+                {user?.profile?.xCredits ?? 5} XC
+              </span>
             </div>
           </div>
         </div>
@@ -138,104 +141,114 @@ export default function DashboardPage() {
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-base font-bold text-white tracking-tight flex items-center gap-1.5">
-                🔥 Your Knowledge Matches
+              <Users className="w-4 h-4 text-blue-400" />
+              <span className="text-base font-bold text-white tracking-tight">
+                Взаимные мэтчи знаний
               </span>
               <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                Live Algorithm
+                Алгоритм совместимости
               </span>
             </div>
             <Link
               href="/matches"
               className="text-xs font-mono text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
             >
-              <span>View all ({matches.length})</span>
+              <span>Все инженеры ({matches.length})</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {matches.map((m, idx) => {
-              const candidate = m.candidateUser;
-              return (
-                <div
-                  key={candidate?.id || idx}
-                  className="drinkit-card p-5 flex flex-col justify-between space-y-4"
+            {matches.length === 0 ? (
+              <div className="col-span-2 drinkit-card p-8 text-center text-zinc-500 font-mono text-xs space-y-2">
+                <div>Алгоритмические пары пока рассчитываются.</div>
+                <Link
+                  href="/matches"
+                  className="inline-block text-blue-400 hover:underline pt-1"
                 >
-                  <div className="space-y-3">
-                    {/* Header */}
-                    <div className="flex items-start justify-between">
-                      <Link
-                        href={`/profile?userId=${candidate?.id}`}
-                        className="flex items-center gap-3 group"
-                        title="Перейти в личный кабинет кандидата"
-                      >
-                        <Identicon name={candidate?.profile?.name || candidate?.email || 'peer'} size={40} />
-                        <div>
-                          <div className="text-xs font-semibold text-white tracking-tight group-hover:text-blue-400 transition-colors">
-                            {candidate?.profile?.name || candidate?.email?.split('@')[0]}
+                  Перейти в общий каталог инженеров →
+                </Link>
+              </div>
+            ) : (
+              matches.map((m, idx) => {
+                const candidate = m.candidateUser;
+                const pName = candidate?.profile?.name || candidate?.email?.split('@')[0] || 'Инженер';
+                return (
+                  <div
+                    key={candidate?.id || idx}
+                    className="drinkit-card p-5 flex flex-col justify-between space-y-4"
+                  >
+                    <div className="space-y-3">
+                      {/* Header */}
+                      <div className="flex items-start justify-between">
+                        <Link
+                          href={`/profile?userId=${candidate?.id}`}
+                          className="flex items-center gap-3 group"
+                          title="Перейти в профиль"
+                        >
+                          <Identicon name={pName} size={40} />
+                          <div>
+                            <div className="text-xs font-semibold text-white tracking-tight group-hover:text-blue-400 transition-colors">
+                              @{pName}
+                            </div>
+                            <div className="text-[10px] font-mono text-zinc-500">
+                              ⭐️ {candidate?.profile?.rating || '5.0'} •{' '}
+                              {candidate?.profile?.location || 'Remote'}
+                            </div>
                           </div>
-                          <div className="text-[10px] font-mono text-zinc-500">
-                            ⭐️ {candidate?.profile?.rating || '4.9'} • {candidate?.profile?.location || 'Remote'}
-                          </div>
-                        </div>
-                      </Link>
+                        </Link>
 
-                      {/* Match Score Badge */}
-                      <div className="text-right">
-                        <span className="font-mono text-xs font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
-                          {m.score}% MATCH
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Exchange Flow */}
-                    <div className="space-y-1 text-xs font-mono bg-black/40 p-2.5 rounded-lg border border-white/[0.04]">
-                      <div className="text-zinc-400">
-                        Teaches: <span className="text-emerald-400 font-semibold">{m.skillsOfferedToYou?.join(', ') || 'English, LLMs'}</span>
-                      </div>
-                      <div className="text-zinc-400">
-                        Wants: <span className="text-blue-400 font-semibold">{m.skillsWantedFromYou?.join(', ') || 'Python, AI'}</span>
-                      </div>
-                    </div>
-
-                    {/* Reason */}
-                    <p className="text-[11px] text-zinc-400 leading-snug line-clamp-2">
-                      {m.reasons?.[0] || 'Direct reciprocal skill exchange match with compatible timezone.'}
-                    </p>
-
-                    {m.descriptionKeywordsMatched && m.descriptionKeywordsMatched.length > 0 && (
-                      <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                        <span className="text-[9px] font-mono text-zinc-500">Bio keywords:</span>
-                        {m.descriptionKeywordsMatched.slice(0, 3).map((kw: string) => (
-                          <span key={kw} className="text-[9px] font-mono px-1 py-0.2 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
-                            #{kw}
+                        {/* Match Score Badge */}
+                        <div className="text-right">
+                          <span className="font-mono text-xs font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
+                            {m.score}% Совместимость
                           </span>
-                        ))}
+                        </div>
                       </div>
-                    )}
-                  </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 pt-1 border-t border-white/[0.06]">
-                    <button
-                      onClick={() => startChat(candidate?.id)}
-                      className="flex-1 py-1.5 px-3 rounded-full bg-[#18181f] hover:bg-zinc-800 text-zinc-200 text-xs font-mono tap-active transition-all flex items-center justify-center gap-1.5 border border-white/[0.08]"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5 text-zinc-400" />
-                      <span>Message</span>
-                    </button>
-                    <button
-                      onClick={() => startDirectSession(candidate?.id, m.skillsOfferedToYou?.[0] || 'Topic')}
-                      className="flex-1 py-1.5 px-3 rounded-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-medium tap-active transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/20"
-                    >
-                      <Video className="w-3.5 h-3.5" />
-                      <span>Start Session</span>
-                    </button>
+                      {/* Exchange Flow */}
+                      <div className="space-y-1 text-xs font-mono bg-black/40 p-2.5 rounded-lg border border-white/[0.04]">
+                        <div className="text-zinc-400">
+                          Обучает:{' '}
+                          <span className="text-emerald-400 font-semibold">
+                            {m.skillsOfferedToYou?.join(', ') || 'Разработка'}
+                          </span>
+                        </div>
+                        <div className="text-zinc-400">
+                          Изучает:{' '}
+                          <span className="text-blue-400 font-semibold">
+                            {m.skillsWantedFromYou?.join(', ') || 'AI / ML'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Reason */}
+                      <p className="text-[11px] text-zinc-400 leading-snug line-clamp-2">
+                        {m.reasons?.[0] || 'Двустороннее пересечение компетенций и совместимый часовой пояс.'}
+                      </p>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 pt-1 border-t border-white/[0.06]">
+                      <button
+                        onClick={() => startChat(candidate?.id)}
+                        className="flex-1 py-1.5 px-3 rounded-xl bg-[#18181f] hover:bg-zinc-800 text-zinc-200 text-xs font-mono tap-active transition-all flex items-center justify-center gap-1.5 border border-white/[0.08]"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-zinc-400" />
+                        <span>Чат</span>
+                      </button>
+                      <button
+                        onClick={() => startDirectSession(candidate?.id)}
+                        className="flex-1 py-1.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-medium tap-active transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/20"
+                      >
+                        <Video className="w-3.5 h-3.5" />
+                        <span>Обмен</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -244,17 +257,17 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <span className="text-base font-bold text-white tracking-tight flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-blue-400" />
-              Upcoming Sessions
+              Ближайшие сессии
             </span>
             <Link href="/calendar" className="text-xs font-mono text-zinc-400 hover:text-white">
-              Calendar
+              Календарь
             </Link>
           </div>
 
           <div className="space-y-3">
             {sessions.length === 0 ? (
               <div className="drinkit-card p-6 text-center text-zinc-500 text-xs font-mono">
-                No sessions booked yet. Request an exchange from your matches!
+                Запланированных сессий нет. Предложите обмен инженеру из каталога!
               </div>
             ) : (
               sessions.map((s) => (
@@ -263,7 +276,10 @@ export default function DashboardPage() {
                     <div>
                       <div className="text-xs font-semibold text-white tracking-tight">{s.title}</div>
                       <div className="text-[11px] font-mono text-blue-400 mt-0.5">
-                        With {s.teacherId === user?.id ? s.student?.profile?.name : s.teacher?.profile?.name}
+                        С{' '}
+                        {s.teacherId === user?.id
+                          ? s.student?.profile?.name || 'студентом'
+                          : s.teacher?.profile?.name || 'ментором'}
                       </div>
                     </div>
                     <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -274,16 +290,23 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400 pt-1">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3 text-zinc-500" />
-                      {new Date(s.scheduledAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {new Date(s.scheduledAt).toLocaleDateString([], {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </span>
-                    <span>{s.duration} min ({s.format})</span>
+                    <span>
+                      {s.duration} мин ({s.format})
+                    </span>
                   </div>
 
                   <Link
                     href={`/calls/${s.meetingLink || 'room_default'}`}
-                    className="mt-2 w-full py-1.5 px-3 rounded-full bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/30 text-blue-300 text-xs font-mono text-center block transition-colors"
+                    className="mt-2 w-full py-1.5 px-3 rounded-xl bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/30 text-blue-300 text-xs font-mono text-center block transition-colors"
                   >
-                    Enter WebRTC Room
+                    Войти в комнату звонка
                   </Link>
                 </div>
               ))
@@ -299,46 +322,53 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <span className="text-base font-bold text-white tracking-tight flex items-center gap-1.5">
               <GraduationCap className="w-4 h-4 text-blue-400" />
-              Recommended Seminars & Workshops
+              Рекомендуемые воркшопы и семинары
             </span>
             <Link href="/seminars" className="text-xs font-mono text-blue-400 hover:text-blue-300">
-              All Seminars
+              Все семинары
             </Link>
           </div>
 
           <div className="space-y-3">
-            {seminars.map((sem) => (
-              <div
-                key={sem.id}
-                className="drinkit-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-              >
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] uppercase px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-400 border border-white/[0.08]">
-                      {sem.category}
-                    </span>
-                    {sem.isLive && (
-                      <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse">
-                        LIVE NOW
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="text-sm font-semibold text-white tracking-tight">{sem.title}</h3>
-                  <div className="text-xs font-mono text-zinc-400">
-                    Host: <span className="text-zinc-200">{sem.host?.profile?.name}</span> • {sem.date} at {sem.time} • {sem.participantCount} / {sem.maxParticipants} peers
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <Link
-                    href={`/seminars/${sem.id}/live`}
-                    className="px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-medium tap-active transition-all"
-                  >
-                    {sem.isLive ? 'Join Live Stage' : 'View Details'}
-                  </Link>
-                </div>
+            {seminars.length === 0 ? (
+              <div className="drinkit-card p-6 text-center text-zinc-500 font-mono text-xs">
+                Семинары запланированы на ближайшие дни.
               </div>
-            ))}
+            ) : (
+              seminars.map((sem) => (
+                <div
+                  key={sem.id}
+                  className="drinkit-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] uppercase px-2 py-0.5 rounded-full bg-white/[0.04] text-zinc-400 border border-white/[0.08]">
+                        {sem.category}
+                      </span>
+                      {sem.isLive && (
+                        <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse">
+                          В ЭФИРЕ
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-sm font-semibold text-white tracking-tight">{sem.title}</h3>
+                    <div className="text-xs font-mono text-zinc-400">
+                      Ведущий: <span className="text-zinc-200">{sem.host?.profile?.name}</span> •{' '}
+                      {sem.date} в {sem.time} • {sem.participantCount} / {sem.maxParticipants} инженеров
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Link
+                      href={`/seminars/${sem.id}/live`}
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-medium tap-active transition-all"
+                    >
+                      {sem.isLive ? 'Подключиться к трансляции' : 'Подробнее'}
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -347,10 +377,10 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <span className="text-base font-bold text-white tracking-tight flex items-center gap-1.5">
               <TrendingUp className="w-4 h-4 text-emerald-400" />
-              Learning Progress
+              Прогресс освоения стека
             </span>
-            <Link href="/progress" className="text-xs font-mono text-zinc-400 hover:text-white">
-              Details
+            <Link href="/tests" className="text-xs font-mono text-zinc-400 hover:text-white">
+              Тесты
             </Link>
           </div>
 
@@ -358,7 +388,7 @@ export default function DashboardPage() {
             <div className="space-y-3">
               <div>
                 <div className="flex justify-between text-xs font-mono mb-1">
-                  <span className="text-zinc-300">Python Mastery</span>
+                  <span className="text-zinc-300">Архитектура и Backend</span>
                   <span className="text-blue-400 font-bold">92%</span>
                 </div>
                 <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
@@ -368,7 +398,7 @@ export default function DashboardPage() {
 
               <div>
                 <div className="flex justify-between text-xs font-mono mb-1">
-                  <span className="text-zinc-300">PyTorch & Transformers</span>
+                  <span className="text-zinc-300">Системное программирование</span>
                   <span className="text-blue-400 font-bold">78%</span>
                 </div>
                 <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
@@ -378,7 +408,7 @@ export default function DashboardPage() {
 
               <div>
                 <div className="flex justify-between text-xs font-mono mb-1">
-                  <span className="text-zinc-300">English for IT</span>
+                  <span className="text-zinc-300">Распределенные системы</span>
                   <span className="text-blue-400 font-bold">64%</span>
                 </div>
                 <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
@@ -388,12 +418,12 @@ export default function DashboardPage() {
             </div>
 
             <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between">
-              <span className="font-mono text-xs text-zinc-500">Streak: 8 Days 🔥</span>
+              <span className="font-mono text-xs text-zinc-500">Серия активности: 8 дней</span>
               <Link
                 href="/tests"
                 className="text-xs font-mono text-blue-400 hover:text-blue-300 flex items-center gap-1"
               >
-                <span>Take Proof Test (+8%)</span>
+                <span>Подтвердить грейд (+8%)</span>
                 <ArrowRight className="w-3 h-3" />
               </Link>
             </div>

@@ -77,6 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await res.json();
         if (data.authenticated && data.user) {
           setUser(data.user);
+          // Auto-announce to cloud registry so friend's laptop sees this user immediately
+          fetch('/api/sync', { method: 'POST' }).catch(() => {});
           return;
         }
       }
@@ -106,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem('pixelmink_token', data.token);
         }
         setUser(data.user);
+        fetch('/api/sync', { method: 'POST' }).catch(() => {});
         return true;
       }
       return false;

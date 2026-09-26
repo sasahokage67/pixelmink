@@ -45,7 +45,7 @@ export default function TopHeader() {
         <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
         <input
           type="text"
-          placeholder="Search skills, topics, peers (e.g. Python, Blender, Rust)..."
+          placeholder="Поиск по навыкам, темам, коллегам..."
           className="w-full bg-[#111114] border border-white/[0.08] focus:border-blue-500/50 rounded-full pl-9 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 outline-none font-sans transition-all"
         />
       </div>
@@ -56,10 +56,10 @@ export default function TopHeader() {
         <Link
           href="/"
           className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-[11px] font-mono text-zinc-400 hover:text-white transition-colors"
-          title="Return to Public Landing Page"
+          title="На главную промо-страницу"
         >
           <Globe className="w-3 h-3 text-zinc-400" />
-          <span>Landing</span>
+          <span>Главная</span>
         </Link>
 
         {/* Trilingual Switcher (RU / KZ / EN) */}
@@ -83,7 +83,7 @@ export default function TopHeader() {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-medium tap-active transition-all shadow-sm shadow-blue-500/20"
         >
           <Video className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Call Room</span>
+          <span className="hidden sm:inline">Созвон</span>
         </Link>
 
         {/* Notification Bell */}
@@ -104,8 +104,8 @@ export default function TopHeader() {
           {showNotifications && (
             <div className="absolute right-0 mt-2 w-80 bg-[#121217] border border-white/[0.1] rounded-xl shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95">
               <div className="flex items-center justify-between pb-2 border-b border-white/[0.06] mb-2">
-                <span className="font-mono text-xs font-semibold text-white">Notifications</span>
-                <span className="font-mono text-[10px] text-blue-400">{notifications.length} total</span>
+                <span className="font-mono text-xs font-semibold text-white">Уведомления</span>
+                <span className="font-mono text-[10px] text-blue-400">{notifications.length} всего</span>
               </div>
               <div className="space-y-2 max-h-72 overflow-y-auto">
                 {notifications.length === 0 ? (

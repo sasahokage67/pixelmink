@@ -414,8 +414,8 @@ export default function SeminarLivePage() {
           {/* Bottom Floating Bar of Emojis for Audience */}
           <div className="h-14 border-t border-white/[0.08] px-6 flex items-center justify-between bg-[#111114]">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-zinc-500 mr-2">React Live:</span>
-              {['🔥', '👏', '🚀', '💡', '❤️'].map((em) => (
+              <span className="text-xs font-mono text-zinc-500 mr-2">Реакции:</span>
+              {['👍', '👏', '🎯', '💡', '❤️'].map((em) => (
                 <button
                   key={em}
                   onClick={() => sendReaction(em)}

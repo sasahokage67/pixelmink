@@ -801,7 +801,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const t = (key: string): string => {
     const entry = DICTIONARY[key];
     if (!entry) return key;
-    return entry[lang] || entry['en'] || key;
+    return entry[lang] || entry['ru'] || entry['en'] || key;
   };
 
   return (

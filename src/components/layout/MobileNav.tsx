@@ -6,13 +6,13 @@ import { usePathname } from 'next/navigation';
 import { Home, Compass, Users, MessageSquare, Video, GraduationCap, User } from 'lucide-react';
 
 const MOBILE_ITEMS = [
-  { href: '/dashboard', label: 'Home', icon: Home },
-  { href: '/discover', label: 'Discover', icon: Compass },
-  { href: '/matches', label: 'Matches', icon: Users },
-  { href: '/chats', label: 'Chats', icon: MessageSquare },
-  { href: '/calls', label: 'Calls', icon: Video },
-  { href: '/seminars', label: 'Seminars', icon: GraduationCap },
-  { href: '/profile', label: 'Profile', icon: User },
+  { href: '/dashboard', label: 'Главная', icon: Home },
+  { href: '/discover', label: 'Каталог', icon: Compass },
+  { href: '/matches', label: 'Мэтчи', icon: Users },
+  { href: '/chats', label: 'Чаты', icon: MessageSquare },
+  { href: '/calls', label: 'Звонки', icon: Video },
+  { href: '/seminars', label: 'Семинары', icon: GraduationCap },
+  { href: '/profile', label: 'Профиль', icon: User },
 ];
 
 export default function MobileNav() {

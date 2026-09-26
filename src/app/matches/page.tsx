@@ -105,10 +105,10 @@ export default function MatchesPage() {
     }
   };
 
-  const loadAllUsers = async () => {
+  const loadAllUsers = async (force = false) => {
     try {
       setAllUsersLoading(true);
-      const res = await fetch('/api/users');
+      const res = await fetch(`/api/users${force ? '?force=true' : ''}`);
       if (res.ok) {
         const data = await res.json();
         setAllUsers(data.users || []);
@@ -122,8 +122,12 @@ export default function MatchesPage() {
 
   const handleSyncAll = async () => {
     setSyncing(true);
-    await Promise.all([loadMatches(), loadAllUsers()]);
-    setSyncing(false);
+    try {
+      await fetch('/api/sync', { method: 'POST' }).catch(() => {});
+      await Promise.all([loadMatches(), loadAllUsers(true)]);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   useEffect(() => {

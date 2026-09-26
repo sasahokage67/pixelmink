@@ -13,7 +13,6 @@ import {
   MessageSquare,
   Video,
   GraduationCap,
-  TrendingUp,
   Award,
   Layers,
   Calendar,
@@ -25,16 +24,16 @@ import {
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Home', icon: Home },
-  { href: '/discover', label: 'Discover', icon: Compass },
-  { href: '/matches', label: 'Matches', icon: Users },
-  { href: '/chats', label: 'Chats', icon: MessageSquare },
-  { href: '/calls', label: 'Calls', icon: Video },
-  { href: '/seminars', label: 'Seminars', icon: GraduationCap },
+  { href: '/dashboard', label: 'Главная', icon: Home },
+  { href: '/discover', label: 'Каталог', icon: Compass },
+  { href: '/matches', label: 'Мэтчи', icon: Users },
+  { href: '/chats', label: 'Чаты', icon: MessageSquare },
+  { href: '/calls', label: 'Звонки', icon: Video },
+  { href: '/seminars', label: 'Семинары', icon: GraduationCap },
   { href: '/profile', label: 'Личный кабинет', icon: User },
-  { href: '/skills', label: 'My Skills', icon: Layers },
-  { href: '/tests', label: 'Proof Tests', icon: Award },
-  { href: '/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/skills', label: 'Мои навыки', icon: Layers },
+  { href: '/tests', label: 'Тестирование', icon: Award },
+  { href: '/calendar', label: 'Календарь', icon: Calendar },
 ];
 
 export default function Sidebar() {
@@ -53,7 +52,7 @@ export default function Sidebar() {
             </span>
           </Link>
           <div className="text-[10px] text-zinc-500 mt-1 leading-tight">
-            Your skills for theirs
+            Бартер технических знаний
           </div>
         </div>
         <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px]">
@@ -66,7 +65,9 @@ export default function Sidebar() {
       <nav className="flex-1 px-2.5 py-3 space-y-1 overflow-y-auto">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+          const isActive =
+            pathname === item.href ||
+            (item.href !== '/dashboard' && pathname.startsWith(item.href));
 
           return (
             <Link
@@ -97,7 +98,7 @@ export default function Sidebar() {
             className="flex items-center gap-2.5 px-3 py-2 rounded text-xs transition-all text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]"
           >
             <Globe className="w-3.5 h-3.5 text-zinc-500" />
-            <span>Public Landing</span>
+            <span>Главная страница</span>
           </Link>
 
           <Link
@@ -109,7 +110,7 @@ export default function Sidebar() {
             }`}
           >
             <ShieldAlert className="w-3.5 h-3.5 text-zinc-500" />
-            <span>Admin Center</span>
+            <span>Панель админа</span>
           </Link>
         </div>
       </nav>
@@ -121,17 +122,17 @@ export default function Sidebar() {
             <Identicon name={user?.profile?.name || user?.email || 'User'} size={28} />
             <div className="min-w-0">
               <div className="text-xs text-white truncate">
-                {user?.profile?.name || user?.email?.split('@')[0] || 'My Profile'}
+                {user?.profile?.name || user?.email?.split('@')[0] || 'Мой профиль'}
               </div>
               <div className="text-[10px] text-zinc-500 truncate">
-                {user?.email || 'Active Peer'}
+                {user?.email || 'Инженер'}
               </div>
             </div>
           </Link>
 
           <button
             onClick={() => logout()}
-            title="Log out"
+            title="Выйти из аккаунта"
             className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors rounded"
           >
             <LogOut className="w-3.5 h-3.5" />

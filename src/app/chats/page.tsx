@@ -483,7 +483,7 @@ export default function ChatsPage() {
 
                         {/* Reaction emojis button on hover */}
                         <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                          {['👍', '🔥', '🚀', '💡'].map((em) => (
+                          {['👍', '🎯', '💡', '❤️'].map((em) => (
                             <button
                               key={em}
                               onClick={() => addReaction(msg.id, em)}

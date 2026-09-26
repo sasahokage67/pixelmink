@@ -7,10 +7,12 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
-    // Pull any peers registered on other laptops / serverless containers
-    await syncPeersFromCloud();
-
     const { searchParams } = new URL(req.url);
+    const forceSync = searchParams.get('force') === 'true';
+
+    // Pull any peers registered on other laptops / serverless containers
+    await syncPeersFromCloud(forceSync);
+
     const search = searchParams.get('search') || '';
     const skill = searchParams.get('skill') || '';
     const category = searchParams.get('category') || '';
@@ -87,7 +89,7 @@ export async function GET(req: NextRequest) {
       orderBy: {
         profile: { rating: 'desc' },
       },
-      take: 50,
+      take: 60,
     });
 
     // Case-insensitive fallback if nothing found with Prisma contains
@@ -108,9 +110,38 @@ export async function GET(req: NextRequest) {
         const uName = (u.profile?.name || '').toLowerCase();
         const uEmail = (u.email || '').toLowerCase();
         const uBio = (u.profile?.bio || '').toLowerCase();
-        const hasSkill = u.userSkills?.some((s) => (s.skill?.name || '').toLowerCase().includes(q));
+        const hasSkill = u.userSkills?.some((s) =>
+          (s.skill?.name || '').toLowerCase().includes(q)
+        );
         return uName.includes(q) || uEmail.includes(q) || uBio.includes(q) || hasSkill;
       });
+    }
+
+    // Direct cloud registry search fallback if still not found
+    if (users.length === 0 && cleanSearch) {
+      const freshCloudPeers = await syncPeersFromCloud(true);
+      const q = cleanSearch.toLowerCase();
+      const matchedFromCloud = freshCloudPeers.filter(
+        (cp) =>
+          cp.name.toLowerCase().includes(q) ||
+          cp.email.toLowerCase().includes(q) ||
+          (cp.bio && cp.bio.toLowerCase().includes(q))
+      );
+
+      if (matchedFromCloud.length > 0) {
+        // Query database again now that syncPeersFromCloud hydrated them
+        users = await prisma.user.findMany({
+          where: {
+            OR: matchedFromCloud.map((cp) => ({ id: cp.id })),
+          },
+          include: {
+            profile: true,
+            userSkills: {
+              include: { skill: true },
+            },
+          },
+        });
+      }
     }
 
     return NextResponse.json({ success: true, users });

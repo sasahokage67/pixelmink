@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { comparePassword, signToken } from '@/lib/auth';
+import { syncPeersFromCloud, pushPeerToCloud } from '@/lib/cloudSync';
 
 export async function POST(req: NextRequest) {
   try {
+    // Pull any newly registered users from other laptops before checking credentials
+    await syncPeersFromCloud();
+
     const body = await req.json();
     const { email, password } = body;
 
     if (!email || !password) {
-      return NextResponse.json({ error: 'Username/Email and password are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Username/Email and password are required' },
+        { status: 400 }
+      );
     }
 
     const trimmedInput = email.trim();
@@ -48,11 +55,13 @@ export async function POST(req: NextRequest) {
 
     const isMatch = await comparePassword(password, user.password);
     if (!isMatch) {
-      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
+      return NextResponse.json({ error: 'Неверный никнейм или пароль' }, { status: 401 });
     }
 
-    const teachSkills = user.userSkills?.filter((s) => s.type === 'TEACH').map((s) => s.skill.name) || [];
-    const learnSkills = user.userSkills?.filter((s) => s.type === 'LEARN').map((s) => s.skill.name) || [];
+    const teachSkills =
+      user.userSkills?.filter((s) => s.type === 'TEACH').map((s) => s.skill.name) || [];
+    const learnSkills =
+      user.userSkills?.filter((s) => s.type === 'LEARN').map((s) => s.skill.name) || [];
 
     const token = signToken({
       userId: user.id,
@@ -61,10 +70,28 @@ export async function POST(req: NextRequest) {
       name: user.profile?.name || user.email.split('@')[0],
       bio: user.profile?.bio || '',
       location: user.profile?.location || 'Remote',
-      languages: user.profile?.languages || 'English',
+      languages: user.profile?.languages || 'Russian, English',
       teachSkills,
       learnSkills,
     });
+
+    // Announce user presence in cloud registry
+    pushPeerToCloud({
+      id: user.id,
+      email: user.email,
+      name: user.profile?.name || user.email.split('@')[0],
+      role: user.role,
+      bio: user.profile?.bio || '',
+      location: user.profile?.location || 'Remote',
+      languages: user.profile?.languages || 'Russian, English',
+      rating: user.profile?.rating ?? 5.0,
+      xCredits: user.profile?.xCredits ?? 5,
+      teachingHours: user.profile?.teachingHours ?? 0,
+      learningHours: user.profile?.learningHours ?? 0,
+      teachSkills,
+      learnSkills,
+      updatedAt: Date.now(),
+    }).catch(() => {});
 
     const response = NextResponse.json({
       success: true,

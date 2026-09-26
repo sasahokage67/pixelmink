@@ -21,14 +21,15 @@ export interface CloudPeer {
 }
 
 let lastSyncTimestamp = 0;
-const CACHE_TTL_MS = 4000; // 4 seconds in-memory cache to prevent excessive roundtrips
+let cachedCloudPeers: CloudPeer[] = [];
+const CACHE_TTL_MS = 3000;
 
 /**
  * Push user profile to global cloud registry so other laptops/devices can discover them.
  */
 export async function pushPeerToCloud(peer: CloudPeer): Promise<void> {
   try {
-    const res = await fetch(SYNC_API_URL);
+    const res = await fetch(SYNC_API_URL, { cache: 'no-store' });
     if (!res.ok) return;
 
     const json = await res.json();
@@ -44,6 +45,8 @@ export async function pushPeerToCloud(peer: CloudPeer): Promise<void> {
       ...peer,
       updatedAt: Date.now(),
     });
+
+    cachedCloudPeers = filtered;
 
     await fetch(SYNC_API_URL, {
       method: 'PUT',
@@ -65,23 +68,25 @@ export async function pushPeerToCloud(peer: CloudPeer): Promise<void> {
 /**
  * Synchronize all peers from the global cloud registry into the local Prisma database.
  */
-export async function syncPeersFromCloud(): Promise<CloudPeer[]> {
+export async function syncPeersFromCloud(force = false): Promise<CloudPeer[]> {
   try {
     const now = Date.now();
-    if (now - lastSyncTimestamp < CACHE_TTL_MS) {
-      return [];
+    if (!force && now - lastSyncTimestamp < CACHE_TTL_MS && cachedCloudPeers.length > 0) {
+      return cachedCloudPeers;
     }
     lastSyncTimestamp = now;
 
-    const res = await fetch(SYNC_API_URL);
-    if (!res.ok) return [];
+    const res = await fetch(SYNC_API_URL, { cache: 'no-store' });
+    if (!res.ok) return cachedCloudPeers;
 
     const json = await res.json();
     const cloudPeers: CloudPeer[] = json.data?.peers || [];
 
     if (!Array.isArray(cloudPeers) || cloudPeers.length === 0) {
-      return [];
+      return cachedCloudPeers;
     }
+
+    cachedCloudPeers = cloudPeers;
 
     // Hydrate or update peers in local database container
     for (const cp of cloudPeers) {
@@ -110,9 +115,9 @@ export async function syncPeersFromCloud(): Promise<CloudPeer[]> {
               profile: {
                 create: {
                   name: cp.name,
-                  bio: cp.bio || 'Computer Science engineer & peer contributor',
+                  bio: cp.bio || 'Инженер платформы pixelmink',
                   location: cp.location || 'Remote',
-                  languages: cp.languages || 'English, Russian',
+                  languages: cp.languages || 'Russian, English',
                   rating: cp.rating ?? 5.0,
                   xCredits: cp.xCredits ?? 5,
                   teachingHours: cp.teachingHours ?? 0,
@@ -172,7 +177,7 @@ export async function syncPeersFromCloud(): Promise<CloudPeer[]> {
               name: cp.name || existing.profile?.name || existing.email.split('@')[0],
               bio: cp.bio || existing.profile?.bio || '',
               location: cp.location || existing.profile?.location || 'Remote',
-              languages: cp.languages || existing.profile?.languages || 'English, Russian',
+              languages: cp.languages || existing.profile?.languages || 'Russian, English',
               rating: cp.rating ?? existing.profile?.rating ?? 5.0,
               xCredits: cp.xCredits ?? existing.profile?.xCredits ?? 5,
               teachingHours: cp.teachingHours ?? existing.profile?.teachingHours ?? 0,
@@ -250,6 +255,49 @@ export async function syncPeersFromCloud(): Promise<CloudPeer[]> {
     return cloudPeers;
   } catch (err) {
     console.warn('Cloud sync pull failed (using local database):', err);
-    return [];
+    return cachedCloudPeers;
+  }
+}
+
+/**
+ * Scan all local users in this instance and push any that are missing to the cloud registry.
+ */
+export async function broadcastLocalUsersToCloud(): Promise<void> {
+  try {
+    const localUsers = await prisma.user.findMany({
+      include: {
+        profile: true,
+        userSkills: { include: { skill: true } },
+      },
+    });
+
+    for (const u of localUsers) {
+      if (!u.profile?.name) continue;
+      const teachSkills = u.userSkills
+        .filter((s) => s.type === 'TEACH')
+        .map((s) => s.skill.name);
+      const learnSkills = u.userSkills
+        .filter((s) => s.type === 'LEARN')
+        .map((s) => s.skill.name);
+
+      await pushPeerToCloud({
+        id: u.id,
+        email: u.email,
+        name: u.profile.name,
+        role: u.role,
+        bio: u.profile.bio,
+        location: u.profile.location,
+        languages: u.profile.languages,
+        rating: u.profile.rating,
+        xCredits: u.profile.xCredits,
+        teachingHours: u.profile.teachingHours,
+        learningHours: u.profile.learningHours,
+        teachSkills,
+        learnSkills,
+        updatedAt: Date.now(),
+      });
+    }
+  } catch (err) {
+    console.warn('broadcastLocalUsersToCloud failed:', err);
   }
 }
