@@ -39,6 +39,42 @@ export async function GET(req: NextRequest) {
       orderBy: { updatedAt: 'desc' },
     });
 
+    // Auto-sync accepted matches into conversations
+    const acceptedMatches = await prisma.match.findMany({
+      where: {
+        status: 'ACCEPTED',
+        OR: [{ userAId: currentUserId }, { userBId: currentUserId }],
+      },
+    });
+
+    for (const m of acceptedMatches) {
+      const partnerId = m.userAId === currentUserId ? m.userBId : m.userAId;
+      const hasConv = conversations.some((c) =>
+        c.members.some((mem: any) => mem.userId === partnerId)
+      );
+      if (!hasConv) {
+        try {
+          const newC = await prisma.conversation.create({
+            data: {
+              isGroup: false,
+              members: {
+                create: [{ userId: currentUserId }, { userId: partnerId }],
+              },
+            },
+            include: {
+              members: {
+                include: {
+                  user: { include: { profile: true } },
+                },
+              },
+              messages: { take: 1 },
+            },
+          });
+          conversations.unshift(newC);
+        } catch {}
+      }
+    }
+
     return NextResponse.json({
       success: true,
       currentUserId,

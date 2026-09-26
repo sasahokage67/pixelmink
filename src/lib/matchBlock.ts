@@ -325,6 +325,32 @@ export async function handleMatchRequest(
         update: { status: 'ACCEPTED' },
       });
     }
+
+    // Auto-create 1-on-1 chat conversation so accepted match appears in Chats immediately
+    try {
+      const existingConv = await prisma.conversation.findFirst({
+        where: {
+          isGroup: false,
+          AND: [
+            { members: { some: { userId: senderId } } },
+            { members: { some: { userId: targetUserId } } },
+          ],
+        },
+      });
+
+      if (!existingConv) {
+        await prisma.conversation.create({
+          data: {
+            isGroup: false,
+            members: {
+              create: [{ userId: senderId }, { userId: targetUserId }],
+            },
+          },
+        });
+      }
+    } catch (convErr) {
+      console.error('Error auto-creating conversation on accept:', convErr);
+    }
   } else {
     // New pending request from sender to target
     match = await prisma.match.upsert({

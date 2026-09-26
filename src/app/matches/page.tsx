@@ -67,8 +67,8 @@ export default function MatchesPage() {
   const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
   const [matchAlert, setMatchAlert] = useState<string | null>(null);
 
-  // Tab state: 'all_users' | 'reciprocal' | 'chains'
-  const [activeTab, setActiveTab] = useState<'all_users' | 'reciprocal' | 'chains'>('all_users');
+  // Tab state: 'connected' | 'all_users' | 'reciprocal' | 'chains'
+  const [activeTab, setActiveTab] = useState<'connected' | 'all_users' | 'reciprocal' | 'chains'>('all_users');
 
   // All Users catalog state (synced globally across devices)
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -194,7 +194,8 @@ export default function MatchesPage() {
           setConnectedUserIds((prev) => Array.from(new Set([...prev, targetUserId])));
           setPendingSentIds((prev) => prev.filter((id) => id !== targetUserId));
           setPendingReceived((prev) => prev.filter((p) => (p.user?.id || p.id) !== targetUserId));
-          setMatchAlert('✓ Взаимный мэтч подтвержден! Чат и созвон разблокированы.');
+          setMatchAlert('✓ Взаимный мэтч подтвержден! Инженер добавлен в «Мои мэтчи» и в список чатов.');
+          setActiveTab('connected');
         } else if (action === 'decline') {
           setPendingReceived((prev) => prev.filter((p) => (p.user?.id || p.id) !== targetUserId));
           setMatchAlert('Запрос на мэтч отклонен.');
@@ -404,21 +405,18 @@ export default function MatchesPage() {
 
   const directMatches = matches.filter((m) => m.matchType !== 'CIRCULAR_CHAIN');
   const chainMatches = matches.filter((m) => m.matchType === 'CIRCULAR_CHAIN');
+  const connectedPeers = allUsers.filter((peer) => connectedUserIds.includes(peer.id));
 
   return (
     <div className="space-y-8 animate-in fade-in">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/[0.08]">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 font-mono text-xs mb-2">
-            <Sparkles className="w-3.5 h-3.5" />
-            Каталог инженеров & Бартер знаний
-          </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            Мэтчи и инженеры платформы
+            Мэтчи и контакты
           </h1>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Синхронизированный пул разработчиков, прямой бартер знаний и цепочки обмена.
+            Взаимный бартер знаний, подтвержденные контакты и алгоритмический подбор инженеров.
           </p>
         </div>
 
@@ -504,6 +502,21 @@ export default function MatchesPage() {
       {/* Main Tab Switcher */}
       <div className="flex border-b border-white/[0.08] gap-2 overflow-x-auto pb-1">
         <button
+          onClick={() => setActiveTab('connected')}
+          className={`pb-3 px-4 text-xs font-mono font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+            activeTab === 'connected'
+              ? 'border-emerald-500 text-white'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Мои мэтчи</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            {connectedPeers.length}
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('all_users')}
           className={`pb-3 px-4 text-xs font-mono font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 ${
             activeTab === 'all_users'
@@ -527,7 +540,7 @@ export default function MatchesPage() {
           }`}
         >
           <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-          <span>Взаимные мэтчи</span>
+          <span>Взаимный подбор</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] bg-zinc-800 text-zinc-300">
             {directMatches.length}
           </span>
@@ -548,6 +561,164 @@ export default function MatchesPage() {
           </span>
         </button>
       </div>
+
+      {/* TAB: CONNECTED PEERS (ACCEPTED MATCHES) */}
+      {activeTab === 'connected' && (
+        <section className="space-y-6 animate-in fade-in">
+          <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
+            <div>
+              <h2 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-emerald-400" />
+                <span>Подтвержденные мэтчи ({connectedPeers.length})</span>
+              </h2>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Инженеры, с которыми подтвержден контакт. Чат, видеозвонки и обмен знаниями полностью разблокированы.
+              </p>
+            </div>
+          </div>
+
+          {connectedPeers.length === 0 ? (
+            <div className="drinkit-card p-12 text-center text-zinc-400 font-mono text-xs space-y-4">
+              <UserCheck className="w-8 h-8 text-zinc-600 mx-auto" />
+              <div className="space-y-1">
+                <div className="text-white font-bold">Список подтвержденных мэтчей пока пуст</div>
+                <p className="text-zinc-500 max-w-md mx-auto">
+                  Когда вы примете входящий запрос или ваш запрос одобрят, контакт сразу появится здесь и в списке чатов.
+                </p>
+              </div>
+              <button
+                onClick={() => setActiveTab('all_users')}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all shadow-md shadow-blue-600/20"
+              >
+                Перейти ко всем инженерам →
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {connectedPeers.map((peer) => {
+                const pName = peer.profile?.name || peer.email?.split('@')[0] || 'Инженер';
+                const teachSkills = peer.userSkills?.filter((s: any) => s.type === 'TEACH') || [];
+                const learnSkills = peer.userSkills?.filter((s: any) => s.type === 'LEARN') || [];
+                const isBlocked = blockedUserIds.includes(peer.id);
+
+                return (
+                  <div
+                    key={peer.id}
+                    className="drinkit-card p-5 flex flex-col justify-between space-y-4 hover:border-emerald-500/30 transition-all bg-[#0d0d12] border-emerald-500/20"
+                  >
+                    <div className="space-y-3">
+                      {/* Top Header */}
+                      <div className="flex items-start justify-between gap-3">
+                        <Link
+                          href={`/profile?userId=${peer.id}`}
+                          className="flex items-center gap-3 group min-w-0"
+                        >
+                          <Identicon name={pName} size={42} />
+                          <div className="truncate">
+                            <div className="text-sm font-bold text-white tracking-tight group-hover:text-emerald-400 transition-colors flex items-center gap-1.5 truncate">
+                              <span>@{pName}</span>
+                            </div>
+                            <div className="text-[10px] font-mono text-zinc-500 flex items-center gap-2 mt-0.5">
+                              <span className="flex items-center gap-0.5 text-amber-400">
+                                <Star className="w-2.5 h-2.5 fill-amber-400" />
+                                {peer.profile?.rating ?? '5.0'}
+                              </span>
+                              <span>•</span>
+                              <span className="truncate">{peer.profile?.location || 'Remote'}</span>
+                            </div>
+                          </div>
+                        </Link>
+
+                        <span className="font-mono text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold shrink-0 flex items-center gap-1">
+                          <Check className="w-3 h-3" />
+                          <span>Мэтч</span>
+                        </span>
+                      </div>
+
+                      {/* Role & Bio */}
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-mono text-zinc-400">
+                          Специализация: <strong className="text-zinc-200">{peer.candidateRole || 'Software Engineer'}</strong>
+                        </div>
+                        <p className="text-xs text-zinc-400 font-sans line-clamp-2 leading-relaxed">
+                          {peer.profile?.bio || 'Инженер платформы pixelmink. Готов к бартеру техническими знаниями.'}
+                        </p>
+                      </div>
+
+                      {/* Skills Summary */}
+                      <div className="space-y-2 pt-2 border-t border-white/[0.04] text-[11px] font-mono">
+                        <div>
+                          <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center justify-between">
+                            <span>Обучает</span>
+                            <span className="text-emerald-400 font-bold">{teachSkills.length}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {teachSkills.slice(0, 3).map((s: any, idx: number) => (
+                              <span
+                                key={s.id || idx}
+                                className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[10px]"
+                              >
+                                {s.skill?.name || s.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1 flex items-center justify-between">
+                            <span>Изучает</span>
+                            <span className="text-blue-400 font-bold">{learnSkills.length}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {learnSkills.slice(0, 3).map((s: any, idx: number) => (
+                              <span
+                                key={s.id || idx}
+                                className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px]"
+                              >
+                                {s.skill?.name || s.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons: fully unlocked! */}
+                    <div className="pt-3 border-t border-white/[0.06] flex items-center gap-2">
+                      <button
+                        onClick={() => handleStartDirectChat(peer.id)}
+                        className="flex-1 py-2 px-3 rounded-xl bg-[#18181f] hover:bg-zinc-800 text-zinc-200 text-xs font-mono font-medium transition-all flex items-center justify-center gap-1.5 border border-white/[0.08]"
+                        title="Написать в чат"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-zinc-400" />
+                        <span>Чат</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleStartDirectCall(peer.id)}
+                        className="flex-1 py-2 px-3 rounded-xl bg-[#18181f] hover:bg-zinc-800 text-zinc-200 text-xs font-mono font-medium transition-all flex items-center justify-center gap-1.5 border border-white/[0.08]"
+                        title="P2P видеосозвон"
+                      >
+                        <Video className="w-3.5 h-3.5 text-zinc-400" />
+                        <span>Созвон</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleOpenRequest(peer)}
+                        className="flex-1 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-bold transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/20"
+                        title="Забронировать 30/30 обмен"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Обмен</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* TAB 1: ALL PLATFORM USERS WITH FILTERS */}
       {activeTab === 'all_users' && (
