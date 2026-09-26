@@ -8,7 +8,6 @@ import Logo from '@/components/ui/Logo';
 import Identicon from '@/components/ui/Identicon';
 import {
   Home,
-  Compass,
   Users,
   MessageSquare,
   Video,
@@ -25,7 +24,6 @@ import {
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Главная', icon: Home },
-  { href: '/discover', label: 'Каталог', icon: Compass },
   { href: '/matches', label: 'Мэтчи', icon: Users },
   { href: '/chats', label: 'Чаты', icon: MessageSquare },
   { href: '/seminars', label: 'Семинары', icon: GraduationCap },

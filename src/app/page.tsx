@@ -244,7 +244,7 @@ export default function LandingPage() {
               </Link>
 
               <Link
-                href="/discover"
+                href="/matches"
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-[#131318] hover:bg-[#181820] border border-white/[0.12] text-zinc-300 font-mono text-xs tap-active transition-all"
               >
                 <span>{t('hero_btn_explore')}</span>
@@ -456,7 +456,7 @@ export default function LandingPage() {
               {t('manifesto_btn')}
             </Link>
             <Link
-              href="/discover"
+              href="/matches"
               className="px-6 py-3 rounded bg-[#16161c] hover:bg-[#1c1c24] border border-white/10 text-zinc-300 font-mono text-xs transition-all"
             >
               {t('manifesto_browse')}
@@ -500,7 +500,7 @@ export default function LandingPage() {
                   </a>
                 </li>
                 <li>
-                  <Link href="/discover" className="hover:text-white transition-colors">
+                  <Link href="/matches" className="hover:text-white transition-colors">
                     {t('hero_btn_explore')}
                   </Link>
                 </li>

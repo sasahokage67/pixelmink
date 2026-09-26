@@ -3,11 +3,10 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Compass, Users, MessageSquare, Video, GraduationCap, User } from 'lucide-react';
+import { Home, Users, MessageSquare, Video, GraduationCap, User } from 'lucide-react';
 
 const MOBILE_ITEMS = [
   { href: '/dashboard', label: 'Главная', icon: Home },
-  { href: '/discover', label: 'Каталог', icon: Compass },
   { href: '/matches', label: 'Мэтчи', icon: Users },
   { href: '/chats', label: 'Чаты', icon: MessageSquare },
   { href: '/seminars', label: 'Семинары', icon: GraduationCap },
