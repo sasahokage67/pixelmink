@@ -86,6 +86,7 @@ export default function RegisterPage() {
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [name, setName] = useState('');
+  const [nameWarning, setNameWarning] = useState('');
   const [password, setPassword] = useState('');
   const [bio, setBio] = useState('');
 
@@ -97,6 +98,24 @@ export default function RegisterPage() {
   const [skillSearch, setSkillSearch] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleNameChange = (raw: string) => {
+    // Strip spaces and forbidden characters
+    const sanitized = raw.replace(/[^a-zA-Z0-9._]/g, '');
+    setName(sanitized);
+    if (raw !== sanitized) {
+      setNameWarning(
+        lang === 'ru'
+          ? 'Пробелы и спецсимволы запрещены. Разрешены только буквы, цифры, точка (.) и подчеркивание (_).'
+          : lang === 'kz'
+          ? 'Бос орындар мен арнайы таңбаларға тыйым салынған. Тек әріптер, сандар, нүкте (.) және астын сызу (_) рұқсат.'
+          : 'Spaces and symbols are prohibited. Only letters, numbers, dot (.) and underscore (_) are allowed.'
+      );
+    } else {
+      setNameWarning('');
+    }
+    if (error) setError('');
+  };
 
   // Filter skills by category and search, strictly sorted by popularity rank (1 to N)
   const filteredSkills = useMemo(() => {
@@ -148,8 +167,8 @@ export default function RegisterPage() {
     setLoading(true);
     setError('');
 
-    const ok = await register({
-      name,
+    const result = await register({
+      name: name.trim(),
       password,
       bio,
       teachSkills,
@@ -158,15 +177,16 @@ export default function RegisterPage() {
       learnSkill: learnSkills[0],
     });
 
-    if (ok) {
+    if (result.success) {
       router.push('/dashboard');
     } else {
       setError(
-        lang === 'ru'
-          ? 'Ошибка регистрации. Возможно, этот никнейм уже занят.'
-          : lang === 'kz'
-          ? 'Тіркелу қатесі. Бұл никнейм бос емес болуы мүмкін.'
-          : 'Registration failed. Nickname may already be taken.'
+        result.error ||
+          (lang === 'ru'
+            ? 'Ошибка регистрации. Проверьте введенные данные.'
+            : lang === 'kz'
+            ? 'Тіркелу қатесі. Енгізілген деректерді тексеріңіз.'
+            : 'Registration failed.')
       );
       setLoading(false);
     }
@@ -277,20 +297,37 @@ export default function RegisterPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-mono text-zinc-300 mb-1.5">
-                      {lang === 'ru' ? 'Никнейм / Имя' : lang === 'kz' ? 'Никнейм / Аты' : 'Username / Nickname'}
+                    <label className="block text-xs font-mono text-zinc-300 mb-1.5 flex items-center justify-between">
+                      <span>{lang === 'ru' ? 'Никнейм' : lang === 'kz' ? 'Никнейм' : 'Username / Nickname'}</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">
+                        {name.length}/24
+                      </span>
                     </label>
                     <div className="relative">
                       <User className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                       <input
                         type="text"
                         required
-                        placeholder="e.g. kent, linus, cyber_dev"
+                        maxLength={24}
+                        placeholder="kent, alex_pro, dev.linus"
                         value={name}
-                        onChange={(e) => setName(e.target.value)}
+                        onChange={(e) => handleNameChange(e.target.value)}
                         className="w-full bg-[#16161c] border border-white/[0.1] focus:border-blue-500 rounded px-3 py-2.5 pl-9 text-xs text-white outline-none font-mono"
                       />
                     </div>
+                    {nameWarning ? (
+                      <p className="mt-1.5 text-[11px] font-mono text-amber-400 leading-tight">
+                        {nameWarning}
+                      </p>
+                    ) : (
+                      <p className="mt-1.5 text-[10px] font-mono text-zinc-500">
+                        {lang === 'ru'
+                          ? 'Формат: a-z, 0-9, \'.\', \'_\' (без пробелов, от 3 до 24 символов)'
+                          : lang === 'kz'
+                          ? 'Пішімі: a-z, 0-9, \'.\', \'_\' (бос орынсыз, 3-тен 24 таңбаға дейін)'
+                          : 'Format: a-z, 0-9, \'.\', \'_\' (no spaces, 3-24 characters)'}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -314,11 +351,29 @@ export default function RegisterPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (!name.trim() || !password.trim()) {
+                        const trimmed = name.trim();
+                        if (!trimmed || !password.trim()) {
                           setError(lang === 'ru' ? 'Укажите никнейм и пароль.' : 'Enter username and password.');
                           return;
                         }
+                        if (trimmed.length < 3) {
+                          setError(lang === 'ru' ? 'Никнейм должен содержать минимум 3 символа.' : 'Username must be at least 3 characters.');
+                          return;
+                        }
+                        if (trimmed.length > 24) {
+                          setError(lang === 'ru' ? 'Никнейм не должен превышать 24 символа.' : 'Username must not exceed 24 characters.');
+                          return;
+                        }
+                        if (!/^[a-zA-Z0-9._]+$/.test(trimmed)) {
+                          setError(lang === 'ru' ? 'В никнейме разрешены только латинские буквы, цифры, точка (.) и подчеркивание (_).' : 'Only letters, numbers, . and _ are allowed.');
+                          return;
+                        }
+                        if (!/[a-zA-Z0-9]/.test(trimmed)) {
+                          setError(lang === 'ru' ? 'Никнейм должен содержать хотя бы одну букву или цифру.' : 'Username must contain at least one letter or digit.');
+                          return;
+                        }
                         setError('');
+                        setNameWarning('');
                         setStep(2);
                       }}
                       className="w-full py-2.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-600/20"

@@ -17,30 +17,53 @@ export async function POST(req: NextRequest) {
       learnSkill,
     } = body;
 
-    if (!name || !password) {
-      return NextResponse.json({ error: 'Name and password are required' }, { status: 400 });
+    const cleanName = (name || '').trim();
+
+    if (!cleanName || !password) {
+      return NextResponse.json({ error: 'Укажите никнейм и пароль' }, { status: 400 });
     }
 
-    const cleanHandle = name.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') || 'peer';
-    
-    // Check if name or email already taken
-    const existingByName = await prisma.profile.findFirst({
-      where: { name: { equals: name.trim() } },
-    });
-    if (existingByName) {
-      return NextResponse.json({ error: 'Пользователь с таким никнеймом уже зарегистрирован' }, { status: 409 });
+    // 1. Prohibit spaces
+    if (/\s/.test(cleanName)) {
+      return NextResponse.json({
+        error: 'В никнейме запрещены пробелы. Используйте только латиницу, цифры, точку (.) или нижнее подчеркивание (_).'
+      }, { status: 400 });
     }
 
+    // 2. Strict character whitelist: only a-z, A-Z, 0-9, dot (.), underscore (_)
+    const USERNAME_REGEX = /^[a-zA-Z0-9._]{3,24}$/;
+    if (!USERNAME_REGEX.test(cleanName)) {
+      return NextResponse.json({
+        error: 'Никнейм должен быть от 3 до 24 символов и содержать только латинские буквы, цифры, точку (.) или нижнее подчеркивание (_).'
+      }, { status: 400 });
+    }
+
+    // 3. Must contain at least one alphanumeric character
+    if (!/[a-zA-Z0-9]/.test(cleanName)) {
+      return NextResponse.json({
+        error: 'Никнейм должен содержать хотя бы одну букву или цифру.'
+      }, { status: 400 });
+    }
+
+    // 4. Check if nickname is taken (case-insensitive)
+    const existingProfiles = await prisma.profile.findMany({ select: { name: true } });
+    const isTaken = existingProfiles.some((p) => p.name.toLowerCase() === cleanName.toLowerCase());
+    if (isTaken) {
+      return NextResponse.json({ error: `Никнейм "${cleanName}" уже занят другим пользователем` }, { status: 409 });
+    }
+
+    const cleanHandle = cleanName.toLowerCase();
     let userEmail = email?.trim();
     if (!userEmail) {
-      const existingCount = await prisma.user.count({
-        where: { email: { startsWith: cleanHandle } },
-      });
-      userEmail = existingCount === 0 ? `${cleanHandle}@peer.dev` : `${cleanHandle}_${Date.now().toString(36)}@peer.dev`;
+      userEmail = `${cleanHandle}@peer.dev`;
+      const existingUserWithEmail = await prisma.user.findUnique({ where: { email: userEmail } });
+      if (existingUserWithEmail) {
+        userEmail = `${cleanHandle}_${Date.now().toString(36)}@peer.dev`;
+      }
     } else {
       const existingByEmail = await prisma.user.findUnique({ where: { email: userEmail } });
       if (existingByEmail) {
-        return NextResponse.json({ error: 'User with this email already exists' }, { status: 409 });
+        return NextResponse.json({ error: 'Пользователь с такой почтой уже существует' }, { status: 409 });
       }
     }
 
@@ -55,7 +78,7 @@ export async function POST(req: NextRequest) {
         role,
         profile: {
           create: {
-            name,
+            name: cleanName,
             bio: userBio,
             location: 'Remote',
             languages: 'English',

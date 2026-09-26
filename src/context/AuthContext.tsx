@@ -31,7 +31,7 @@ interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
   login: (email: string, password?: string) => Promise<boolean>;
-  register: (data: any) => Promise<boolean>;
+  register: (data: any) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   switchDemoUser: (email: string) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (formData: any) => {
+  const register = async (formData: any): Promise<{ success: boolean; error?: string }> => {
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -94,11 +94,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await res.json();
       if (res.ok && data.user) {
         setUser(data.user);
-        return true;
+        return { success: true };
       }
-      return false;
-    } catch {
-      return false;
+      return { success: false, error: data.error || 'Ошибка регистрации' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Ошибка сети при регистрации' };
     }
   };
 

@@ -12,10 +12,11 @@ export async function POST(req: NextRequest) {
     }
 
     const trimmedInput = email.trim();
-    const user = await prisma.user.findFirst({
+    let user = await prisma.user.findFirst({
       where: {
         OR: [
           { email: trimmedInput },
+          { email: trimmedInput.toLowerCase() },
           { profile: { name: { equals: trimmedInput } } },
           { email: `${trimmedInput.toLowerCase()}@peer.dev` },
         ],
@@ -29,7 +30,20 @@ export async function POST(req: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
+      const allUsers = await prisma.user.findMany({
+        include: { profile: true, userSkills: { include: { skill: true } } },
+      });
+      user =
+        allUsers.find(
+          (u) =>
+            u.profile?.name?.toLowerCase() === trimmedInput.toLowerCase() ||
+            u.email.toLowerCase() === trimmedInput.toLowerCase() ||
+            u.email.toLowerCase() === `${trimmedInput.toLowerCase()}@peer.dev`
+        ) || null;
+    }
+
+    if (!user) {
+      return NextResponse.json({ error: 'Неверный никнейм или пароль' }, { status: 401 });
     }
 
     const isMatch = await comparePassword(password, user.password);
