@@ -5,7 +5,7 @@ import { Layers, Plus, CheckCircle2, BookOpen, Clock, Target, X, Trash2, Loader2
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 
-export const AVAILABLE_SKILLS_BY_CATEGORY: Record<string, string[]> = {
+const AVAILABLE_SKILLS_BY_CATEGORY: Record<string, string[]> = {
   CODING: [
     'Python', 'JavaScript', 'TypeScript', 'React', 'Next.js', 'Node.js', 
     'Go (Golang)', 'Rust', 'C++', 'C#', 'Java', 'PHP', 'Swift', 
