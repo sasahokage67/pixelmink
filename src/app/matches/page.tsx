@@ -29,26 +29,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
+import { useLanguage } from '@/context/LanguageContext';
 import Identicon from '@/components/ui/Identicon';
-
-const CATEGORIES = [
-  { id: '', label: 'Все сферы' },
-  { id: 'CODING', label: 'Разработка (Backend/Web)' },
-  { id: 'AI_ML', label: 'AI & Data Science' },
-  { id: 'DEVOPS', label: 'DevOps & Infra' },
-  { id: 'DESIGN', label: 'UI/UX & Product' },
-  { id: 'COMPUTER_SCIENCE', label: 'CS & Algorithms' },
-  { id: 'MATH', label: 'Math & Cryptography' },
-  { id: 'VIDEO_EDITING', label: 'Media & Motion' },
-];
-
-const LEVELS = [
-  { id: '', label: 'Любой грейд' },
-  { id: 'BEGINNER', label: 'Junior / Beginner' },
-  { id: 'INTERMEDIATE', label: 'Middle' },
-  { id: 'ADVANCED', label: 'Senior' },
-  { id: 'EXPERT', label: 'Lead / Expert' },
-];
 
 export default function MatchesPage() {
   const router = useRouter();
@@ -56,6 +38,26 @@ export default function MatchesPage() {
   const requestTeacherId = searchParams.get('requestTeacherId');
   const { user } = useAuth();
   const { socket } = useSocket();
+  const { lang } = useLanguage();
+
+  const CATEGORIES = [
+    { id: '', label: lang === 'kz' ? 'Барлық салалар' : lang === 'en' ? 'All Domains' : 'Все сферы' },
+    { id: 'CODING', label: lang === 'kz' ? 'Әзірлеу (Backend/Web)' : lang === 'en' ? 'Development (Backend/Web)' : 'Разработка (Backend/Web)' },
+    { id: 'AI_ML', label: lang === 'kz' ? 'AI & Data Science' : lang === 'en' ? 'AI & Data Science' : 'AI & Data Science' },
+    { id: 'DEVOPS', label: lang === 'kz' ? 'DevOps & Инфра' : lang === 'en' ? 'DevOps & Infra' : 'DevOps & Infra' },
+    { id: 'DESIGN', label: lang === 'kz' ? 'UI/UX & Дизайн' : lang === 'en' ? 'UI/UX & Product' : 'UI/UX & Product' },
+    { id: 'COMPUTER_SCIENCE', label: lang === 'kz' ? 'CS & Алгоритмдер' : lang === 'en' ? 'CS & Algorithms' : 'CS & Algorithms' },
+    { id: 'MATH', label: lang === 'kz' ? 'Математика & Крипто' : lang === 'en' ? 'Math & Cryptography' : 'Math & Cryptography' },
+    { id: 'VIDEO_EDITING', label: lang === 'kz' ? 'Медиа & Motion' : lang === 'en' ? 'Media & Motion' : 'Media & Motion' },
+  ];
+
+  const LEVELS = [
+    { id: '', label: lang === 'kz' ? 'Кез келген деңгей' : lang === 'en' ? 'Any Grade' : 'Любой грейд' },
+    { id: 'BEGINNER', label: lang === 'kz' ? 'Junior / Бастаушы' : lang === 'en' ? 'Junior / Beginner' : 'Junior / Beginner' },
+    { id: 'INTERMEDIATE', label: lang === 'kz' ? 'Middle / Орташа' : lang === 'en' ? 'Middle' : 'Middle' },
+    { id: 'ADVANCED', label: lang === 'kz' ? 'Senior / Жоғары' : lang === 'en' ? 'Senior' : 'Senior' },
+    { id: 'EXPERT', label: lang === 'kz' ? 'Lead / Сарапшы' : lang === 'en' ? 'Lead / Expert' : 'Lead / Expert' },
+  ];
 
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -570,7 +572,7 @@ export default function MatchesPage() {
           }`}
         >
           <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Мои мэтчи</span>
+          <span>{lang === 'kz' ? 'Менің сәйкестіктерім' : lang === 'en' ? 'My Matches' : 'Мои мэтчи'}</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             {connectedPeers.length}
           </span>
@@ -585,7 +587,7 @@ export default function MatchesPage() {
           }`}
         >
           <Users className="w-3.5 h-3.5 text-blue-400" />
-          <span>Все инженеры платформы</span>
+          <span>{lang === 'kz' ? 'Барлық инженерлер' : lang === 'en' ? 'All Engineers' : 'Все инженеры платформы'}</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20">
             {allUsers.length}
           </span>
@@ -600,7 +602,7 @@ export default function MatchesPage() {
           }`}
         >
           <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-          <span>Взаимный подбор</span>
+          <span>{lang === 'kz' ? 'Өзара сәйкестік' : lang === 'en' ? 'Reciprocal Matches' : 'Взаимный подбор'}</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] bg-zinc-800 text-zinc-300">
             {directMatches.length}
           </span>
@@ -615,7 +617,7 @@ export default function MatchesPage() {
           }`}
         >
           <Repeat className="w-3.5 h-3.5 text-purple-400" />
-          <span>Цепочки (A → B → C)</span>
+          <span>{lang === 'kz' ? 'Тізбектер (A → B → C)' : lang === 'en' ? 'Chains (A → B → C)' : 'Цепочки (A → B → C)'}</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-500/10 text-purple-300">
             {chainMatches.length}
           </span>

@@ -22,20 +22,22 @@ import {
   User,
 } from 'lucide-react';
 
+import { useLanguage } from '@/context/LanguageContext';
+
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Главная', icon: Home },
-  { href: '/matches', label: 'Мэтчи', icon: Users },
-  { href: '/chats', label: 'Чаты', icon: MessageSquare },
-  { href: '/seminars', label: 'Семинары', icon: GraduationCap },
-  { href: '/profile', label: 'Личный кабинет', icon: User },
-  { href: '/skills', label: 'Мои навыки', icon: Layers },
-  { href: '/tests', label: 'Тестирование', icon: Award },
-  { href: '/calendar', label: 'Календарь', icon: Calendar },
+  { href: '/dashboard', key: 'dashboard', icon: Home, ru: 'Главная', kz: 'Басты бет', en: 'Dashboard' },
+  { href: '/matches', key: 'matches', icon: Users, ru: 'Мэтчи', kz: 'Сәйкестіктер', en: 'Matches' },
+  { href: '/chats', key: 'chats', icon: MessageSquare, ru: 'Чаты', kz: 'Чаттар', en: 'Chats' },
+  { href: '/seminars', key: 'seminars', icon: GraduationCap, ru: 'Семинары', kz: 'Семинарлар', en: 'Seminars' },
+  { href: '/profile', key: 'profile', icon: User, ru: 'Личный кабинет', kz: 'Жеке кабинет', en: 'Profile' },
+  { href: '/skills', key: 'skills', icon: Layers, ru: 'Мои навыки', kz: 'Менің дағдыларым', en: 'My Skills' },
+  { href: '/calendar', key: 'calendar', icon: Calendar, ru: 'Календарь', kz: 'Күнтізбе', en: 'Calendar' },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { lang } = useLanguage();
 
   return (
     <aside className="hidden md:flex flex-col w-64 h-screen bg-[#09090b] border-r border-white/[0.08] sticky top-0 shrink-0 select-none z-30 font-mono">
@@ -49,7 +51,7 @@ export default function Sidebar() {
             </span>
           </Link>
           <div className="text-[10px] text-zinc-500 mt-1 leading-tight">
-            Бартер технических знаний
+            {lang === 'kz' ? 'Техникалық білім бартері' : lang === 'en' ? 'Technical Knowledge Barter' : 'Бартер технических знаний'}
           </div>
         </div>
         <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px]">
@@ -82,7 +84,7 @@ export default function Sidebar() {
                     isActive ? 'text-blue-400' : 'text-zinc-500 group-hover:text-zinc-300'
                   }`}
                 />
-                <span>{item.label}</span>
+                <span>{item[lang] || item.ru}</span>
               </div>
             </Link>
           );
@@ -97,17 +99,17 @@ export default function Sidebar() {
             <Identicon name={user?.profile?.name || user?.email || 'User'} size={28} />
             <div className="min-w-0">
               <div className="text-xs text-white truncate">
-                {user?.profile?.name || user?.email?.split('@')[0] || 'Мой профиль'}
+                {user?.profile?.name || user?.email?.split('@')[0] || (lang === 'kz' ? 'Менің профилім' : lang === 'en' ? 'My Profile' : 'Мой профиль')}
               </div>
               <div className="text-[10px] text-zinc-500 truncate">
-                {user?.email || 'Инженер'}
+                {user?.email || (lang === 'kz' ? 'Инженер' : lang === 'en' ? 'Engineer' : 'Инженер')}
               </div>
             </div>
           </Link>
 
           <button
             onClick={() => logout()}
-            title="Выйти из аккаунта"
+            title={lang === 'kz' ? 'Аккаунттан шығу' : lang === 'en' ? 'Sign out' : 'Выйти из аккаунта'}
             className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors rounded"
           >
             <LogOut className="w-3.5 h-3.5" />

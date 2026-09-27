@@ -7,8 +7,11 @@ import { Bell, Search, Video, UserCheck, Globe } from 'lucide-react';
 import LanguageSwitcher from '@/components/ui/LanguageSwitcher';
 import Identicon from '@/components/ui/Identicon';
 
+import { useLanguage } from '@/context/LanguageContext';
+
 export default function TopHeader() {
   const { user } = useAuth();
+  const { lang } = useLanguage();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -45,7 +48,13 @@ export default function TopHeader() {
         <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
         <input
           type="text"
-          placeholder="Поиск по навыкам, темам, коллегам..."
+          placeholder={
+            lang === 'kz'
+              ? 'Дағдылар, тақырыптар, әріптестер бойынша іздеу...'
+              : lang === 'en'
+              ? 'Search skills, topics, peers...'
+              : 'Поиск по навыкам, темам, коллегам...'
+          }
           className="w-full bg-[#111114] border border-white/[0.08] focus:border-blue-500/50 rounded-full pl-9 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 outline-none font-sans transition-all"
         />
       </div>
@@ -56,10 +65,10 @@ export default function TopHeader() {
         <Link
           href="/"
           className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-[11px] font-mono text-zinc-400 hover:text-white transition-colors"
-          title="На главную промо-страницу"
+          title={lang === 'kz' ? 'Басты бетке өту' : lang === 'en' ? 'To landing page' : 'На главную промо-страницу'}
         >
           <Globe className="w-3 h-3 text-zinc-400" />
-          <span>Главная</span>
+          <span>{lang === 'kz' ? 'Басты бет' : lang === 'en' ? 'Home' : 'Главная'}</span>
         </Link>
 
         {/* Trilingual Switcher (RU / KZ / EN) */}
