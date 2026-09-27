@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Mic,
@@ -20,6 +20,9 @@ import {
 } from 'lucide-react';
 import Identicon from '@/components/ui/Identicon';
 import SharedCallTerminal from '@/components/call/SharedCallTerminal';
+import CallAudio from '@/components/call/CallAudio';
+import { useCallConnection } from '@/hooks/useCallConnection';
+import { useCallMedia } from '@/hooks/useCallMedia';
 
 interface InChatCallProps {
   roomId: string;
@@ -30,14 +33,6 @@ interface InChatCallProps {
   initialType?: 'AUDIO' | 'VIDEO';
   onClose: () => void;
 }
-
-const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-  ],
-};
 
 export default function InChatCall({
   roomId,
@@ -50,12 +45,6 @@ export default function InChatCall({
 }: InChatCallProps) {
   const router = useRouter();
 
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [isPeerConnected, setIsPeerConnected] = useState(false);
-  const [isMicMuted, setIsMicMuted] = useState(false);
-  const [isCamOff, setIsCamOff] = useState(initialType === 'AUDIO');
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [durationSeconds, setDurationSeconds] = useState(0);
 
   // Shared Terminal States (Mutual Consent)
@@ -66,303 +55,56 @@ export default function InChatCall({
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
   const effectiveUserName = currentUser?.profile?.name || currentUser?.email?.split('@')[0] || 'Me';
+  const media = useCallMedia(true, initialType === 'AUDIO');
+  const {
+    stream: localStream, preview: localPreview, micMuted: isMicMuted, camOff: isCamOff,
+    sharing: isScreenSharing, toggleMic, toggleCam, toggleScreenShare,
+  } = media;
+  const { remoteStream, isPeerConnected, connectionError, replaceVideo, stopConnection } =
+    useCallConnection(socket, roomId, localStream, true, effectiveUserName, currentUser?.id);
+  media.replaceVideoRef.current = replaceVideo;
 
-  // 1. Initialize Local Media Stream
   useEffect(() => {
-    let streamInstance: MediaStream | null = null;
+    const timer = setInterval(() => setDurationSeconds((value) => value + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-    async function initMedia() {
-      try {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          let preferredId = typeof window !== 'undefined' ? localStorage.getItem('pixelmink_preferred_cam_id') : null;
-          if (!preferredId && navigator.mediaDevices.enumerateDevices) {
-            try {
-              const devices = await navigator.mediaDevices.enumerateDevices();
-              const cams = devices.filter((d) => d.kind === 'videoinput');
-              const physicalCam = cams.find((c) => {
-                const lbl = (c.label || '').toLowerCase();
-                return !lbl.includes('vcam') && !lbl.includes('virtual') && !lbl.includes('obs');
-              });
-              if (physicalCam) preferredId = physicalCam.deviceId;
-            } catch {}
-          }
-
-          const videoConstraint: any = initialType === 'VIDEO'
-            ? (preferredId ? { deviceId: { exact: preferredId } } : true)
-            : false;
-
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: videoConstraint,
-            audio: true,
-          });
-          streamInstance = stream;
-          setLocalStream(stream);
-
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = stream;
-          }
-
-          const vTrack = stream.getVideoTracks()[0];
-          if (vTrack) {
-            cameraTrackRef.current = vTrack;
-            if (initialType === 'AUDIO') {
-              vTrack.enabled = false;
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('In-chat video failed, fallback to audio:', err);
-        try {
-          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          streamInstance = audioStream;
-          setLocalStream(audioStream);
-          setIsCamOff(true);
-        } catch (audioErr) {
-          console.error('All media devices blocked:', audioErr);
-        }
-      }
-    }
-
-    initMedia();
-
-    // Call duration timer
-    const timer = setInterval(() => {
-      setDurationSeconds((s) => s + 1);
-    }, 1000);
-
-    return () => {
-      clearInterval(timer);
-      if (streamInstance) {
-        streamInstance.getTracks().forEach((track) => track.stop());
-      }
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-      }
-    };
-  }, [initialType]);
-
-  // PeerConnection creation & management
-  const getOrCreatePeerConnection = useCallback((targetSocketId: string) => {
-    if (peerConnectionRef.current) {
-      return peerConnectionRef.current;
-    }
-
-    const pc = new RTCPeerConnection(RTC_CONFIG);
-
-    if (localStream) {
-      localStream.getTracks().forEach((track) => {
-        pc.addTrack(track, localStream);
-      });
-    }
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate && socket) {
-        socket.emit('webrtc:signal', {
-          to: targetSocketId,
-          signal: { type: 'candidate', candidate: event.candidate },
-        });
-      }
-    };
-
-    pc.ontrack = (event) => {
-      const incomingStream = event.streams[0];
-      if (incomingStream) {
-        setRemoteStream(incomingStream);
-        setIsPeerConnected(true);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = incomingStream;
-        }
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'connected') {
-        setIsPeerConnected(true);
-      } else if (
-        pc.connectionState === 'disconnected' ||
-        pc.connectionState === 'failed' ||
-        pc.connectionState === 'closed'
-      ) {
-        setIsPeerConnected(false);
-        setRemoteStream(null);
-      }
-    };
-
-    peerConnectionRef.current = pc;
-    return pc;
-  }, [localStream, socket]);
-
-  // 2. WebRTC Signaling via Socket.io
   useEffect(() => {
-    if (!socket || !roomId) return;
-
-    socket.emit('call:join_room', {
-      roomId,
-      userId: currentUser?.id,
-      userName: effectiveUserName,
-    });
-
-    socket.on('call:existing_peers', ({ peers }: { peers: string[] }) => {
-      if (peers && peers.length > 0) {
-        getOrCreatePeerConnection(peers[0]);
-      }
-    });
-
-    socket.on('call:peer_joined', async ({ socketId, userName }: { socketId: string; userName: string }) => {
-      const pc = getOrCreatePeerConnection(socketId);
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        socket.emit('webrtc:signal', {
-          to: socketId,
-          signal: { type: 'offer', sdp: offer, senderName: effectiveUserName },
-        });
-      } catch (err) {
-        console.error('In-chat WebRTC offer creation error:', err);
-      }
-    });
-
-    socket.on('webrtc:signal', async ({ signal, from }: { signal: any; from: string }) => {
-      if (!from) return;
-      const pc = getOrCreatePeerConnection(from);
-
-      try {
-        if (signal.type === 'offer') {
-          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-
-          socket.emit('webrtc:signal', {
-            to: from,
-            signal: { type: 'answer', sdp: answer },
-          });
-        } else if (signal.type === 'answer') {
-          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-        } else if (signal.type === 'candidate' && signal.candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-        }
-      } catch (err) {
-        console.error('In-chat signaling handling error:', err);
-      }
-    });
-
-    // Terminal events
-    socket.on('call:terminal_request', (data: { fromUserId: string; fromUserName: string }) => {
-      setTerminalProposal(data);
-    });
-
-    socket.on('call:terminal_opened', () => {
+    if (!socket) return;
+    const request = (data: any) => { if (data.roomId === roomId) setTerminalProposal(data); };
+    const opened = (data: any) => {
+      if (data.roomId !== roomId) return;
       setIsTerminalOpen(true);
       setTerminalProposal(null);
       setTerminalRequestSent(false);
-    });
-
-    socket.on('call:terminal_declined', ({ byUserName }: { byUserName?: string }) => {
-      setTerminalRequestSent(false);
-      const name = byUserName || otherMember?.profile?.name || 'Собеседник';
-      setTerminalDeclinedNotice(`${name} отклонил(а) предложение открыть терминал`);
-      setTimeout(() => setTerminalDeclinedNotice(null), 4000);
-    });
-
-    socket.on('call:terminal_closed', () => {
-      setIsTerminalOpen(false);
-    });
-
-    return () => {
-      socket.off('call:existing_peers');
-      socket.off('call:peer_joined');
-      socket.off('webrtc:signal');
-      socket.off('call:terminal_request');
-      socket.off('call:terminal_opened');
-      socket.off('call:terminal_declined');
-      socket.off('call:terminal_closed');
     };
-  }, [socket, roomId, currentUser, effectiveUserName, getOrCreatePeerConnection, otherMember]);
-
-  // Controls
-  const toggleMic = () => {
-    if (!localStream) return;
-    localStream.getAudioTracks().forEach((track) => {
-      track.enabled = !track.enabled;
-    });
-    setIsMicMuted((prev) => !prev);
-  };
-
-  const toggleCam = () => {
-    if (!localStream) return;
-    const vTrack = localStream.getVideoTracks()[0];
-    if (vTrack) {
-      vTrack.enabled = !vTrack.enabled;
-      setIsCamOff(!vTrack.enabled);
-    }
-  };
-
-  const toggleScreenShare = async () => {
-    if (isScreenSharing) {
-      if (cameraTrackRef.current && localVideoRef.current) {
-        localVideoRef.current.srcObject = new MediaStream([cameraTrackRef.current]);
-      }
-      if (peerConnectionRef.current && cameraTrackRef.current) {
-        const videoSender = peerConnectionRef.current
-          .getSenders()
-          .find((s) => s.track?.kind === 'video');
-        if (videoSender) videoSender.replaceTrack(cameraTrackRef.current);
-      }
-      setIsScreenSharing(false);
-    } else {
-      try {
-        if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-          const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-          const screenTrack = displayStream.getVideoTracks()[0];
-
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = displayStream;
-          }
-
-          if (peerConnectionRef.current) {
-            const videoSender = peerConnectionRef.current
-              .getSenders()
-              .find((s) => s.track?.kind === 'video');
-            if (videoSender) videoSender.replaceTrack(screenTrack);
-          }
-
-          screenTrack.onended = () => {
-            setIsScreenSharing(false);
-            if (cameraTrackRef.current && localVideoRef.current) {
-              localVideoRef.current.srcObject = new MediaStream([cameraTrackRef.current]);
-            }
-            if (peerConnectionRef.current && cameraTrackRef.current) {
-              const videoSender = peerConnectionRef.current
-                .getSenders()
-                .find((s) => s.track?.kind === 'video');
-              if (videoSender) videoSender.replaceTrack(cameraTrackRef.current);
-            }
-          };
-
-          setIsScreenSharing(true);
-        }
-      } catch (err) {
-        console.warn('Screen share cancelled in chat:', err);
-      }
-    }
-  };
+    const declined = (data: any) => {
+      if (data.roomId !== roomId) return;
+      setTerminalRequestSent(false);
+      setTerminalDeclinedNotice(`${data.byUserName || 'Собеседник'} отклонил(а) предложение открыть терминал`);
+    };
+    const closed = (data: any) => { if (data.roomId === roomId) setIsTerminalOpen(false); };
+    socket.on('call:terminal_request', request);
+    socket.on('call:terminal_opened', opened);
+    socket.on('call:terminal_declined', declined);
+    socket.on('call:terminal_closed', closed);
+    return () => {
+      socket.off('call:terminal_request', request);
+      socket.off('call:terminal_opened', opened);
+      socket.off('call:terminal_declined', declined);
+      socket.off('call:terminal_closed', closed);
+    };
+  }, [socket, roomId]);
 
   const handleEndCall = () => {
-    if (localStream) {
-      localStream.getTracks().forEach((track) => track.stop());
-    }
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-    }
+    stopConnection();
+    media.stop();
     onClose();
   };
 
   const handleOpenFullscreen = () => {
-    router.push(`/calls/${roomId}`);
+    router.push(`/calls/${roomId}?type=${initialType}`);
   };
 
   const handleToggleTerminal = () => {
@@ -411,6 +153,10 @@ export default function InChatCall({
 
   return (
     <div className="border-b border-white/[0.08] bg-[#09090c] p-3 animate-in slide-in-from-top-4 transition-all">
+      <CallAudio stream={remoteStream} />
+      {(media.error || connectionError) && (
+        <div role="status" className="px-3 py-2 text-xs text-amber-200">{media.error || connectionError}</div>
+      )}
       {/* Mutual Consent Proposal Modal */}
       {terminalProposal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
@@ -476,9 +222,16 @@ export default function InChatCall({
           <div className="relative aspect-video rounded-xl overflow-hidden bg-[#141419] border border-white/[0.08] flex items-center justify-center">
             {isPeerConnected && remoteStream ? (
               <video
-                ref={remoteVideoRef}
+                ref={(element) => {
+                  remoteVideoRef.current = element;
+                  if (element && element.srcObject !== remoteStream) {
+                    element.srcObject = remoteStream;
+                    element.play().catch(() => {});
+                  }
+                }}
                 autoPlay
                 playsInline
+                muted
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -499,9 +252,12 @@ export default function InChatCall({
 
           {/* Local User's Stream */}
           <div className="relative aspect-video rounded-xl overflow-hidden bg-[#141419] border border-white/[0.08] flex items-center justify-center">
-            {localStream && !isCamOff ? (
+            {localStream && (!isCamOff || isScreenSharing) ? (
               <video
-                ref={localVideoRef}
+                ref={(element) => {
+                  localVideoRef.current = element;
+                  if (element && element.srcObject !== localPreview) element.srcObject = localPreview;
+                }}
                 autoPlay
                 playsInline
                 muted
@@ -608,7 +364,6 @@ export default function InChatCall({
             currentUser={currentUser}
             partnerName={otherMember?.profile?.name || 'Собеседник'}
             onClose={() => {
-              if (socket) socket.emit('call:terminal_close', { roomId });
               setIsTerminalOpen(false);
             }}
           />

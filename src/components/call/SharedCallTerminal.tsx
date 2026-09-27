@@ -160,7 +160,14 @@ export default function SharedCallTerminal({
   const [mobileTab, setMobileTab] = useState<'editor' | 'console'>('editor');
 
   const canEdit = isMentor !== false;
-  const isLocalChange = useRef(false);
+  const revisionRef = useRef(0);
+  const editSequenceRef = useRef(0);
+  const onCloseRef = useRef(onClose);
+  const cacheKey = `pixelmink_terminal_${roomId}`;
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   const localSenderIdRef = useRef<string>(mySenderId || currentUser?.id || '');
   useEffect(() => {
@@ -171,139 +178,116 @@ export default function SharedCallTerminal({
     }
   }, [mySenderId, currentUser?.id]);
 
-  // Dual channel sync: Socket.io + ntfy SSE fallback for live cloud coding
-  useEffect(() => {
-    // 1. Socket.io listeners
-    if (socket) {
-      socket.on('call:terminal_sync', (data: { code: string; language: string; byUserName?: string; senderId?: string }) => {
-        if (data.senderId && localSenderIdRef.current && data.senderId === localSenderIdRef.current) return;
-        isLocalChange.current = true;
-        if (data.code !== undefined) setCode(data.code);
-        if (data.language && data.language !== language) setLanguage(data.language);
-        if (data.byUserName) setLastEditor(data.byUserName);
-        setTimeout(() => {
-          isLocalChange.current = false;
-        }, 50);
-      });
-
-      socket.on('call:terminal_executing', () => {
-        setIsRunning(true);
-        setStderr('');
-      });
-
-      socket.on('call:terminal_output', (data: any) => {
-        setIsRunning(false);
-        setStdout(data.stdout || '');
-        setStderr(data.stderr || '');
-        setExecutionTime(data.executionTime || 0);
-        setRuntimeLabel(data.runtime || '');
-      });
-
-      socket.on('call:terminal_closed', () => {
-        onClose();
-      });
-    }
-
-    // 2. ntfy SSE listener for cross-platform / Vercel real-time collaboration
-    let eventSource: EventSource | null = null;
-    const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
-    const termTopic = `pixelmink_term_${cleanRoomId}`;
-
+  const saveCachedState = useCallback((nextCode: string, nextLanguage: string, revision: number) => {
     try {
-      eventSource = new EventSource(`https://ntfy.sh/${termTopic}/sse`);
-      eventSource.onmessage = (event) => {
-        try {
-          const raw = JSON.parse(event.data);
-          const data = typeof raw.message === 'string' ? JSON.parse(raw.message) : raw;
-          if (!data) return;
-          if (data.senderId && localSenderIdRef.current && data.senderId === localSenderIdRef.current) return;
-
-          if (data.type === 'sync') {
-            isLocalChange.current = true;
-            if (data.code !== undefined) setCode(data.code);
-            if (data.language && data.language !== language) setLanguage(data.language);
-            if (data.byUserName) setLastEditor(data.byUserName);
-            setTimeout(() => {
-              isLocalChange.current = false;
-            }, 50);
-          } else if (data.type === 'executing') {
-            setIsRunning(true);
-            setStderr('');
-          } else if (data.type === 'output') {
-            setIsRunning(false);
-            setStdout(data.stdout || '');
-            setStderr(data.stderr || '');
-            setExecutionTime(data.executionTime || 0);
-            setRuntimeLabel(data.runtime || '');
-          } else if (data.type === 'close') {
-            onClose();
-          }
-        } catch {}
-      };
+      localStorage.setItem(cacheKey, JSON.stringify({
+        code: nextCode,
+        language: nextLanguage,
+        revision,
+      }));
     } catch {}
+  }, [cacheKey]);
+
+  const applyEditorState = useCallback((data: {
+    code?: string;
+    language?: string;
+    byUserName?: string;
+    revision?: number;
+  } | null) => {
+    if (!data) return;
+    const revision = typeof data.revision === 'number' ? data.revision : 0;
+    if (revision > 0 && revision < revisionRef.current) return;
+    revisionRef.current = Math.max(revisionRef.current, revision);
+    if (typeof data.code === 'string') setCode(data.code);
+    if (typeof data.language === 'string' && data.language) setLanguage(data.language);
+    if (data.byUserName) setLastEditor(data.byUserName);
+    if (typeof data.code === 'string' && typeof data.language === 'string') {
+      saveCachedState(data.code, data.language, revisionRef.current);
+    }
+  }, [saveCachedState]);
+
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) applyEditorState(JSON.parse(cached));
+    } catch {}
+  }, [applyEditorState, cacheKey]);
+
+  // Socket.IO is the authoritative ordered channel. The server keeps the latest
+  // room snapshot and returns it on mount/reconnect so refresh does not reset code.
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleSync = (data: any) => { if (data.roomId === roomId) applyEditorState(data); };
+    const handleState = handleSync;
+    const handleExecuting = (data: any) => {
+      if (data.roomId !== roomId) return;
+      setIsRunning(true);
+      setStderr('');
+    };
+    const handleOutput = (data: any) => {
+      if (data.roomId !== roomId) return;
+      setIsRunning(false);
+      setStdout(data.stdout || '');
+      setStderr(data.stderr || '');
+      setExecutionTime(data.executionTime || 0);
+      setRuntimeLabel(data.runtime || '');
+    };
+    const handleClosed = (data: any) => { if (data.roomId === roomId) onCloseRef.current(); };
+    const requestState = () => {
+      const sequence = editSequenceRef.current;
+      socket.emit('call:terminal_get_state', { roomId }, (state: any) => {
+        if (sequence === editSequenceRef.current) applyEditorState(state);
+      });
+    };
+
+    socket.on('call:terminal_sync', handleSync);
+    socket.on('call:terminal_state', handleState);
+    socket.on('call:terminal_executing', handleExecuting);
+    socket.on('call:terminal_output', handleOutput);
+    socket.on('call:terminal_closed', handleClosed);
+    socket.on('connect', requestState);
+
+    if (socket.connected) requestState();
 
     return () => {
-      if (socket) {
-        socket.off('call:terminal_sync');
-        socket.off('call:terminal_executing');
-        socket.off('call:terminal_output');
-        socket.off('call:terminal_closed');
-      }
-      if (eventSource) {
-        eventSource.close();
-      }
+      socket.off('call:terminal_sync', handleSync);
+      socket.off('call:terminal_state', handleState);
+      socket.off('call:terminal_executing', handleExecuting);
+      socket.off('call:terminal_output', handleOutput);
+      socket.off('call:terminal_closed', handleClosed);
+      socket.off('connect', requestState);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, onClose, roomId]);
+  }, [socket, roomId, applyEditorState]);
 
-  const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const termTopic = `pixelmink_term_${cleanRoomId}`;
-
-  const publishToCloudTerm = useCallback((payload: any) => {
-    try {
-      fetch(`https://ntfy.sh/${termTopic}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, senderId: localSenderIdRef.current || currentUser?.id }),
-      }).catch(() => {});
-    } catch {}
-  }, [termTopic, currentUser?.id]);
-
-  // Code change broadcast with debounce
-  const syncTimerRef = useRef<NodeJS.Timeout | null>(null);
-
+  // Socket.IO preserves event order; the server assigns a monotonic revision.
   const handleCodeChange = (newCode: string) => {
     if (!canEdit) return;
+    const sequence = ++editSequenceRef.current;
     setCode(newCode);
-    if (!isLocalChange.current) {
-      const myName = currentUser?.profile?.name || currentUser?.email?.split('@')[0] || 'Peer';
-      if (socket) {
-        socket.emit('call:terminal_sync', {
-          roomId,
-          code: newCode,
-          language,
-          byUserName: myName,
-          senderId: localSenderIdRef.current,
-        });
-      }
-      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-      syncTimerRef.current = setTimeout(() => {
-        publishToCloudTerm({
-          type: 'sync',
-          code: newCode,
-          language,
-          byUserName: myName,
-        });
-      }, 80);
+    saveCachedState(newCode, language, revisionRef.current);
+    const myName = currentUser?.profile?.name || currentUser?.email?.split('@')[0] || 'Peer';
+    if (socket) {
+      socket.emit('call:terminal_sync', {
+        roomId,
+        code: newCode,
+        language,
+        byUserName: myName,
+        senderId: localSenderIdRef.current,
+      }, (state: any) => {
+        if (sequence === editSequenceRef.current) applyEditorState(state);
+      });
     }
   };
 
   // Language switch
   const handleLanguageChange = (newLang: string) => {
     if (!canEdit) return;
+    const sequence = ++editSequenceRef.current;
     setLanguage(newLang);
     const newCode = TEMPLATES[newLang] || `// ${newLang} Environment\n`;
     setCode(newCode);
+    saveCachedState(newCode, newLang, revisionRef.current);
     const myName = currentUser?.profile?.name || currentUser?.email?.split('@')[0] || 'Peer';
     if (socket) {
       socket.emit('call:terminal_sync', {
@@ -312,14 +296,10 @@ export default function SharedCallTerminal({
         language: newLang,
         byUserName: myName,
         senderId: localSenderIdRef.current,
+      }, (state: any) => {
+        if (sequence === editSequenceRef.current) applyEditorState(state);
       });
     }
-    publishToCloudTerm({
-      type: 'sync',
-      code: newCode,
-      language: newLang,
-      byUserName: myName,
-    });
   };
 
   // Execute Code
@@ -333,7 +313,6 @@ export default function SharedCallTerminal({
     if (socket) {
       socket.emit('call:terminal_executing', { roomId });
     }
-    publishToCloudTerm({ type: 'executing' });
 
     try {
       const res = await fetch('/api/terminal/run', {
@@ -364,7 +343,6 @@ export default function SharedCallTerminal({
           output: outPayload,
         });
       }
-      publishToCloudTerm(outPayload);
     } catch (err: any) {
       setIsRunning(false);
       const errMsg = err.message || 'Execution failed';
@@ -376,7 +354,6 @@ export default function SharedCallTerminal({
           output: errPayload,
         });
       }
-      publishToCloudTerm(errPayload);
     }
   };
 
@@ -390,7 +367,6 @@ export default function SharedCallTerminal({
     if (socket) {
       socket.emit('call:terminal_close', { roomId });
     }
-    publishToCloudTerm({ type: 'close' });
     onClose();
   };
 

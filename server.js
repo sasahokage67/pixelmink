@@ -1,6 +1,7 @@
 const http = require('http');
 const next = require('next');
 const { Server } = require('socket.io');
+const { registerCallSignaling } = require('./server/call-signaling');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -32,11 +33,29 @@ app.prepare().then(() => {
   const onlineUsers = new Map();
   // Track seminar participants: seminarId -> Map(socketId -> { userId, userName, role })
   const seminarRooms = new Map();
-  // Track call rooms: roomId -> Set(socketId)
-  const callRooms = new Map();
+  // Keep the latest collaborative editor snapshot so refresh/reconnect can restore it.
+  // Snapshots are intentionally process-local and expire to avoid unbounded memory use.
+  const callTerminalStates = new Map();
+  const TERMINAL_STATE_TTL_MS = 6 * 60 * 60 * 1000;
+
+  const getTerminalState = (roomId) => {
+    const state = callTerminalStates.get(roomId);
+    if (!state) return null;
+    if (Date.now() - state.updatedAt > TERMINAL_STATE_TTL_MS) {
+      callTerminalStates.delete(roomId);
+      return null;
+    }
+    return state;
+  };
+
+  registerCallSignaling(io, (socket, roomId) => {
+    const state = getTerminalState(roomId);
+    if (state) socket.emit('call:terminal_state', { roomId, ...state });
+  });
 
   io.on('connection', (socket) => {
     let currentUserId = null;
+    const inCall = (roomId) => socket.data.callRoomId === roomId;
 
     // --- Presence ---
     socket.on('user:register', (userId) => {
@@ -114,30 +133,6 @@ app.prepare().then(() => {
       }
     });
 
-    socket.on('call:join_room', ({ roomId, userId, userName }) => {
-      socket.join(`call_${roomId}`);
-      if (!callRooms.has(roomId)) {
-        callRooms.set(roomId, new Set());
-      }
-      callRooms.get(roomId).add(socket.id);
-
-      socket.to(`call_${roomId}`).emit('call:peer_joined', {
-        socketId: socket.id,
-        userId,
-        userName,
-      });
-
-      const peers = Array.from(callRooms.get(roomId)).filter(id => id !== socket.id);
-      socket.emit('call:existing_peers', { peers });
-    });
-
-    socket.on('webrtc:signal', ({ to, signal, from }) => {
-      io.to(to).emit('webrtc:signal', {
-        signal,
-        from: from || socket.id,
-      });
-    });
-
     socket.on('call:screen_share', ({ roomId, isSharing, userId }) => {
       socket.to(`call_${roomId}`).emit('call:screen_share_status', { isSharing, userId });
     });
@@ -150,46 +145,74 @@ app.prepare().then(() => {
       io.to(`call_${roomId}`).emit('call:moderated', { targetUserId, action });
     });
 
-    socket.on('call:chat_message', ({ roomId, message }) => {
-      io.to(`call_${roomId}`).emit('call:new_chat_message', message);
+    socket.on('call:chat_message', ({ roomId, message }, callback) => {
+      if (!inCall(roomId) || !message?.id) return;
+      socket.to(`call_${roomId}`).emit('call:new_chat_message', { ...message, roomId });
+      if (typeof callback === 'function') callback({ delivered: true, messageId: message.id });
+    });
+
+    socket.on('call:role_switch', ({ roomId, mentorRole }) => {
+      if (!inCall(roomId) || !['local', 'remote'].includes(mentorRole)) return;
+      socket.to(`call_${roomId}`).emit('call:role_switch', { roomId, mentorRole });
     });
 
     // --- Shared In-Call Terminal & Code IDE (Mutual Consent) ---
     socket.on('call:terminal_request', ({ roomId, fromUserId, fromUserName }) => {
-      socket.to(`call_${roomId}`).emit('call:terminal_request', { fromUserId, fromUserName });
+      if (!inCall(roomId)) return;
+      socket.to(`call_${roomId}`).emit('call:terminal_request', { roomId, fromUserId, fromUserName });
     });
 
     socket.on('call:terminal_response', ({ roomId, accepted, fromUserName }) => {
+      if (!inCall(roomId)) return;
       if (accepted) {
-        io.to(`call_${roomId}`).emit('call:terminal_opened', { byUserName: fromUserName });
+        io.to(`call_${roomId}`).emit('call:terminal_opened', { roomId, byUserName: fromUserName });
       } else {
-        socket.to(`call_${roomId}`).emit('call:terminal_declined', { byUserName: fromUserName });
+        socket.to(`call_${roomId}`).emit('call:terminal_declined', { roomId, byUserName: fromUserName });
       }
     });
 
-    socket.on('call:terminal_sync', ({ roomId, code, language }) => {
-      socket.to(`call_${roomId}`).emit('call:terminal_sync', { code, language });
+    socket.on('call:terminal_opened', ({ roomId, byUserName }) => {
+      if (!inCall(roomId)) return;
+      io.to(`call_${roomId}`).emit('call:terminal_opened', { roomId, byUserName });
+    });
+
+    socket.on('call:terminal_get_state', ({ roomId }, callback) => {
+      if (!inCall(roomId)) return;
+      const state = getTerminalState(roomId);
+      if (state) socket.emit('call:terminal_state', state);
+      if (typeof callback === 'function') callback(state);
+    });
+
+    socket.on('call:terminal_sync', ({ roomId, code, language, byUserName, senderId }, callback) => {
+      if (!inCall(roomId) || typeof code !== 'string' || code.length > 200000 || typeof language !== 'string') return;
+      const previous = getTerminalState(roomId);
+      const state = {
+        roomId,
+        code,
+        language,
+        byUserName,
+        senderId,
+        revision: (previous?.revision || 0) + 1,
+        updatedAt: Date.now(),
+      };
+      callTerminalStates.set(roomId, state);
+      socket.to(`call_${roomId}`).emit('call:terminal_sync', state);
+      if (typeof callback === 'function') callback(state);
     });
 
     socket.on('call:terminal_executing', ({ roomId }) => {
-      io.to(`call_${roomId}`).emit('call:terminal_executing');
+      if (!inCall(roomId)) return;
+      io.to(`call_${roomId}`).emit('call:terminal_executing', { roomId });
     });
 
     socket.on('call:terminal_output', ({ roomId, output }) => {
-      io.to(`call_${roomId}`).emit('call:terminal_output', output);
+      if (!inCall(roomId)) return;
+      io.to(`call_${roomId}`).emit('call:terminal_output', { ...output, roomId });
     });
 
     socket.on('call:terminal_close', ({ roomId }) => {
-      io.to(`call_${roomId}`).emit('call:terminal_closed');
-    });
-
-    socket.on('call:leave', ({ roomId }) => {
-      socket.leave(`call_${roomId}`);
-      if (callRooms.has(roomId)) {
-        callRooms.get(roomId).delete(socket.id);
-        if (callRooms.get(roomId).size === 0) callRooms.delete(roomId);
-      }
-      socket.to(`call_${roomId}`).emit('call:peer_left', { socketId: socket.id });
+      if (!inCall(roomId)) return;
+      io.to(`call_${roomId}`).emit('call:terminal_closed', { roomId });
     });
 
     // --- Massive Seminars (SFU / Broadcast Mode) ---
@@ -257,12 +280,7 @@ app.prepare().then(() => {
         }
       }
 
-      for (const [roomId, peers] of callRooms.entries()) {
-        if (peers.has(socket.id)) {
-          peers.delete(socket.id);
-          socket.to(`call_${roomId}`).emit('call:peer_left', { socketId: socket.id });
-        }
-      }
+
     });
   });
 

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -34,33 +34,9 @@ import {
 } from 'lucide-react';
 import Identicon from '@/components/ui/Identicon';
 import SharedCallTerminal from '@/components/call/SharedCallTerminal';
-
-const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [
-    { urls: 'stun:stun.cloudflare.com:3478' },
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun.services.mozilla.com' },
-    { urls: 'stun:openrelay.metered.ca:80' },
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelay',
-      credential: 'openrelay',
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelay',
-      credential: 'openrelay',
-    },
-    {
-      urls: 'turns:openrelay.metered.ca:443?transport=tcp',
-      username: 'openrelay',
-      credential: 'openrelay',
-    },
-  ],
-  iceCandidatePoolSize: 10,
-};
+import CallAudio from '@/components/call/CallAudio';
+import { useCallConnection } from '@/hooks/useCallConnection';
+import { useCallMedia } from '@/hooks/useCallMedia';
 
 const MAX_CALL_SECONDS = 3600; // 1 hour hard cap
 const PHASE_1_SECONDS = 1800; // 30 minutes for Phase 1
@@ -72,6 +48,7 @@ function playAlertChime(type: 'switch' | 'warning' | 'finish') {
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
     const osc = ctx.createOscillator();
+    osc.onended = () => { void ctx.close(); };
     const gain = ctx.createGain();
 
     if (type === 'switch') {
@@ -112,6 +89,7 @@ function playAlertChime(type: 'switch' | 'warning' | 'finish') {
 export default function CallRoomPage() {
   const params = useParams();
   const roomId = params.roomId as string;
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { socket } = useSocket();
@@ -121,22 +99,7 @@ export default function CallRoomPage() {
   const [guestName, setGuestName] = useState<string>('');
   const [hasEnteredName, setHasEnteredName] = useState<boolean>(false);
 
-  // Local media states
-  const [isMicMuted, setIsMicMuted] = useState(false);
-  const [isCamOff, setIsCamOff] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
-
-  // Camera devices
-  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
   const [showCameraMenu, setShowCameraMenu] = useState(false);
-
-  // Remote peer state
-  const [remotePeerSocketId, setRemotePeerSocketId] = useState<string | null>(null);
-  const [remotePeerName, setRemotePeerName] = useState<string | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [isPeerConnected, setIsPeerConnected] = useState(false);
 
   // UI & 1-Hour Call Reciprocal Mentoring state (30 min + 30 min)
   const [callDuration, setCallDuration] = useState(0);
@@ -145,10 +108,8 @@ export default function CallRoomPage() {
   const [showWarningBanner, setShowWarningBanner] = useState(false);
   const [isCallFinished, setIsCallFinished] = useState(false);
 
-  // Cloud signaling refs (cross-laptop P2P relay on Vercel)
+  // Stable peer identity used by the shared editor.
   const myPeerIdRef = useRef<string>('');
-  const lastSignalPollTimeRef = useRef<number>(0);
-  const handledSignalIdsRef = useRef<Set<string>>(new Set());
 
   const [showChat, setShowChat] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
@@ -162,34 +123,20 @@ export default function CallRoomPage() {
   const [terminalRequestSent, setTerminalRequestSent] = useState(false);
   const [terminalDeclinedNotice, setTerminalDeclinedNotice] = useState<string | null>(null);
 
-  // Refs & Media / ICE Buffers
+  const effectiveUserName = user?.profile?.name || guestName || 'Peer';
+  const media = useCallMedia(hasEnteredName && !isCallFinished, searchParams.get('type') === 'AUDIO');
+  const {
+    stream: mediaStream, preview: localPreview, micMuted: isMicMuted, camOff: isCamOff,
+    sharing: isScreenSharing, devices: videoDevices, cameraId: selectedCameraId,
+    toggleMic, toggleCam, toggleScreenShare,
+  } = media;
+  const {
+    remoteStream, remotePeerName, isPeerConnected, status: connectionStatus,
+    connectionError, replaceVideo, stopConnection,
+  } = useCallConnection(socket, roomId, mediaStream, hasEnteredName && !isCallFinished, effectiveUserName, user?.id);
+  media.replaceVideoRef.current = replaceVideo;
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
-  const screenTrackRef = useRef<MediaStreamTrack | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const remoteStreamRef = useRef<MediaStream | null>(null);
-  const pendingCandidatesRef = useRef<{ [peerId: string]: RTCIceCandidateInit[] }>({});
-  const isPeerConnectedRef = useRef(false);
-
-  // Flush queued candidates once remote description is set
-  const flushCandidates = useCallback(async (peerId: string, pc: RTCPeerConnection) => {
-    const queue = pendingCandidatesRef.current[peerId] || [];
-    if (queue.length > 0) {
-      for (const cand of queue) {
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(cand));
-        } catch (err) {
-          console.warn('Error flushing queued ICE candidate:', err);
-        }
-      }
-      pendingCandidatesRef.current[peerId] = [];
-    }
-  }, []);
-
-  // Effective username
-  const effectiveUserName = user?.profile?.name || guestName || 'Peer';
 
   // Initialize unique peer ID on mount (session-isolated so 2 tabs/devices never clash)
   useEffect(() => {
@@ -206,62 +153,6 @@ export default function CallRoomPage() {
       }
     }
   }, [user]);
-
-  const cleanRoomId = (roomId || '').replace(/[^a-zA-Z0-9_-]/g, '_');
-
-  // Dual signaling helper: Direct client ntfy broadcast (sub-40ms P2P) + Cloud REST relay for Vercel
-  const sendRoomSignalHttp = useCallback(
-    async (signal: any, toPeerId?: string | null) => {
-      const now = Date.now();
-      const payload = {
-        action: 'room_send',
-        roomId,
-        fromPeerId: myPeerIdRef.current,
-        toPeerId: toPeerId || undefined,
-        signal,
-        createdAt: now,
-      };
-
-      // 1. Direct browser publish to ntfy (sub-40ms latency, bypasses serverless lambdas)
-      try {
-        fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'room_signal',
-            fromPeerId: myPeerIdRef.current,
-            toPeerId: toPeerId || undefined,
-            signal,
-            createdAt: now,
-          }),
-          mode: 'cors',
-        }).catch(() => {});
-      } catch {}
-
-      // 2. Server API route for fallback & persistence
-      try {
-        await fetch('/api/calls/signal', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      } catch {}
-    },
-    [roomId, cleanRoomId]
-  );
-
-  const sendRoomSignal = useCallback(
-    async (signal: any, toPeerId?: string | null) => {
-      if (socket) {
-        socket.emit('webrtc:signal', {
-          to: toPeerId || remotePeerSocketId,
-          signal,
-        });
-      }
-      await sendRoomSignalHttp(signal, toPeerId || remotePeerSocketId);
-    },
-    [socket, remotePeerSocketId, sendRoomSignalHttp]
-  );
 
   // Check if we need guest prompt: authenticated users bypass immediately
   useEffect(() => {
@@ -288,718 +179,77 @@ export default function CallRoomPage() {
     }
   };
 
-  // Switch camera device dynamically
-  const handleSwitchCamera = async (newDeviceId: string) => {
-    try {
-      setShowCameraMenu(false);
-      setSelectedCameraId(newDeviceId);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('pixelmink_preferred_cam_id', newDeviceId);
-      }
-
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { ideal: newDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      });
-      const newVideoTrack = newStream.getVideoTracks()[0];
-      if (!newVideoTrack) return;
-
-      if (cameraTrackRef.current) {
-        cameraTrackRef.current.stop();
-      }
-      cameraTrackRef.current = newVideoTrack;
-
-      if (mediaStream) {
-        const oldTrack = mediaStream.getVideoTracks()[0];
-        if (oldTrack) mediaStream.removeTrack(oldTrack);
-        mediaStream.addTrack(newVideoTrack);
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = mediaStream;
-        }
-      }
-
-      if (peerConnectionRef.current) {
-        const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === 'video');
-        if (sender) {
-          await sender.replaceTrack(newVideoTrack);
-        }
-      }
-
-      setIsCamOff(false);
-    } catch (err) {
-      console.error('Failed to switch camera:', err);
-    }
+  const handleSwitchCamera = async (id: string) => {
+    setShowCameraMenu(false);
+    await media.switchCamera(id);
   };
 
-  // 1. Initialize Local Media Stream
-  useEffect(() => {
-    if (!hasEnteredName) return;
-
-    let activeStream: MediaStream | null = null;
-
-    async function setupCamera() {
-      try {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          // Discover video devices
-          let cams: MediaDeviceInfo[] = [];
-          try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            cams = devices.filter((d) => d.kind === 'videoinput');
-            setVideoDevices(cams);
-          } catch {}
-
-          let preferredId = typeof window !== 'undefined' ? localStorage.getItem('pixelmink_preferred_cam_id') : null;
-
-          // If no stored preference or stored device is missing, avoid virtual cam (VCam, OBS) if physical exists
-          if (!preferredId || !cams.some((c) => c.deviceId === preferredId)) {
-            const physicalCam = cams.find((c) => {
-              const lbl = (c.label || '').toLowerCase();
-              return !lbl.includes('vcam') && !lbl.includes('virtual') && !lbl.includes('obs');
-            });
-            preferredId = physicalCam?.deviceId || cams[0]?.deviceId || '';
-          }
-
-          if (preferredId) {
-            setSelectedCameraId(preferredId);
-          }
-
-          const videoConstraints: MediaTrackConstraints = preferredId
-            ? { deviceId: { ideal: preferredId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-            : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
-
-          let stream: MediaStream;
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({
-              video: videoConstraints,
-              audio: true,
-            });
-          } catch (camErr) {
-            console.warn('Preferred camera constraint failed, retrying with basic video: true', camErr);
-            try {
-              stream = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: true,
-              });
-            } catch (anyCamErr) {
-              console.warn('All video attempts failed, falling back to audio only', anyCamErr);
-              throw anyCamErr;
-            }
-          }
-          activeStream = stream;
-          mediaStreamRef.current = stream;
-          setMediaStream(stream);
-
-          // If peer connection was already created, attach/replace tracks immediately
-          if (peerConnectionRef.current) {
-            const pc = peerConnectionRef.current;
-            const currentSenders = pc.getSenders();
-            stream.getTracks().forEach((track) => {
-              const existing = currentSenders.find((s) => s.track?.kind === track.kind);
-              if (existing) {
-                existing.replaceTrack(track).catch(() => {});
-              } else {
-                try {
-                  pc.addTrack(track, stream);
-                } catch {}
-              }
-            });
-          }
-
-          // Re-enumerate to get labeled devices if first enumerate was unlabeled
-          try {
-            const updatedDevices = await navigator.mediaDevices.enumerateDevices();
-            const updatedCams = updatedDevices.filter((d) => d.kind === 'videoinput');
-            setVideoDevices(updatedCams);
-          } catch {}
-
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = stream;
-          }
-
-          const vTrack = stream.getVideoTracks()[0];
-          if (vTrack) cameraTrackRef.current = vTrack;
-        }
-      } catch (err) {
-        console.warn('Could not access camera/mic, trying audio-only:', err);
-        try {
-          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          activeStream = audioStream;
-          mediaStreamRef.current = audioStream;
-          setMediaStream(audioStream);
-          setIsCamOff(true);
-
-          if (peerConnectionRef.current) {
-            const pc = peerConnectionRef.current;
-            const currentSenders = pc.getSenders();
-            audioStream.getTracks().forEach((track) => {
-              const existing = currentSenders.find((s) => s.track?.kind === track.kind);
-              if (existing) {
-                existing.replaceTrack(track).catch(() => {});
-              } else {
-                try {
-                  pc.addTrack(track, audioStream);
-                } catch {}
-              }
-            });
-          }
-        } catch (audioErr) {
-          console.warn('Audio access also failed:', audioErr);
-        }
-      }
-    }
-
-    setupCamera();
-
-    return () => {
-      if (activeStream) {
-        activeStream.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, [hasEnteredName]);
-
-  // 1-Hour Call Reciprocal Timer (30m Mentor 1 + 30m Mentor 2)
   useEffect(() => {
     if (!hasEnteredName || isCallFinished) return;
-
-    const timer = setInterval(() => {
-      setCallDuration((prev) => {
-        const next = prev + 1;
-
-        // Auto role switch at 30 minutes (1800s)
-        if (next === PHASE_1_SECONDS) {
-          playAlertChime('switch');
-          setMentorRole((r) => (r === 'local' ? 'remote' : 'local'));
-          setShowRoleSwitchBanner(true);
-          setTimeout(() => setShowRoleSwitchBanner(false), 9000);
-        }
-
-        // 2-minute warning at 58 minutes (3480s)
-        if (next === WARNING_SECONDS) {
-          playAlertChime('warning');
-          setShowWarningBanner(true);
-        }
-
-        // 1-hour hard cap at 60 minutes (3600s)
-        if (next >= MAX_CALL_SECONDS) {
-          playAlertChime('finish');
-          setIsCallFinished(true);
-          if (mediaStream) {
-            mediaStream.getTracks().forEach((track) => track.stop());
-          }
-          if (peerConnectionRef.current) {
-            peerConnectionRef.current.close();
-            peerConnectionRef.current = null;
-          }
-          clearInterval(timer);
-          return MAX_CALL_SECONDS;
-        }
-
-        return next;
-      });
-    }, 1000);
-
+    const timer = setInterval(() => setCallDuration((value) => value + 1), 1000);
     return () => clearInterval(timer);
-  }, [hasEnteredName, isCallFinished, mediaStream]);
+  }, [hasEnteredName, isCallFinished]);
 
-  // Handle incoming candidate with queuing if remote description is not set yet
-  const handleIncomingCandidate = useCallback(async (fromPeerId: string, candidate: RTCIceCandidateInit) => {
-    if (!candidate) return;
-    const pc = getOrCreatePeerConnection(fromPeerId);
-    if (pc.remoteDescription && pc.remoteDescription.type) {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (err) {
-        console.warn('Error adding ICE candidate directly:', err);
-      }
-    } else {
-      if (!pendingCandidatesRef.current[fromPeerId]) {
-        pendingCandidatesRef.current[fromPeerId] = [];
-      }
-      pendingCandidatesRef.current[fromPeerId].push(candidate);
-    }
-  }, []);
-
-  // Create or retrieve PeerConnection
-  const getOrCreatePeerConnection = useCallback((targetSocketId: string) => {
-    if (peerConnectionRef.current) {
-      return peerConnectionRef.current;
-    }
-
-    const pc = new RTCPeerConnection(RTC_CONFIG);
-
-    // Add local tracks to WebRTC
-    const curStream = mediaStreamRef.current || mediaStream;
-    if (curStream) {
-      curStream.getTracks().forEach((track) => {
-        try {
-          pc.addTrack(track, curStream);
-        } catch {}
-      });
-    }
-
-    // Ensure transceivers exist so SDP offer/answer always negotiates video & audio
-    try {
-      const currentSenders = pc.getSenders();
-      if (!currentSenders.some((s) => s.track?.kind === 'video')) {
-        pc.addTransceiver('video', { direction: 'sendrecv' });
-      }
-      if (!currentSenders.some((s) => s.track?.kind === 'audio')) {
-        pc.addTransceiver('audio', { direction: 'sendrecv' });
-      }
-    } catch {}
-
-    // ICE Candidate handler with robust JSON serialization
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        const candInit = event.candidate.toJSON ? event.candidate.toJSON() : {
-          candidate: event.candidate.candidate,
-          sdpMid: event.candidate.sdpMid,
-          sdpMLineIndex: event.candidate.sdpMLineIndex,
-          usernameFragment: event.candidate.usernameFragment,
-        };
-        if (socket) {
-          socket.emit('webrtc:signal', {
-            to: targetSocketId,
-            signal: { type: 'candidate', candidate: candInit },
-          });
-        }
-        sendRoomSignalHttp({ type: 'candidate', candidate: candInit }, targetSocketId);
-      }
-    };
-
-    // Remote Track handler
-    pc.ontrack = (event) => {
-      let incomingStream = event.streams && event.streams[0] ? event.streams[0] : null;
-      if (!incomingStream) {
-        if (!remoteStreamRef.current) {
-          remoteStreamRef.current = new MediaStream();
-        }
-        if (!remoteStreamRef.current.getTracks().some((t) => t.id === event.track.id)) {
-          remoteStreamRef.current.addTrack(event.track);
-        }
-        incomingStream = remoteStreamRef.current;
-      }
-      const freshStream = new MediaStream(incomingStream.getTracks());
-      setRemoteStream(freshStream);
-      setIsPeerConnected(true);
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = freshStream;
-        remoteVideoRef.current.play().catch(() => {});
-      }
-    };
-
-    // Auto renegotiate when tracks are dynamically attached/changed
-    pc.onnegotiationneeded = async () => {
-      try {
-        if (pc.signalingState === 'stable' && targetSocketId) {
-          const isLeader = myPeerIdRef.current.localeCompare(targetSocketId) > 0;
-          if (isLeader) {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, targetSocketId);
-          }
-        }
-      } catch (err) {
-        console.warn('Renegotiation warning:', err);
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'connected') {
-        isPeerConnectedRef.current = true;
-        setIsPeerConnected(true);
-      } else if (
-        pc.connectionState === 'disconnected' ||
-        pc.connectionState === 'failed' ||
-        pc.connectionState === 'closed'
-      ) {
-        isPeerConnectedRef.current = false;
-        setIsPeerConnected(false);
-      }
-    };
-
-    peerConnectionRef.current = pc;
-    return pc;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Ensure remote video auto-plays when remoteStream arrives
   useEffect(() => {
-    if (remoteStream && remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = remoteStream;
-      remoteVideoRef.current.play().catch(() => {});
+    if (callDuration === PHASE_1_SECONDS) {
+      playAlertChime('switch');
+      setMentorRole((role) => role === 'local' ? 'remote' : 'local');
+      setShowRoleSwitchBanner(true);
     }
-  }, [remoteStream]);
+    if (callDuration === WARNING_SECONDS) {
+      playAlertChime('warning');
+      setShowWarningBanner(true);
+    }
+    if (callDuration >= MAX_CALL_SECONDS && !isCallFinished) {
+      playAlertChime('finish');
+      setIsCallFinished(true);
+    }
+  }, [callDuration, isCallFinished]);
 
-  // 2. WebRTC Signaling over Socket.io
   useEffect(() => {
-    if (!socket || !roomId || !hasEnteredName) return;
-
-    // Join room on server
-    socket.emit('call:join_room', {
-      roomId,
-      userId: user?.id || `guest_${Date.now()}`,
-      userName: effectiveUserName,
-    });
-
-    // A: Existing peers already in the room when we joined
-    socket.on('call:existing_peers', ({ peers }: { peers: string[] }) => {
-      if (peers && peers.length > 0) {
-        const firstPeer = peers[0];
-        setRemotePeerSocketId(firstPeer);
-      }
-    });
-
-    // B: New peer joins the room -> WE initiate WebRTC Offer
-    socket.on('call:peer_joined', async ({ socketId, userName }: { socketId: string; userId: string; userName: string }) => {
-      setRemotePeerSocketId(socketId);
-      setRemotePeerName(userName);
-
-      const pc = getOrCreatePeerConnection(socketId);
-
-      try {
-        if (pc.signalingState === 'stable') {
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-
-          sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, socketId);
-        }
-      } catch (err) {
-        console.error('Error creating WebRTC offer:', err);
-      }
-    });
-
-    // C: Receive WebRTC Signal (Offer / Answer / Candidate)
-    socket.on('webrtc:signal', async ({ signal, from }: { signal: any; from: string }) => {
-      if (!from || !signal) return;
-
-      if (signal.senderName && !remotePeerName) {
-        setRemotePeerName(signal.senderName);
-      }
-      setRemotePeerSocketId(from);
-
-      const pc = getOrCreatePeerConnection(from);
-
-      try {
-        if (signal.type === 'offer' && signal.sdp) {
-          const isPolite = myPeerIdRef.current.localeCompare(from) > 0;
-          if (pc.signalingState !== 'stable') {
-            if (!isPolite) return;
-            try {
-              await pc.setLocalDescription({ type: 'rollback' });
-            } catch {}
-          }
-          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-          await flushCandidates(from, pc);
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-
-          sendRoomSignal({ type: 'answer', sdp: answer, senderName: effectiveUserName }, from);
-        } else if (signal.type === 'answer' && signal.sdp) {
-          if (pc.signalingState === 'have-local-offer') {
-            await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-            await flushCandidates(from, pc);
-          }
-        } else if ((signal.type === 'candidate' || signal.type === 'ice-candidate') && signal.candidate) {
-          await handleIncomingCandidate(from, signal.candidate);
-        }
-      } catch (err) {
-        console.error('Error handling WebRTC signal:', err);
-      }
-    });
-
-    // D: In-call Chat Messages
-    socket.on('call:new_chat_message', (msg: any) => {
-      setCallMessages((prev) => [...prev, msg]);
-    });
-
-    // Role switch event over socket
-    socket.on('call:role_switch', ({ mentorRole: newRole }: any) => {
-      if (newRole) {
-        setMentorRole(newRole);
-        playAlertChime('switch');
-        setShowRoleSwitchBanner(true);
-        setTimeout(() => setShowRoleSwitchBanner(false), 8000);
-      }
-    });
-
-    // E: Peer Disconnected
-    socket.on('call:peer_left', ({ socketId }: { socketId: string }) => {
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
-      setRemotePeerSocketId(null);
-      setRemotePeerName(null);
-      setRemoteStream(null);
-      setIsPeerConnected(false);
-    });
-
-    // F: Shared Coding Terminal Events (Mutual Consent)
-    socket.on('call:terminal_request', (data: { fromUserId: string; fromUserName: string }) => {
-      setTerminalProposal(data);
-    });
-
-    socket.on('call:terminal_opened', () => {
+    if (!socket || !hasEnteredName || isCallFinished) return;
+    const handleChatMessage = (msg: any) => {
+      if (msg.roomId !== roomId) return;
+      setCallMessages((prev) => prev.some((item) => item.id === msg.id) ? prev : [...prev, msg]);
+    };
+    const handleRoleSwitch = (data: any) => {
+      if (data.roomId !== roomId) return;
+      setMentorRole(data.mentorRole);
+      playAlertChime('switch');
+      setShowRoleSwitchBanner(true);
+    };
+    const handleRequest = (data: any) => {
+      if (data.roomId === roomId) setTerminalProposal(data);
+    };
+    const handleOpened = (data: any) => {
+      if (data.roomId !== roomId) return;
       setIsTerminalOpen(true);
       setTerminalProposal(null);
       setTerminalRequestSent(false);
-    });
-
-    socket.on('call:terminal_declined', ({ byUserName }: { byUserName?: string }) => {
+    };
+    const handleDeclined = (data: any) => {
+      if (data.roomId !== roomId) return;
       setTerminalRequestSent(false);
-      const name = byUserName || 'Собеседник';
-      setTerminalDeclinedNotice(`${name} отклонил(а) предложение открыть терминал`);
-      setTimeout(() => setTerminalDeclinedNotice(null), 4000);
-    });
-
-    socket.on('call:terminal_closed', () => {
-      setIsTerminalOpen(false);
-    });
-
-    return () => {
-      socket.emit('call:leave', { roomId });
-      socket.off('call:existing_peers');
-      socket.off('call:peer_joined');
-      socket.off('webrtc:signal');
-      socket.off('call:new_chat_message');
-      socket.off('call:role_switch');
-      socket.off('call:peer_left');
-      socket.off('call:terminal_request');
-      socket.off('call:terminal_opened');
-      socket.off('call:terminal_declined');
-      socket.off('call:terminal_closed');
-
-      if (isCallFinished && peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
+      setTerminalDeclinedNotice(`${data.byUserName || 'Собеседник'} отклонил(а) предложение открыть терминал`);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const handleClosed = (data: any) => {
+      if (data.roomId === roomId) setIsTerminalOpen(false);
+    };
+    socket.on('call:new_chat_message', handleChatMessage);
+    socket.on('call:role_switch', handleRoleSwitch);
+    socket.on('call:terminal_request', handleRequest);
+    socket.on('call:terminal_opened', handleOpened);
+    socket.on('call:terminal_declined', handleDeclined);
+    socket.on('call:terminal_closed', handleClosed);
+    return () => {
+      socket.off('call:new_chat_message', handleChatMessage);
+      socket.off('call:role_switch', handleRoleSwitch);
+      socket.off('call:terminal_request', handleRequest);
+      socket.off('call:terminal_opened', handleOpened);
+      socket.off('call:terminal_declined', handleDeclined);
+      socket.off('call:terminal_closed', handleClosed);
+    };
   }, [socket, roomId, hasEnteredName, isCallFinished]);
-
-  // 3. WebRTC Signaling over HTTP Cloud Relay + ntfy SSE (Vercel cross-device instant sync)
-  useEffect(() => {
-    if (!roomId || !hasEnteredName || isCallFinished) return;
-
-    let isMounted = true;
-
-    // Announce immediate entry into room
-    sendRoomSignalHttp({
-      type: 'peer_joined',
-      userName: effectiveUserName,
-      peerId: myPeerIdRef.current,
-    });
-
-    // Presence heartbeat: broadcasts every 2.5s until WebRTC peer connection is established
-    const heartbeatTimer = setInterval(() => {
-      if (!isPeerConnectedRef.current) {
-        sendRoomSignalHttp({
-          type: 'presence',
-          userName: effectiveUserName,
-          peerId: myPeerIdRef.current,
-        });
-      }
-    }, 2500);
-
-    const pollSignals = async () => {
-      try {
-        const res = await fetch(
-          `/api/calls/signal?action=room_poll&roomId=${encodeURIComponent(roomId)}&peerId=${encodeURIComponent(myPeerIdRef.current)}&since=${lastSignalPollTimeRef.current}`,
-          { cache: 'no-store' }
-        );
-        if (res.ok && isMounted) {
-          const data = await res.json();
-          if (data.timestamp) lastSignalPollTimeRef.current = data.timestamp;
-          const signals = data.signals || [];
-
-          for (const item of signals) {
-            if (handledSignalIdsRef.current.has(item.id)) continue;
-            handledSignalIdsRef.current.add(item.id);
-
-            const { fromPeerId, signal } = item;
-            if (!signal) continue;
-
-            if (signal.userName && !remotePeerName) {
-              setRemotePeerName(signal.userName);
-            }
-            if (fromPeerId && !remotePeerSocketId) {
-              setRemotePeerSocketId(fromPeerId);
-            }
-
-            if (signal.type === 'peer_joined' || signal.type === 'presence') {
-              setRemotePeerSocketId(fromPeerId);
-              if (signal.userName) setRemotePeerName(signal.userName);
-
-              const pc = getOrCreatePeerConnection(fromPeerId);
-              const isLeader = myPeerIdRef.current.localeCompare(fromPeerId) > 0;
-              if (isLeader && pc.signalingState === 'stable' && !remoteStreamRef.current && !isPeerConnectedRef.current) {
-                try {
-                  const offer = await pc.createOffer();
-                  await pc.setLocalDescription(offer);
-                  sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, fromPeerId);
-                } catch (e) {
-                  console.warn('Poll offer error:', e);
-                }
-              }
-            } else if (signal.type === 'offer' && signal.sdp) {
-              const pc = getOrCreatePeerConnection(fromPeerId);
-              const isPolite = myPeerIdRef.current.localeCompare(fromPeerId) < 0;
-              if (pc.signalingState !== 'stable') {
-                if (!isPolite) continue;
-                try {
-                  await pc.setLocalDescription({ type: 'rollback' });
-                } catch {}
-              }
-              try {
-                await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-                await flushCandidates(fromPeerId, pc);
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                sendRoomSignal({ type: 'answer', sdp: answer, senderName: effectiveUserName }, fromPeerId);
-              } catch (e) {
-                console.error(e);
-              }
-            } else if (signal.type === 'answer' && signal.sdp) {
-              const pc = getOrCreatePeerConnection(fromPeerId);
-              try {
-                if (pc.signalingState === 'have-local-offer') {
-                  await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-                  await flushCandidates(fromPeerId, pc);
-                }
-              } catch (e) {
-                console.error(e);
-              }
-            } else if ((signal.type === 'candidate' || signal.type === 'ice-candidate') && signal.candidate) {
-              await handleIncomingCandidate(fromPeerId, signal.candidate);
-            } else if (signal.type === 'chat_message') {
-              setCallMessages((prev) => {
-                if (prev.some((m) => m.id === signal.message.id)) return prev;
-                return [...prev, signal.message];
-              });
-            } else if (signal.type === 'role_switch') {
-              if (signal.mentorRole) {
-                setMentorRole(signal.mentorRole);
-                playAlertChime('switch');
-                setShowRoleSwitchBanner(true);
-                setTimeout(() => setShowRoleSwitchBanner(false), 8000);
-              }
-            } else if (signal.type === 'terminal_request') {
-              setTerminalProposal({ fromUserId: fromPeerId, fromUserName: signal.fromUserName || 'Собеседник' });
-            } else if (signal.type === 'terminal_opened') {
-              setIsTerminalOpen(true);
-              setTerminalProposal(null);
-              setTerminalRequestSent(false);
-            } else if (signal.type === 'terminal_declined') {
-              setTerminalRequestSent(false);
-              setTerminalDeclinedNotice(`${signal.byUserName || 'Собеседник'} отклонил(а) предложение открыть терминал`);
-              setTimeout(() => setTerminalDeclinedNotice(null), 4000);
-            } else if (signal.type === 'terminal_closed') {
-              setIsTerminalOpen(false);
-            }
-          }
-        }
-      } catch {}
-    };
-
-    // Instant WebRTC signals over ntfy SSE with 10m historical replay
-    let sseSource: EventSource | null = null;
-    try {
-      sseSource = new EventSource(`https://ntfy.sh/pixelmink_call_${cleanRoomId}/sse?since=10m`);
-      sseSource.onmessage = async (event) => {
-        try {
-          const raw = JSON.parse(event.data);
-          let item = raw;
-          if (typeof raw.message === 'string') {
-            try {
-              item = JSON.parse(raw.message);
-            } catch {
-              item = raw.message;
-            }
-          } else if (raw.message && typeof raw.message === 'object') {
-            item = raw.message;
-          }
-
-          if (!item) return;
-          const fromPeerId = item.fromPeerId || item.peerId;
-          if (!fromPeerId || fromPeerId === myPeerIdRef.current) return;
-          if (item.toPeerId && item.toPeerId !== myPeerIdRef.current) return;
-
-          const signal = item.signal || (item.type !== 'room_signal' ? item : null);
-          if (!signal) return;
-
-          if (signal.userName && !remotePeerName) setRemotePeerName(signal.userName);
-          if (fromPeerId && !remotePeerSocketId) setRemotePeerSocketId(fromPeerId);
-
-          if (signal.type === 'peer_joined' || signal.type === 'presence') {
-            setRemotePeerSocketId(fromPeerId);
-            if (signal.userName) setRemotePeerName(signal.userName);
-            const pc = getOrCreatePeerConnection(fromPeerId);
-            const isLeader = myPeerIdRef.current.localeCompare(fromPeerId) > 0;
-            if (isLeader && pc.signalingState === 'stable' && !remoteStreamRef.current && !isPeerConnectedRef.current) {
-              try {
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                sendRoomSignal({ type: 'offer', sdp: offer, senderName: effectiveUserName }, fromPeerId);
-              } catch (e) {
-                console.warn('SSE offer error:', e);
-              }
-            }
-          } else if (signal.type === 'offer' && signal.sdp) {
-            const pc = getOrCreatePeerConnection(fromPeerId);
-            const isPolite = myPeerIdRef.current.localeCompare(fromPeerId) < 0;
-            if (pc.signalingState !== 'stable') {
-              if (!isPolite) return;
-              try {
-                await pc.setLocalDescription({ type: 'rollback' });
-              } catch {}
-            }
-            try {
-              await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-              await flushCandidates(fromPeerId, pc);
-              const answer = await pc.createAnswer();
-              await pc.setLocalDescription(answer);
-              sendRoomSignal({ type: 'answer', sdp: answer, senderName: effectiveUserName }, fromPeerId);
-            } catch (e) {}
-          } else if (signal.type === 'answer' && signal.sdp) {
-            const pc = getOrCreatePeerConnection(fromPeerId);
-            try {
-              if (pc.signalingState === 'have-local-offer') {
-                await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-                await flushCandidates(fromPeerId, pc);
-              }
-            } catch (e) {}
-          } else if ((signal.type === 'candidate' || signal.type === 'ice-candidate') && signal.candidate) {
-            await handleIncomingCandidate(fromPeerId, signal.candidate);
-          } else if (signal.type === 'chat_message' && signal.message) {
-            setCallMessages((prev) => {
-              if (prev.some((m) => m.id === signal.message.id)) return prev;
-              return [...prev, signal.message];
-            });
-          } else if (signal.type === 'role_switch' && signal.mentorRole) {
-            setMentorRole(signal.mentorRole);
-            playAlertChime('switch');
-            setShowRoleSwitchBanner(true);
-            setTimeout(() => setShowRoleSwitchBanner(false), 8000);
-          } else if (signal.type === 'terminal_opened') {
-            setIsTerminalOpen(true);
-            setTerminalProposal(null);
-            setTerminalRequestSent(false);
-          } else if (signal.type === 'terminal_closed') {
-            setIsTerminalOpen(false);
-          }
-        } catch {}
-      };
-    } catch {}
-
-    const interval = setInterval(pollSignals, 1800);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-      clearInterval(heartbeatTimer);
-      if (sseSource) sseSource.close();
-    };
-  }, [roomId, hasEnteredName, isCallFinished, cleanRoomId]);
 
   // Manual role swap handler
   const handleManualRoleSwitch = () => {
@@ -1009,130 +259,11 @@ export default function CallRoomPage() {
     setShowRoleSwitchBanner(true);
     setTimeout(() => setShowRoleSwitchBanner(false), 8000);
 
-    sendRoomSignal({
-      type: 'role_switch',
+    socket?.emit('call:role_switch', {
+      roomId,
       mentorRole: nextRole === 'local' ? 'remote' : 'local',
       byUserName: effectiveUserName,
     });
-  };
-
-  // Toggle Microphone
-  const toggleMic = () => {
-    if (mediaStream) {
-      const aTrack = mediaStream.getAudioTracks()[0];
-      if (aTrack) {
-        aTrack.enabled = !aTrack.enabled;
-        setIsMicMuted(!aTrack.enabled);
-      } else {
-        setIsMicMuted(!isMicMuted);
-      }
-    } else {
-      setIsMicMuted(!isMicMuted);
-    }
-  };
-
-  // Toggle Camera
-  const toggleCam = async () => {
-    if (mediaStream) {
-      const vTrack = mediaStream.getVideoTracks()[0];
-      if (vTrack) {
-        vTrack.enabled = !vTrack.enabled;
-        setIsCamOff(!vTrack.enabled);
-        return;
-      }
-    }
-    // If no video track exists, attempt to request physical camera
-    try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: selectedCameraId ? { deviceId: { ideal: selectedCameraId } } : true,
-        audio: false,
-      });
-      const newVTrack = newStream.getVideoTracks()[0];
-      if (newVTrack) {
-        cameraTrackRef.current = newVTrack;
-        if (mediaStream) {
-          mediaStream.addTrack(newVTrack);
-        } else {
-          setMediaStream(newStream);
-          mediaStreamRef.current = newStream;
-        }
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = mediaStream || newStream;
-        }
-        if (peerConnectionRef.current) {
-          const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === 'video');
-          if (sender) {
-            await sender.replaceTrack(newVTrack);
-          } else {
-            peerConnectionRef.current.addTrack(newVTrack, mediaStream || newStream);
-          }
-        }
-        setIsCamOff(false);
-      }
-    } catch (e) {
-      console.warn('Failed to start camera on toggle:', e);
-      setIsCamOff(true);
-    }
-  };
-
-  // Screen Sharing
-  const toggleScreenShare = async () => {
-    if (isScreenSharing) {
-      // Revert to camera
-      if (screenTrackRef.current) {
-        screenTrackRef.current.stop();
-        screenTrackRef.current = null;
-      }
-      if (cameraTrackRef.current && localVideoRef.current) {
-        localVideoRef.current.srcObject = new MediaStream([cameraTrackRef.current]);
-      }
-      if (peerConnectionRef.current && cameraTrackRef.current) {
-        const senders = peerConnectionRef.current.getSenders();
-        const videoSender = senders.find((s) => s.track?.kind === 'video');
-        if (videoSender) {
-          videoSender.replaceTrack(cameraTrackRef.current);
-        }
-      }
-      setIsScreenSharing(false);
-    } else {
-      try {
-        if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-          const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-          const screenTrack = displayStream.getVideoTracks()[0];
-          screenTrackRef.current = screenTrack;
-
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = displayStream;
-          }
-
-          if (peerConnectionRef.current) {
-            const senders = peerConnectionRef.current.getSenders();
-            const videoSender = senders.find((s) => s.track?.kind === 'video');
-            if (videoSender) {
-              videoSender.replaceTrack(screenTrack);
-            }
-          }
-
-          screenTrack.onended = () => {
-            setIsScreenSharing(false);
-            if (cameraTrackRef.current && localVideoRef.current) {
-              localVideoRef.current.srcObject = new MediaStream([cameraTrackRef.current]);
-            }
-            if (peerConnectionRef.current && cameraTrackRef.current) {
-              const senders = peerConnectionRef.current.getSenders();
-              const videoSender = senders.find((s) => s.track?.kind === 'video');
-              if (videoSender) {
-                videoSender.replaceTrack(cameraTrackRef.current);
-              }
-            }
-          };
-
-          setIsScreenSharing(true);
-        }
-      } catch (err) {
-        console.warn('Screen share cancelled:', err);
-      }
-    }
   };
 
   // Send In-call Chat Message
@@ -1141,7 +272,9 @@ export default function CallRoomPage() {
     if (!chatInput.trim()) return;
 
     const newMsg = {
-      id: Math.random().toString(36).substring(2, 9),
+      id: typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(36).slice(2)}`,
       sender: effectiveUserName,
       text: chatInput.trim(),
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1150,9 +283,8 @@ export default function CallRoomPage() {
     if (socket) {
       socket.emit('call:chat_message', { roomId, message: newMsg });
     }
-    sendRoomSignalHttp({ type: 'chat_message', message: newMsg });
 
-    setCallMessages((prev) => [...prev, newMsg]);
+    setCallMessages((prev) => prev.some((item) => item.id === newMsg.id) ? prev : [...prev, newMsg]);
     setChatInput('');
   };
 
@@ -1162,17 +294,11 @@ export default function CallRoomPage() {
       if (socket) {
         socket.emit('call:terminal_close', { roomId });
       }
-      sendRoomSignalHttp({ type: 'terminal_closed' });
       setIsTerminalOpen(false);
     } else {
       if (socket) {
-        socket.emit('call:terminal_opened', { byUserName: effectiveUserName });
+        socket.emit('call:terminal_opened', { roomId, byUserName: effectiveUserName });
       }
-      sendRoomSignalHttp({
-        type: 'terminal_opened',
-        accepted: true,
-        fromUserName: effectiveUserName,
-      });
       setIsTerminalOpen(true);
     }
   };
@@ -1185,11 +311,6 @@ export default function CallRoomPage() {
         fromUserName: effectiveUserName,
       });
     }
-    sendRoomSignalHttp({
-      type: 'terminal_opened',
-      accepted: true,
-      fromUserName: effectiveUserName,
-    });
     setTerminalProposal(null);
     setIsTerminalOpen(true);
   };
@@ -1202,22 +323,12 @@ export default function CallRoomPage() {
         fromUserName: effectiveUserName,
       });
     }
-    sendRoomSignalHttp({
-      type: 'terminal_declined',
-      byUserName: effectiveUserName,
-    });
     setTerminalProposal(null);
   };
 
-  // Leave Call
   const handleLeaveCall = () => {
-    if (mediaStream) {
-      mediaStream.getTracks().forEach((t) => t.stop());
-    }
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
+    stopConnection();
+    media.stop();
     router.push('/matches');
   };
 
@@ -1296,7 +407,7 @@ export default function CallRoomPage() {
   }
 
   const isPhase1 = callDuration < PHASE_1_SECONDS;
-  const isLocalMentor = isPhase1 ? mentorRole === 'local' : mentorRole !== 'local';
+  const isLocalMentor = mentorRole === 'local';
   const currentMentorName = isLocalMentor ? effectiveUserName : (remotePeerName || 'Собеседник');
   const currentStudentName = isLocalMentor ? (remotePeerName || 'Собеседник') : effectiveUserName;
   const phaseRemaining = isPhase1 ? PHASE_1_SECONDS - callDuration : MAX_CALL_SECONDS - callDuration;
@@ -1485,6 +596,12 @@ export default function CallRoomPage() {
         </div>
       )}
 
+      {(media.error || connectionError || connectionStatus === 'reconnecting') && (
+        <div role="status" className="px-4 py-2 text-xs text-amber-200 bg-amber-500/10">
+          {media.error || connectionError || 'Восстанавливаем соединение…'}
+        </div>
+      )}
+
       {/* Main Video Viewport (Responsive: Full-width IDE with Floating PiP on Mobile, Docked 2-column on Desktop) */}
       <div className="flex-1 p-2 sm:p-3 md:p-6 flex flex-col md:flex-row gap-3 md:gap-4 overflow-hidden relative min-h-0">
         {/* If Terminal is Open: show collaborative IDE taking full space on mobile */}
@@ -1498,8 +615,6 @@ export default function CallRoomPage() {
               isMentor={isLocalMentor}
               mySenderId={myPeerIdRef.current || user?.id}
               onClose={() => {
-                if (socket) socket.emit('call:terminal_close', { roomId });
-                sendRoomSignalHttp({ type: 'terminal_closed' });
                 setIsTerminalOpen(false);
               }}
             />
@@ -1507,6 +622,7 @@ export default function CallRoomPage() {
         )}
 
         {/* Mobile-only Floating PiP Video when Terminal is Open */}
+        <CallAudio stream={remoteStream} />
         {isTerminalOpen && (
           <div className="md:hidden fixed bottom-20 right-3 z-30 w-32 sm:w-36 aspect-video rounded-xl overflow-hidden border border-white/20 shadow-2xl bg-[#121217] backdrop-blur-md">
             {isPeerConnected && remoteStream ? (
@@ -1519,6 +635,7 @@ export default function CallRoomPage() {
                 }}
                 autoPlay
                 playsInline
+                muted
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -1555,18 +672,18 @@ export default function CallRoomPage() {
             <video
               ref={(el) => {
                 localVideoRef.current = el;
-                if (el && mediaStream && el.srcObject !== mediaStream) {
-                  el.srcObject = mediaStream;
+                if (el && localPreview && el.srcObject !== localPreview) {
+                  el.srcObject = localPreview;
                   el.play().catch(() => {});
                 }
               }}
               autoPlay
               playsInline
               muted
-              className={`w-full h-full object-cover ${isCamOff ? 'hidden' : ''}`}
+              className={`w-full h-full object-cover ${isCamOff && !isScreenSharing ? 'hidden' : ''}`}
             />
 
-            {isCamOff && (
+            {isCamOff && !isScreenSharing && (
               <div className="flex flex-col items-center justify-center gap-1 sm:gap-2 text-zinc-500 p-2 text-center">
                 <Identicon name={effectiveUserName} size={isTerminalOpen ? 48 : 56} />
                 <div className="text-[11px] font-mono text-zinc-400 truncate max-w-[90px]">{effectiveUserName}</div>
@@ -1610,6 +727,7 @@ export default function CallRoomPage() {
                   }}
                   autoPlay
                   playsInline
+                  muted
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute bottom-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/75 backdrop-blur-md border border-white/10 text-xs font-mono text-white">

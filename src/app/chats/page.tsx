@@ -52,6 +52,7 @@ export default function ChatsPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const sendQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const loadBlockedUsers = async () => {
     try {
@@ -190,19 +191,7 @@ export default function ChatsPage() {
                 if (m.id) map.set(m.id, m);
               });
 
-              data.messages.forEach((m: any) => {
-                for (const [key, existing] of Array.from(map.entries())) {
-                  if (
-                    typeof existing.id === 'string' &&
-                    existing.id.startsWith('temp_') &&
-                    existing.content === m.content &&
-                    existing.senderId === m.senderId
-                  ) {
-                    map.delete(key);
-                  }
-                }
-                map.set(m.id, m);
-              });
+              data.messages.forEach((m: any) => map.set(m.id, m));
 
               return Array.from(map.values()).sort(
                 (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -230,9 +219,9 @@ export default function ChatsPage() {
             // Skip own messages (they are already shown optimistically)
             if (msg.senderId && user?.id && msg.senderId === user.id) return;
             setMessages((prev) => {
-              // Deduplicate by id or by content+timestamp combo
+              // IDs are stable across optimistic, API, Socket.IO and SSE delivery.
+              // Repeated text is valid chat content and must not be deduplicated.
               if (prev.some((m) => m.id === msg.id)) return prev;
-              if (msg.content && prev.some((m) => m.content === msg.content && m.senderId === msg.senderId && Math.abs(new Date(m.createdAt).getTime() - new Date(msg.createdAt).getTime()) < 3000)) return prev;
               return [...prev, msg];
             });
             loadConversations();
@@ -244,16 +233,16 @@ export default function ChatsPage() {
     // Polling fallback every 2.5 seconds
     const interval = setInterval(loadMessages, 2500);
 
-    // Join Socket room
-    if (socket) {
-      socket.emit('chat:join', activeConv.id);
-    }
+    const joinConversation = () => socket?.emit('chat:join', activeConv.id);
+    socket?.on('connect', joinConversation);
+    if (socket?.connected) joinConversation();
 
     return () => {
       isMounted = false;
       if (sseSource) sseSource.close();
       clearInterval(interval);
       if (socket) {
+        socket.off('connect', joinConversation);
         socket.emit('chat:leave', activeConv.id);
       }
     };
@@ -334,7 +323,7 @@ export default function ChatsPage() {
     }
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !activeConv) return;
 
@@ -344,7 +333,9 @@ export default function ChatsPage() {
     setReplyTo(null);
 
     // Optimistic message display (0ms perceived latency)
-    const tempId = `temp_${Date.now()}`;
+    const tempId = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const optimisticMsg = {
       id: tempId,
       conversationId: activeConv.id,
@@ -359,56 +350,53 @@ export default function ChatsPage() {
     };
     setMessages((prev) => [...prev, optimisticMsg]);
 
-    // Direct browser broadcast via ntfy (sub-40ms P2P delivery to peer's SSE)
-    try {
-      fetch(`https://ntfy.sh/pixelmink_conv_${activeConv.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'new_message',
-          conversationId: activeConv.id,
-          message: optimisticMsg,
-        }),
-        mode: 'cors',
-      }).catch(() => {});
-    } catch {}
+    const conversationId = activeConv.id;
+    const recipientIds = activeConv.members
+      ?.map((m: any) => m.userId)
+      .filter((uid: string) => uid !== user?.id);
 
-    try {
-      const res = await fetch(`/api/conversations/${activeConv.id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content,
-          replyToId: currentReply?.id || null,
-          senderId: user?.id,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.message) {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === tempId ? data.message : m))
-          );
-        }
-        loadConversations();
-
-        // Emit through socket for real-time broadcast if socket is connected
-        if (socket) {
-          const recipientIds = activeConv.members
-            ?.map((m: any) => m.userId)
-            .filter((uid: string) => uid !== user?.id);
-
-          socket.emit('chat:message', {
-            conversationId: activeConv.id,
-            message: data.message || optimisticMsg,
-            recipientIds,
+    const persistMessage = async () => {
+      let lastError: unknown = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const res = await fetch(`/api/conversations/${conversationId}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content,
+              replyToId: currentReply?.id || null,
+              senderId: user?.id,
+              clientMessageId: tempId,
+            }),
           });
+          if (!res.ok) throw new Error(`Message request failed with ${res.status}`);
+
+          const data = await res.json();
+          if (data.message) {
+            setMessages((prev) => prev.map((m) => (m.id === tempId ? data.message : m)));
+            socket?.emit('chat:message', {
+              conversationId,
+              message: data.message,
+              recipientIds,
+            });
+          }
+          loadConversations();
+          return;
+        } catch (err) {
+          lastError = err;
         }
       }
-    } catch (err) {
-      console.error(err);
-    }
+      throw lastError;
+    };
+
+    // SQLite writes and realtime emits stay ordered even during rapid sends.
+    sendQueueRef.current = sendQueueRef.current
+      .catch(() => undefined)
+      .then(persistMessage)
+      .catch((err) => {
+        console.error(err);
+        setChatAlert('Не удалось отправить сообщение. Попробуйте ещё раз.');
+      });
   };
 
   const [inChatCallRoom, setInChatCallRoom] = useState<string | null>(null);

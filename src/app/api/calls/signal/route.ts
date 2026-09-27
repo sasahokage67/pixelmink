@@ -142,6 +142,7 @@ export async function POST(req: NextRequest) {
       if (receiverId) {
         await fetch(`https://ntfy.sh/pixelmink_user_${receiverId}`, {
           method: 'POST',
+          signal: AbortSignal.timeout(2000),
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'incoming_call',
@@ -174,6 +175,7 @@ export async function POST(req: NextRequest) {
       const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
       await fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
         method: 'POST',
+        signal: AbortSignal.timeout(2000),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'call_accepted',
@@ -185,6 +187,7 @@ export async function POST(req: NextRequest) {
       if (callerId) {
         await fetch(`https://ntfy.sh/pixelmink_user_${callerId}`, {
           method: 'POST',
+          signal: AbortSignal.timeout(2000),
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'call_accepted',
@@ -212,6 +215,7 @@ export async function POST(req: NextRequest) {
       const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
       await fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
         method: 'POST',
+        signal: AbortSignal.timeout(2000),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'call_rejected',
@@ -223,6 +227,7 @@ export async function POST(req: NextRequest) {
       if (callerId) {
         await fetch(`https://ntfy.sh/pixelmink_user_${callerId}`, {
           method: 'POST',
+          signal: AbortSignal.timeout(2000),
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             type: 'call_rejected',
@@ -259,6 +264,7 @@ export async function POST(req: NextRequest) {
       const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
       await fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
         method: 'POST',
+        signal: AbortSignal.timeout(2000),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'room_signal',

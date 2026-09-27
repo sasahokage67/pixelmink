@@ -31,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   try {
     const conversationId = params.id;
     const body = await req.json();
-    const { content, messageType = 'TEXT', replyToId, senderId: bodySenderId } = body;
+    const { content, messageType = 'TEXT', replyToId, senderId: bodySenderId, clientMessageId } = body;
 
     const user = await getSessionUser(req);
     let senderId = user?.id || bodySenderId;
@@ -84,8 +84,29 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
     }
 
+    const requestedId = typeof clientMessageId === 'string' && /^[a-zA-Z0-9_-]{8,64}$/.test(clientMessageId)
+      ? clientMessageId
+      : undefined;
+
+    if (requestedId) {
+      const existingMessage = await prisma.message.findUnique({
+        where: { id: requestedId },
+        include: {
+          sender: { include: { profile: true } },
+          reactions: true,
+        },
+      });
+      if (existingMessage) {
+        if (existingMessage.conversationId !== conversationId || existingMessage.senderId !== senderId) {
+          return NextResponse.json({ error: 'Message id conflict' }, { status: 409 });
+        }
+        return NextResponse.json({ success: true, message: existingMessage });
+      }
+    }
+
     const message = await prisma.message.create({
       data: {
+        ...(requestedId ? { id: requestedId } : {}),
         conversationId,
         senderId,
         content,

@@ -6,6 +6,7 @@ import { useAuth } from './AuthContext';
 import { useRouter } from 'next/navigation';
 import { Phone, PhoneOff, Video } from 'lucide-react';
 import Identicon from '@/components/ui/Identicon';
+import { resolveSocketEndpoint } from '@/lib/socket-endpoint';
 
 interface IncomingCallPayload {
   callerId: string;
@@ -34,12 +35,15 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [incomingCall, setIncomingCall] = useState<IncomingCallPayload | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const dismissedCallsRef = useRef<Set<string>>(new Set());
+  const userIdRef = useRef(user?.id);
+  userIdRef.current = user?.id;
 
   useEffect(() => {
     // Initialize socket connection
-    const s = io({
+    const s = io(resolveSocketEndpoint(process.env.NEXT_PUBLIC_SOCKET_URL, window.location.origin), {
       path: '/socket.io/',
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       autoConnect: true,
     });
 
@@ -48,8 +52,8 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     s.on('connect', () => {
       setIsConnected(true);
-      if (user?.id) {
-        s.emit('user:register', user.id);
+      if (userIdRef.current) {
+        s.emit('user:register', userIdRef.current);
       }
     });
 
@@ -67,11 +71,12 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     });
 
     s.on('call:incoming', (payload: IncomingCallPayload) => {
+      if (dismissedCallsRef.current.has(payload.roomId) || window.location.pathname.startsWith('/calls/')) return;
       setIncomingCall(payload);
     });
 
-    s.on('call:rejected', () => {
-      setIncomingCall(null);
+    s.on('call:rejected', (payload: { roomId: string }) => {
+      setIncomingCall((current) => current?.roomId === payload.roomId ? null : current);
     });
 
     return () => {
@@ -97,6 +102,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         if (!AudioCtx) return;
         const ctx = new AudioCtx();
         const osc = ctx.createOscillator();
+        osc.onended = () => { void ctx.close(); };
         const gain = ctx.createGain();
 
         osc.type = 'sine';
@@ -164,8 +170,6 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   }, [user?.id]);
 
   // Fallback poll for incoming calls
-  const dismissedCallsRef = useRef<Set<string>>(new Set());
-
   useEffect(() => {
     if (!user?.id) return;
 
@@ -203,13 +207,20 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user?.id, incomingCall]);
 
-  const acceptCall = async () => {
+  const acceptCall = () => {
     if (!incomingCall) return;
     const { roomId, callerId } = incomingCall;
+    const callType = incomingCall.type;
+    if (dismissedCallsRef.current.has(roomId)) return;
+    dismissedCallsRef.current.add(roomId);
+    socket?.emit('call:accept', { roomId, callerId });
+    setIncomingCall(null);
+    router.push(`/calls/${roomId}?type=${callType}`);
 
-    try {
-      await fetch('/api/calls/signal', {
+    // Notification persistence must not delay entering the media room.
+    void fetch('/api/calls/signal', {
         method: 'POST',
+        keepalive: true,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'accept',
@@ -217,22 +228,20 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
           callerId,
           receiverId: user?.id,
         }),
-      });
-    } catch {}
-
-    socket?.emit('call:accept', { roomId, callerId });
-    setIncomingCall(null);
-    router.push(`/calls/${roomId}`);
+      }).catch(() => {});
   };
 
-  const declineCall = async () => {
+  const declineCall = () => {
     if (!incomingCall) return;
     const { roomId, callerId } = incomingCall;
+    if (dismissedCallsRef.current.has(roomId)) return;
     dismissedCallsRef.current.add(roomId);
+    socket?.emit('call:reject', { roomId, callerId });
+    setIncomingCall(null);
 
-    try {
-      await fetch('/api/calls/signal', {
+    void fetch('/api/calls/signal', {
         method: 'POST',
+        keepalive: true,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'reject',
@@ -240,11 +249,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
           callerId,
           receiverId: user?.id,
         }),
-      });
-    } catch {}
-
-    socket?.emit('call:reject', { roomId, callerId });
-    setIncomingCall(null);
+      }).catch(() => {});
   };
 
   return (
