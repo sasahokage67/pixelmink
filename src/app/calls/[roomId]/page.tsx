@@ -171,6 +171,7 @@ export default function CallRoomPage() {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const pendingCandidatesRef = useRef<{ [peerId: string]: RTCIceCandidateInit[] }>({});
+  const isPeerConnectedRef = useRef(false);
 
   // Flush queued candidates once remote description is set
   const flushCandidates = useCallback(async (peerId: string, pc: RTCPeerConnection) => {
@@ -605,12 +606,14 @@ export default function CallRoomPage() {
 
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'connected') {
+        isPeerConnectedRef.current = true;
         setIsPeerConnected(true);
       } else if (
         pc.connectionState === 'disconnected' ||
         pc.connectionState === 'failed' ||
         pc.connectionState === 'closed'
       ) {
+        isPeerConnectedRef.current = false;
         setIsPeerConnected(false);
       }
     };
@@ -790,7 +793,7 @@ export default function CallRoomPage() {
 
     // Presence heartbeat: broadcasts every 2.5s until WebRTC peer connection is established
     const heartbeatTimer = setInterval(() => {
-      if (!isPeerConnected) {
+      if (!isPeerConnectedRef.current) {
         sendRoomSignalHttp({
           type: 'presence',
           userName: effectiveUserName,
@@ -830,7 +833,7 @@ export default function CallRoomPage() {
 
               const pc = getOrCreatePeerConnection(fromPeerId);
               const isLeader = myPeerIdRef.current.localeCompare(fromPeerId) > 0;
-              if (isLeader && pc.signalingState === 'stable' && !remoteStream) {
+              if (isLeader && pc.signalingState === 'stable' && !remoteStreamRef.current && !isPeerConnectedRef.current) {
                 try {
                   const offer = await pc.createOffer();
                   await pc.setLocalDescription(offer);
@@ -933,7 +936,7 @@ export default function CallRoomPage() {
             if (signal.userName) setRemotePeerName(signal.userName);
             const pc = getOrCreatePeerConnection(fromPeerId);
             const isLeader = myPeerIdRef.current.localeCompare(fromPeerId) > 0;
-            if (isLeader && pc.signalingState === 'stable' && !remoteStream) {
+            if (isLeader && pc.signalingState === 'stable' && !remoteStreamRef.current && !isPeerConnectedRef.current) {
               try {
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
