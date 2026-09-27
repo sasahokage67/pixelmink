@@ -1,12 +1,12 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import { useRouter } from 'next/navigation';
 import { Phone, PhoneOff, Video } from 'lucide-react';
 import Identicon from '@/components/ui/Identicon';
 import { resolveSocketEndpoint } from '@/lib/socket-endpoint';
+import { createRealtimeSocket, type RealtimeSocket } from '@/lib/realtime-socket';
 
 interface IncomingCallPayload {
   callerId: string;
@@ -17,7 +17,7 @@ interface IncomingCallPayload {
 }
 
 interface SocketContextType {
-  socket: Socket | null;
+  socket: RealtimeSocket | null;
   isConnected: boolean;
   onlineUsers: Set<string>;
   incomingCall: IncomingCallPayload | null;
@@ -30,11 +30,11 @@ const SocketContext = createContext<SocketContextType | undefined>(undefined);
 export function SocketProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const router = useRouter();
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const [socket, setSocket] = useState<RealtimeSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [incomingCall, setIncomingCall] = useState<IncomingCallPayload | null>(null);
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<RealtimeSocket | null>(null);
   const dismissedCallsRef = useRef<Set<string>>(new Set());
   const userIdRef = useRef(user?.id);
   userIdRef.current = user?.id;
@@ -42,12 +42,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Initialize socket connection
     const endpoint = resolveSocketEndpoint(process.env.NEXT_PUBLIC_SOCKET_URL, window.location.origin);
-    const useVercelFunction = !endpoint && window.location.protocol === 'https:';
-    const s = io(endpoint, {
-      path: useVercelFunction ? '/api/socket-io/socket.io' : '/socket.io/',
-      transports: useVercelFunction ? ['websocket'] : ['polling', 'websocket'],
-      autoConnect: true,
-    });
+    const s = createRealtimeSocket(endpoint, window.location.origin);
 
     socketRef.current = s;
     setSocket(s);

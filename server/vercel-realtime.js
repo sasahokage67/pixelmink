@@ -5,6 +5,7 @@ const { registerCallSignaling } = require('./call-signaling');
 // fresh session ids when Vercel rotates that instance.
 function registerVercelRealtime(io) {
   const onlineUsers = new Map();
+  const seminarRooms = new Map();
   const callTerminalStates = new Map();
   const TERMINAL_STATE_TTL_MS = 6 * 60 * 60 * 1000;
   const getTerminalState = (roomId) => {
@@ -77,6 +78,15 @@ function registerVercelRealtime(io) {
     socket.on('call:reject', (payload = {}) => {
       if (payload.callerId) io.to(`user_${payload.callerId}`).emit('call:rejected', payload);
     });
+    socket.on('call:screen_share', ({ roomId, isSharing, userId } = {}) => {
+      if (inCall(roomId)) socket.to(`call_${roomId}`).emit('call:screen_share_status', { isSharing, userId });
+    });
+    socket.on('call:raise_hand', ({ roomId, userId, userName } = {}) => {
+      if (inCall(roomId)) io.to(`call_${roomId}`).emit('call:hand_raised', { userId, userName });
+    });
+    socket.on('call:host_control', ({ roomId, targetUserId, action } = {}) => {
+      if (inCall(roomId)) io.to(`call_${roomId}`).emit('call:moderated', { targetUserId, action });
+    });
     socket.on('call:chat_message', ({ roomId, message } = {}, callback) => {
       if (!inCall(roomId) || !message?.id) return;
       socket.to(`call_${roomId}`).emit('call:new_chat_message', { ...message, roomId });
@@ -122,13 +132,58 @@ function registerVercelRealtime(io) {
       if (inCall(roomId)) io.to(`call_${roomId}`).emit('call:terminal_closed', { roomId });
     });
 
+    socket.on('seminar:join', ({ seminarId, userId, userName, role } = {}) => {
+      if (typeof seminarId !== 'string' || !seminarId) return;
+      socket.join(`seminar_${seminarId}`);
+      if (!seminarRooms.has(seminarId)) seminarRooms.set(seminarId, new Map());
+      seminarRooms.get(seminarId).set(socket.id, { userId, userName, role });
+      io.to(`seminar_${seminarId}`).emit('seminar:count_update', { count: seminarRooms.get(seminarId).size });
+    });
+    socket.on('seminar:message', (payload = {}) => {
+      if (payload.seminarId) io.to(`seminar_${payload.seminarId}`).emit('seminar:new_message', payload.message);
+    });
+    socket.on('seminar:question', (payload = {}) => {
+      if (payload.seminarId) io.to(`seminar_${payload.seminarId}`).emit('seminar:new_question', payload.question);
+    });
+    socket.on('seminar:question_upvote', ({ seminarId, questionId, upvotes } = {}) => {
+      if (seminarId) io.to(`seminar_${seminarId}`).emit('seminar:question_upvoted', { questionId, upvotes });
+    });
+    socket.on('seminar:answering_now', ({ seminarId, questionId } = {}) => {
+      if (seminarId) io.to(`seminar_${seminarId}`).emit('seminar:answering_status', { questionId });
+    });
+    socket.on('seminar:reaction', ({ seminarId, emoji, userName } = {}) => {
+      if (seminarId) io.to(`seminar_${seminarId}`).emit('seminar:floating_reaction', {
+        emoji, userName, id: Math.random().toString(),
+      });
+    });
+    socket.on('seminar:moderation', ({ seminarId, action, targetMessageId, targetUserId } = {}) => {
+      if (seminarId) io.to(`seminar_${seminarId}`).emit('seminar:moderated', { action, targetMessageId, targetUserId });
+    });
+    socket.on('seminar:recording_toggle', ({ seminarId, isRecording } = {}) => {
+      if (seminarId) io.to(`seminar_${seminarId}`).emit('seminar:recording_status', { isRecording });
+    });
+    socket.on('seminar:leave', ({ seminarId } = {}) => {
+      if (!seminarId) return;
+      socket.leave(`seminar_${seminarId}`);
+      const participants = seminarRooms.get(seminarId);
+      participants?.delete(socket.id);
+      if (participants && !participants.size) seminarRooms.delete(seminarId);
+      io.to(`seminar_${seminarId}`).emit('seminar:count_update', { count: participants?.size || 0 });
+    });
+
     socket.on('disconnect', () => {
-      if (!currentUserId) return;
-      const connections = onlineUsers.get(currentUserId);
-      connections?.delete(socket.id);
-      if (!connections?.size) {
-        onlineUsers.delete(currentUserId);
-        io.emit('presence:update', { userId: currentUserId, status: 'offline' });
+      if (currentUserId) {
+        const connections = onlineUsers.get(currentUserId);
+        connections?.delete(socket.id);
+        if (!connections?.size) {
+          onlineUsers.delete(currentUserId);
+          io.emit('presence:update', { userId: currentUserId, status: 'offline' });
+        }
+      }
+      for (const [seminarId, participants] of seminarRooms) {
+        if (!participants.delete(socket.id)) continue;
+        if (!participants.size) seminarRooms.delete(seminarId);
+        io.to(`seminar_${seminarId}`).emit('seminar:count_update', { count: participants.size });
       }
     });
   });

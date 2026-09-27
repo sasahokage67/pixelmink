@@ -1,9 +1,9 @@
-import type { Socket } from 'socket.io-client';
+import type { RealtimeSocket } from '@/lib/realtime-socket';
 
 export type CallStatus = 'waiting' | 'connecting' | 'connected' | 'reconnecting' | 'failed';
 type Peer = { socketId: string; sessionId: string; userName: string };
 type Options = {
-  socket: Socket;
+  socket: RealtimeSocket;
   roomId: string;
   userName: string;
   userId?: string;

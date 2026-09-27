@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Socket } from 'socket.io-client';
+import type { RealtimeSocket } from '@/lib/realtime-socket';
 import { CallConnection, CallStatus } from '@/lib/call-connection';
 import { getRtcConfiguration } from '@/lib/webrtc';
 
-export function useCallConnection(socket: Socket | null, roomId: string, stream: MediaStream | null,
+export function useCallConnection(socket: RealtimeSocket | null, roomId: string, stream: MediaStream | null,
   enabled: boolean, userName: string, userId?: string) {
   const controller = useRef<CallConnection | null>(null);
   const identity = useRef({ userName, userId });
