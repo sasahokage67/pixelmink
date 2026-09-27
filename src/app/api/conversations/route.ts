@@ -2,20 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getSessionUser } from '@/lib/auth';
 import { isUserMatched, isUserBlocked } from '@/lib/matchBlock';
+import { directConversationId, isUsableConversation } from '@/lib/conversations';
 
 export async function GET(req: NextRequest) {
   try {
     const user = await getSessionUser(req);
-    // Fallback to Alex for seamless demo experience
-    let currentUserId = user?.id;
-    if (!currentUserId) {
-      const demo = await prisma.user.findFirst({ where: { email: 'alex@xchange.dev' } });
-      currentUserId = demo?.id;
-    }
-
-    if (!currentUserId) {
-      return NextResponse.json({ success: true, conversations: [] });
-    }
+    if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    const currentUserId = user.id;
 
     const conversations = await prisma.conversation.findMany({
       where: {
@@ -54,8 +47,10 @@ export async function GET(req: NextRequest) {
       );
       if (!hasConv) {
         try {
+          const directId = directConversationId(currentUserId, partnerId);
           const newC = await prisma.conversation.create({
             data: {
+              id: directId,
               isGroup: false,
               members: {
                 create: [{ userId: currentUserId }, { userId: partnerId }],
@@ -71,14 +66,23 @@ export async function GET(req: NextRequest) {
             },
           });
           conversations.unshift(newC);
-        } catch {}
+        } catch {
+          // Another serverless invocation may have created the deterministic
+          // conversation first. The next list refresh will return that row.
+        }
       }
     }
+
+    // Never expose legacy one-sided direct chats. They were produced by the old
+    // message "auto-heal" path and render as the fake "Tech Peer" participant.
+    const validConversations = conversations.filter((conversation) =>
+      isUsableConversation(conversation, currentUserId)
+    );
 
     return NextResponse.json({
       success: true,
       currentUserId,
-      conversations,
+      conversations: validConversations,
     });
   } catch (err: any) {
     console.error('Error fetching conversations:', err);
@@ -89,15 +93,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const user = await getSessionUser(req);
-    let senderId = user?.id;
-    if (!senderId) {
-      const demo = await prisma.user.findFirst({ where: { email: 'alex@xchange.dev' } });
-      senderId = demo?.id;
-    }
-
-    if (!senderId) {
-      return NextResponse.json({ error: 'User required' }, { status: 401 });
-    }
+    if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    const senderId = user.id;
 
     const body = await req.json();
     const { targetUserId, title } = body;
@@ -105,6 +102,11 @@ export async function POST(req: NextRequest) {
     if (!targetUserId) {
       return NextResponse.json({ error: 'targetUserId is required' }, { status: 400 });
     }
+    if (targetUserId === senderId) {
+      return NextResponse.json({ error: 'Cannot create a conversation with yourself' }, { status: 400 });
+    }
+    const targetExists = await prisma.user.findUnique({ where: { id: targetUserId }, select: { id: true } });
+    if (!targetExists) return NextResponse.json({ error: 'Target user not found' }, { status: 404 });
 
     // 1. Check if blocked
     if (await isUserBlocked(senderId, targetUserId)) {
@@ -182,20 +184,32 @@ export async function POST(req: NextRequest) {
     }
 
     // Otherwise create new conversation
-    const newConv = await prisma.conversation.create({
-      data: {
-        title: title || null,
-        isGroup: false,
-        members: {
-          create: [{ userId: senderId }, { userId: targetUserId }],
+    // A deterministic id makes concurrent serverless requests idempotent.
+    const directId = directConversationId(senderId, targetUserId);
+    let newConv;
+    try {
+      newConv = await prisma.conversation.create({
+        data: {
+          id: directId,
+          title: title || null,
+          isGroup: false,
+          members: { create: [{ userId: senderId }, { userId: targetUserId }] },
         },
-      },
-      include: {
-        members: {
-          include: { user: { include: { profile: true } } },
+        include: {
+          members: { include: { user: { include: { profile: true } } } },
+          messages: { orderBy: { createdAt: 'desc' }, take: 1 },
         },
-      },
-    });
+      });
+    } catch {
+      newConv = await prisma.conversation.findUnique({
+        where: { id: directId },
+        include: {
+          members: { include: { user: { include: { profile: true } } } },
+          messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+        },
+      });
+      if (!newConv) throw new Error('Unable to create conversation');
+    }
 
     return NextResponse.json({ success: true, conversation: newConv });
   } catch (err: any) {

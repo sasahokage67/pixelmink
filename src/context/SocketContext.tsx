@@ -41,9 +41,11 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Initialize socket connection
-    const s = io(resolveSocketEndpoint(process.env.NEXT_PUBLIC_SOCKET_URL, window.location.origin), {
-      path: '/socket.io/',
-      transports: ['polling', 'websocket'],
+    const endpoint = resolveSocketEndpoint(process.env.NEXT_PUBLIC_SOCKET_URL, window.location.origin);
+    const useVercelFunction = !endpoint && window.location.protocol === 'https:';
+    const s = io(endpoint, {
+      path: useVercelFunction ? '/api/socket-io/socket.io' : '/socket.io/',
+      transports: useVercelFunction ? ['websocket'] : ['polling', 'websocket'],
       autoConnect: true,
     });
 

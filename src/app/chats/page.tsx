@@ -28,13 +28,14 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 import InChatCall from '@/components/chat/InChatCall';
+import { isUsableConversation } from '@/lib/conversations';
 
 export default function ChatsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const paramConvId = searchParams.get('convId');
   const paramUserId = searchParams.get('userId');
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { socket, onlineUsers } = useSocket();
 
   const [conversations, setConversations] = useState<any[]>([]);
@@ -53,6 +54,10 @@ export default function ChatsPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const sendQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const conversationLoadRef = useRef(0);
+  const activeConversationIdRef = useRef<string | null>(null);
+  const pendingMessageIdsRef = useRef(new Set<string>());
+  activeConversationIdRef.current = activeConv?.id || null;
 
   const loadBlockedUsers = async () => {
     try {
@@ -94,73 +99,59 @@ export default function ChatsPage() {
 
   // Fetch all conversations
   const loadConversations = async () => {
+    if (authLoading || !user?.id) return;
+    const requestId = ++conversationLoadRef.current;
     try {
-      const res = await fetch('/api/conversations');
-      if (res.ok) {
-        const data = await res.json();
-        const convList = data.conversations || [];
-        setConversations(convList);
+      const res = await fetch('/api/conversations', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (requestId !== conversationLoadRef.current) return;
+      let convList = (data.conversations || []).filter((item: any) => isUsableConversation(item, user.id));
+      let selected = paramConvId ? convList.find((item: any) => item.id === paramConvId) : undefined;
 
-        if (paramConvId) {
-          const match = convList.find((c: any) => c.id === paramConvId);
-          if (match) {
-            setActiveConv(match);
-          } else {
-            // Try to fetch directly (may fail on ephemeral Vercel SQLite)
-            let found = false;
-            try {
-              const directRes = await fetch(`/api/conversations/${paramConvId}`);
-              if (directRes.ok) {
-                const directData = await directRes.json();
-                if (directData.conversation) {
-                  setConversations((prev) => [directData.conversation, ...prev.filter((c) => c.id !== paramConvId)]);
-                  setActiveConv(directData.conversation);
-                  found = true;
-                }
-              }
-            } catch {}
-            // Fallback: if paramUserId is also available, create a fresh conversation
-            if (!found && paramUserId) {
-              try {
-                const createRes = await fetch('/api/conversations', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ targetUserId: paramUserId }),
-                });
-                if (createRes.ok) {
-                  const createData = await createRes.json();
-                  if (createData.conversation) {
-                    setConversations((prev) => [createData.conversation, ...prev.filter((c) => c.id !== createData.conversation.id)]);
-                    setActiveConv(createData.conversation);
-                  }
-                }
-              } catch {}
+      if (paramConvId && !selected) {
+        try {
+          const directRes = await fetch(`/api/conversations/${paramConvId}`, { cache: 'no-store' });
+          if (directRes.ok) {
+            const direct = (await directRes.json()).conversation;
+            if (isUsableConversation(direct, user.id)) {
+              convList = [direct, ...convList.filter((item: any) => item.id !== direct.id)];
+              selected = direct;
             }
           }
-        } else if (paramUserId) {
-          const matchUser = convList.find((c: any) => c.members?.some((m: any) => m.userId === paramUserId));
-          if (matchUser) {
-            setActiveConv(matchUser);
-          } else {
-            try {
-              const createRes = await fetch('/api/conversations', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ targetUserId: paramUserId }),
-              });
-              if (createRes.ok) {
-                const createData = await createRes.json();
-                if (createData.conversation) {
-                  setConversations((prev) => [createData.conversation, ...prev.filter((c) => c.id !== createData.conversation.id)]);
-                  setActiveConv(createData.conversation);
-                }
+        } catch {}
+      }
+
+      if (!selected && paramUserId) {
+        selected = convList.find((item: any) =>
+          item.members.some((member: any) => member.userId === paramUserId)
+        );
+        if (!selected) {
+          try {
+            const createRes = await fetch('/api/conversations', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ targetUserId: paramUserId }),
+            });
+            if (createRes.ok) {
+              const created = (await createRes.json()).conversation;
+              if (isUsableConversation(created, user.id)) {
+                convList = [created, ...convList.filter((item: any) => item.id !== created.id)];
+                selected = created;
               }
-            } catch {}
-          }
-        } else if (convList.length > 0 && !activeConv && typeof window !== 'undefined' && window.innerWidth >= 768) {
-          setActiveConv(convList[0]);
+            }
+          } catch {}
         }
       }
+
+      if (requestId !== conversationLoadRef.current) return;
+      const current = convList.find((item: any) => item.id === activeConversationIdRef.current);
+      if (!selected) selected = current;
+      if (!selected && !paramConvId && !paramUserId && typeof window !== 'undefined' && window.innerWidth >= 768) {
+        selected = convList[0];
+      }
+      setConversations(convList);
+      setActiveConv(selected || null);
     } catch (err) {
       console.error(err);
     }
@@ -168,30 +159,34 @@ export default function ChatsPage() {
 
   useEffect(() => {
     loadConversations();
-  }, [paramConvId, paramUserId, user]);
+  }, [paramConvId, paramUserId, user?.id, authLoading]);
 
   // Load messages when activeConv changes, subscribe to SSE & polling
   useEffect(() => {
     if (!activeConv) return;
 
     let isMounted = true;
+    const conversationId = activeConv.id;
+    setMessages([]);
+    setReplyTo(null);
+    setPeerTyping(null);
 
     async function loadMessages() {
       try {
-        const res = await fetch(`/api/conversations/${activeConv.id}/messages`);
+        const res = await fetch(`/api/conversations/${conversationId}/messages`, { cache: 'no-store' });
         if (res.ok && isMounted) {
           const data = await res.json();
           if (data.messages) {
             setMessages((prev) => {
-              if (!data.messages) return prev;
-              if (data.messages.length === 0 && prev.length > 0) return prev;
-
               const map = new Map<string, any>();
-              prev.forEach((m) => {
-                if (m.id) map.set(m.id, m);
-              });
-
               data.messages.forEach((m: any) => map.set(m.id, m));
+              // Preserve only messages that are still being persisted for this
+              // room. Messages from the previously selected chat must disappear.
+              prev.forEach((message) => {
+                if (message.conversationId === conversationId && pendingMessageIdsRef.current.has(message.id)) {
+                  map.set(message.id, message);
+                }
+              });
 
               return Array.from(map.values()).sort(
                 (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -209,13 +204,14 @@ export default function ChatsPage() {
     // Subscribe to ntfy SSE for instant real-time delivery
     let sseSource: EventSource | null = null;
     try {
-      sseSource = new EventSource(`https://ntfy.sh/pixelmink_conv_${activeConv.id}/sse`);
+      sseSource = new EventSource(`https://ntfy.sh/pixelmink_conv_${conversationId}/sse`);
       sseSource.onmessage = (event) => {
         try {
           const raw = JSON.parse(event.data);
           const data = typeof raw.message === 'string' ? JSON.parse(raw.message) : raw;
           if (data && data.type === 'new_message' && data.message) {
             const msg = data.message;
+            if (msg.conversationId !== conversationId || activeConversationIdRef.current !== conversationId) return;
             // Skip own messages (they are already shown optimistically)
             if (msg.senderId && user?.id && msg.senderId === user.id) return;
             setMessages((prev) => {
@@ -233,7 +229,7 @@ export default function ChatsPage() {
     // Polling fallback every 2.5 seconds
     const interval = setInterval(loadMessages, 2500);
 
-    const joinConversation = () => socket?.emit('chat:join', activeConv.id);
+    const joinConversation = () => socket?.emit('chat:join', conversationId);
     socket?.on('connect', joinConversation);
     if (socket?.connected) joinConversation();
 
@@ -243,17 +239,18 @@ export default function ChatsPage() {
       clearInterval(interval);
       if (socket) {
         socket.off('connect', joinConversation);
-        socket.emit('chat:leave', activeConv.id);
+        socket.emit('chat:leave', conversationId);
       }
     };
-  }, [activeConv?.id, socket]);
+  }, [activeConv?.id, socket, user?.id]);
 
   // Real-time socket message and typing listener
   useEffect(() => {
     if (!socket) return;
 
     const handleNewMessage = (msg: any) => {
-      if (activeConv && msg.conversationId === activeConv.id) {
+      const activeId = activeConversationIdRef.current;
+      if (activeId && msg.conversationId === activeId) {
         // Skip own messages (already shown optimistically)
         if (msg.senderId && user?.id && msg.senderId === user.id) return;
         setMessages((prev) => {
@@ -265,7 +262,7 @@ export default function ChatsPage() {
     };
 
     const handleTypingStatus = ({ conversationId, userName, isTyping }: any) => {
-      if (activeConv && conversationId === activeConv.id) {
+      if (conversationId === activeConversationIdRef.current) {
         setPeerTyping(isTyping ? userName : null);
       }
     };
@@ -289,7 +286,7 @@ export default function ChatsPage() {
       socket.off('chat:typing_status', handleTypingStatus);
       socket.off('chat:message_reaction', handleReaction);
     };
-  }, [socket, activeConv]);
+  }, [socket, user?.id]);
 
   // Scroll to bottom on messages update
   useEffect(() => {
@@ -348,6 +345,7 @@ export default function ChatsPage() {
       reactions: [],
       isRead: false,
     };
+    pendingMessageIdsRef.current.add(tempId);
     setMessages((prev) => [...prev, optimisticMsg]);
 
     const conversationId = activeConv.id;
@@ -373,7 +371,10 @@ export default function ChatsPage() {
 
           const data = await res.json();
           if (data.message) {
-            setMessages((prev) => prev.map((m) => (m.id === tempId ? data.message : m)));
+            pendingMessageIdsRef.current.delete(tempId);
+            if (activeConversationIdRef.current === conversationId) {
+              setMessages((prev) => prev.map((m) => (m.id === tempId ? data.message : m)));
+            }
             socket?.emit('chat:message', {
               conversationId,
               message: data.message,
@@ -394,6 +395,7 @@ export default function ChatsPage() {
       .catch(() => undefined)
       .then(persistMessage)
       .catch((err) => {
+        pendingMessageIdsRef.current.delete(tempId);
         console.error(err);
         setChatAlert('Не удалось отправить сообщение. Попробуйте ещё раз.');
       });

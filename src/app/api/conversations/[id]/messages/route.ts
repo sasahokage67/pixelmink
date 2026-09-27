@@ -5,7 +5,14 @@ import { isUserBlocked } from '@/lib/matchBlock';
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const user = await getSessionUser(req);
+    if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     const conversationId = params.id;
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, members: { some: { userId: user.id } } },
+      select: { id: true },
+    });
+    if (!conversation) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     const messages = await prisma.message.findMany({
       where: { conversationId },
       include: {
@@ -31,47 +38,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   try {
     const conversationId = params.id;
     const body = await req.json();
-    const { content, messageType = 'TEXT', replyToId, senderId: bodySenderId, clientMessageId } = body;
+    const { content, messageType = 'TEXT', replyToId, clientMessageId } = body;
 
     const user = await getSessionUser(req);
-    let senderId = user?.id || bodySenderId;
-    if (!senderId) {
-      const demo = await prisma.user.findFirst({ where: { email: 'alex@xchange.dev' } });
-      senderId = demo?.id;
-    }
-
-    if (!senderId) {
-      return NextResponse.json({ error: 'User required' }, { status: 401 });
-    }
+    if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    const senderId = user.id;
 
     if (!content || !content.trim()) {
       return NextResponse.json({ error: 'Message content cannot be empty' }, { status: 400 });
     }
 
-    // Auto-heal: Ensure conversation exists in DB before inserting message
-    let conv = await prisma.conversation.findUnique({
-      where: { id: conversationId },
+    const conv = await prisma.conversation.findFirst({
+      where: { id: conversationId, members: { some: { userId: senderId } } },
       include: { members: true },
     });
-
-    if (!conv) {
-      try {
-        conv = await prisma.conversation.create({
-          data: {
-            id: conversationId,
-            isGroup: false,
-            members: {
-              create: [{ userId: senderId }],
-            },
-          },
-          include: { members: true },
-        });
-      } catch {
-        conv = await prisma.conversation.findUnique({
-          where: { id: conversationId },
-          include: { members: true },
-        });
-      }
+    if (!conv) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+    if (!conv.isGroup && conv.members.length !== 2) {
+      return NextResponse.json({ error: 'Conversation has no participant' }, { status: 409 });
     }
 
     // Verify conversation members are not blocked

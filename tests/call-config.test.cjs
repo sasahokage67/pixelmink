@@ -16,6 +16,7 @@ function loadTypeScript(relativePath) {
 }
 
 const { resolveSocketEndpoint } = loadTypeScript('../src/lib/socket-endpoint.ts');
+const { directConversationId, isUsableConversation } = loadTypeScript('../src/lib/conversations.ts');
 test('signaling URL cannot point remote visitors at their own localhost or mixed content', () => {
   assert.equal(resolveSocketEndpoint(undefined, 'https://example.com'), undefined);
   assert.equal(resolveSocketEndpoint('http://localhost:3000', 'https://example.com'), undefined);
@@ -44,4 +45,15 @@ test('TURN config uses configured credentials and supports multiple relay transp
   } finally {
     keys.forEach((key, index) => { if (saved[index] === undefined) delete process.env[key]; else process.env[key] = saved[index]; });
   }
+});
+
+test('direct chat identity is stable and one-sided Tech Peer conversations are rejected', () => {
+  assert.equal(directConversationId('user-b', 'user-a'), directConversationId('user-a', 'user-b'));
+  assert.equal(isUsableConversation({ id: 'broken', members: [{ userId: 'me', user: {} }] }, 'me'), false);
+  assert.equal(isUsableConversation({ id: 'foreign', members: [
+    { userId: 'a', user: {} }, { userId: 'b', user: {} },
+  ] }, 'me'), false);
+  assert.equal(isUsableConversation({ id: 'valid', members: [
+    { userId: 'me', user: {} }, { userId: 'peer', user: {} },
+  ] }, 'me'), true);
 });
