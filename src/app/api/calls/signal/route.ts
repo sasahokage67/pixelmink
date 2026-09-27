@@ -243,6 +243,10 @@ export async function POST(req: NextRequest) {
     // 4. Send WebRTC signal / chat message / terminal event to room
     if (action === 'room_send') {
       const { roomId, fromPeerId, toPeerId, signal } = body;
+      if (typeof roomId !== 'string' || !roomId || roomId.length > 200 ||
+          typeof fromPeerId !== 'string' || !fromPeerId || fromPeerId.length > 100 || !signal) {
+        return NextResponse.json({ error: 'Invalid room signal' }, { status: 400 });
+      }
       const signalEntry = {
         id: `sig_${now}_${Math.random().toString(36).substring(2, 7)}`,
         roomId,
@@ -262,18 +266,34 @@ export async function POST(req: NextRequest) {
 
       // Also publish to ntfy room channel for real-time delivery
       const cleanRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
-      await fetch(`https://ntfy.sh/pixelmink_call_${cleanRoomId}`, {
-        method: 'POST',
-        signal: AbortSignal.timeout(2000),
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'room_signal',
-          fromPeerId,
-          toPeerId,
-          signal,
-          createdAt: now,
-        }),
-      }).catch(() => {});
+      const notification = {
+        type: 'room_signal', fromPeerId, toPeerId, signal, createdAt: now,
+      };
+      const rawNotification = JSON.stringify(notification);
+      const topic = `https://ntfy.sh/pixelmink_call_${cleanRoomId}`;
+      if (Buffer.byteLength(rawNotification) <= 2800) {
+        await fetch(topic, {
+          method: 'POST', signal: AbortSignal.timeout(4000),
+          headers: { 'Content-Type': 'application/json' }, body: rawNotification,
+        });
+      } else {
+        const encoded = Buffer.from(rawNotification, 'utf8').toString('base64');
+        const chunks = encoded.match(/.{1,2400}/g) || [];
+        if (chunks.length > 256) {
+          return NextResponse.json({ error: 'Room signal is too large' }, { status: 413 });
+        }
+        const chunkId = signalEntry.id;
+        for (let offset = 0; offset < chunks.length; offset += 8) {
+          await Promise.all(chunks.slice(offset, offset + 8).map((data, relativeIndex) => fetch(topic, {
+            method: 'POST', signal: AbortSignal.timeout(4000),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'room_signal_chunk', chunkId,
+              index: offset + relativeIndex, total: chunks.length, data,
+            }),
+          })));
+        }
+      }
 
       return NextResponse.json({ success: true, signalId: signalEntry.id });
     }

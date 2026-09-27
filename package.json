@@ -9,7 +9,7 @@
     "start": "NODE_ENV=production node server.js",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:call": "node --test tests/call-signaling.test.cjs tests/call-config.test.cjs tests/vercel-realtime.test.cjs tests/vercel-websocket-hub.test.cjs",
+    "test:call": "node --test tests/call-signaling.test.cjs tests/call-config.test.cjs tests/vercel-realtime.test.cjs tests/vercel-websocket-hub.test.cjs tests/vercel-client-relay.test.cjs",
     "test:rtc": "node tests/rtc-browser-server.cjs",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",

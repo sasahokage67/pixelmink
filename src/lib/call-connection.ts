@@ -214,7 +214,10 @@ export class CallConnection {
     if (payload.peers?.[0]) this.ensurePeer(payload.peers[0]);
   };
   private handlePeerJoined = (payload: any) => {
-    if (this.matches(payload)) this.ensurePeer(payload.peer);
+    if (!this.matches(payload)) return;
+    if (this.joinTimer) clearTimeout(this.joinTimer);
+    this.joinTimer = null;
+    this.ensurePeer(payload.peer);
   };
   private handlePeerLeft = (payload: any) => {
     if (!this.matches(payload) || this.peer?.sessionId !== payload.sessionId ||
